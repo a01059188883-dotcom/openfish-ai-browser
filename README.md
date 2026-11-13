@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **1.0.4**.
+Open-source, free-first browser automation starter. Version: **1.0.5**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -38,7 +38,7 @@ Configure your MCP host to launch `node packages/mcp-server/src/index.js` from t
 3. Explicitly approve the exact plan using the side-panel confirmation or the MCP `execute_plan` tool with `approved: true`.
 4. The runtime executes steps in order and stops on the first failure or blocked action.
 
-The executor accepts at most 8 steps. It requires unique, visible, enabled targets; only button-like controls may be clicked, and only ordinary editable fields may be filled. Passwords, tokens, recovery codes, payment/identity fields, hidden fields, and potentially irreversible actions (such as payment, sending, deletion, publishing, and form submission) are blocked. Review each plan before approval. The executor does not bypass CAPTCHAs, access controls, paywalls, or site restrictions.
+The side panel invalidates old plans when the task text changes, disables execution until a fresh plan is generated, and clears the plan after execution. The executor accepts at most 8 steps. It requires unique, visible, enabled targets; only button-like controls may be clicked, and only ordinary editable fields may be filled. Passwords, tokens, recovery codes, payment/identity fields, hidden fields, and potentially irreversible actions (such as payment, sending, deletion, publishing, and form submission) are blocked. Review each plan before approval. The executor does not bypass CAPTCHAs, access controls, paywalls, or site restrictions.
 
 ## Cloud browser
 Set `BROWSER_WS_ENDPOINT` to a Chromium Playwright-compatible WebSocket endpoint and run the bridge/MCP server in a trusted server environment. A free local setup is included; a permanently available cloud browser needs compute hosting and may not remain free.
