@@ -51,7 +51,7 @@ const server = http.createServer(async (req, res) => {
   res.reqOrigin = origin;
   if (req.method === "OPTIONS") return send(res, 200, { ok: true });
   try {
-    if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, name: "OpenFish AI Browser", version: "1.0.4" });
+    if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, name: "OpenFish AI Browser", version: "1.0.5" });
     if (req.method === "POST" && req.url === "/api/inspect") {
       const page = await getPage();
       return send(res, 200, { title: await page.title().catch(() => ""), url: page.url(), text: (await page.locator("body").innerText().catch(() => "")).slice(0, 12000) });
