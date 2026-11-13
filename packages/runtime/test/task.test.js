@@ -38,7 +38,7 @@ test("bridge applies strict URL validation to AI planning and uses the configure
   assert.ok(bridge.includes("const ALLOWED_HOSTS = new Set(["));
   assert.ok(bridge.includes("127.0.0.1:${PORT}"));
   assert.ok(bridge.includes("const parsed = validateHttpUrl(body.url)"));
-  assert.ok(bridge.includes('const VERSION = "1.0.8"'));
+  assert.ok(bridge.includes('const VERSION = "1.0.9"'));
 });
 
 test("approved plan executor enforces explicit approval and stops on unsafe targets", async () => {
@@ -86,7 +86,7 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   const html = await readFile(resolve("packages/admin/index.html"), "utf8");
   const app = await readFile(resolve("packages/admin/app.js"), "utf8");
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "1.0.8");
+  assert.equal(pkg.version, "1.0.9");
   assert.ok(bridge.includes('req.url === "/api/admin/status"'));
   assert.ok(bridge.includes('req.url === "/api/admin/events"'));
   assert.ok(bridge.includes('["../../admin/index.html"'));
@@ -105,4 +105,13 @@ test("MCP server proxies to the shared bridge instead of creating its own browse
   assert.ok(mcp.includes("/api/mcp/plan_task"));
   assert.ok(!mcp.includes('from "../../runtime/src/browser.js"'));
   for (const route of ["/api/mcp/read_page", "/api/mcp/open_page", "/api/mcp/execute_plan", "/api/mcp/click_element", "/api/mcp/fill_element", "/api/mcp/take_screenshot", "/api/mcp/list_interactive_elements", "/api/mcp/get_accessibility_snapshot"]) assert.ok(bridge.includes(route));
+});
+
+\ntest("multi-provider adapter and REST tool catalog are exposed", async () => {
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  for (const route of ["/api/v1/tools", "/api/v1/adapters/openai", "/api/v1/adapters/anthropic", "/api/v1/adapters/gemini", "/api/v1/openapi.json", "/api/v1/tools/"]) assert.ok(bridge.includes(route));
+  assert.ok(bridge.includes('kind === "openai"'));
+  assert.ok(bridge.includes('kind === "anthropic"'));
+  assert.ok(bridge.includes('kind === "gemini"'));
+  assert.ok(bridge.includes('a.approved !== true'));
 });
