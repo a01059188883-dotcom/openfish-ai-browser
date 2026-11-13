@@ -53,3 +53,6 @@
 - Add bridge endpoints for MCP page inspection, navigation, planning, approved execution, safe click/fill, screenshots, interactive elements, and accessibility outline.
 - MCP server now proxies to the shared bridge instead of launching a separate browser.
 - Synchronize package, extension, bridge, MCP, side-panel, README, and test versions.
+
+## 1.0.8
+- Fix the regression test file formatting and synchronize all release version markers.
