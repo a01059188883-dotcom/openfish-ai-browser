@@ -38,7 +38,7 @@ test("bridge applies strict URL validation to AI planning and uses the configure
   assert.ok(bridge.includes("const ALLOWED_HOSTS = new Set(["));
   assert.ok(bridge.includes("127.0.0.1:${PORT}"));
   assert.ok(bridge.includes("const parsed = validateHttpUrl(body.url)"));
-  assert.ok(bridge.includes('const VERSION = "1.1.1"'));
+  assert.ok(bridge.includes('const VERSION = "1.1.2"'));
 });
 
 test("approved plan executor enforces explicit approval and stops on unsafe targets", async () => {
@@ -86,7 +86,7 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   const html = await readFile(resolve("packages/admin/index.html"), "utf8");
   const app = await readFile(resolve("packages/admin/app.js"), "utf8");
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "1.1.1");
+  assert.equal(pkg.version, "1.1.2");
   assert.ok(bridge.includes('req.url === "/api/admin/status"'));
   assert.ok(bridge.includes('req.url === "/api/admin/events"'));
   assert.ok(bridge.includes('["../../admin/index.html"'));
@@ -115,4 +115,18 @@ test("multi-provider adapter and REST tool catalog are exposed", async () => {
   assert.ok(bridge.includes('kind === "anthropic"'));
   assert.ok(bridge.includes('kind === "gemini"'));
   assert.ok(bridge.includes('a.approved !== true'));
+});
+
+
+test("URL validation blocks private, loopback, metadata, and reserved destinations", () => {
+  for (const url of ["http://127.0.0.1/","http://10.0.0.8/","http://192.168.1.1/","http://169.254.169.254/latest/meta-data/","http://[::1]/","http://[fd00::1]/","http://router.local/","http://metadata.google.internal/"]) {
+    assert.throws(() => validateHttpUrl(url), error => error.statusCode === 403, url);
+  }
+  assert.equal(validateHttpUrl("https://example.com").hostname, "example.com");
+});
+test("browser context applies destination validation to HTTP requests", async () => {
+  const browser = await readFile(resolve("packages/runtime/src/browser.js"), "utf8");
+  assert.ok(browser.includes('context.route("**/*"'));
+  assert.ok(browser.includes("validateHttpUrl(requestUrl)"));
+  assert.ok(browser.includes('route.abort("blockedbyclient")'));
 });
