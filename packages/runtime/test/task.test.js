@@ -107,7 +107,8 @@ test("MCP server proxies to the shared bridge instead of creating its own browse
   for (const route of ["/api/mcp/read_page", "/api/mcp/open_page", "/api/mcp/execute_plan", "/api/mcp/click_element", "/api/mcp/fill_element", "/api/mcp/take_screenshot", "/api/mcp/list_interactive_elements", "/api/mcp/get_accessibility_snapshot"]) assert.ok(bridge.includes(route));
 });
 
-\ntest("multi-provider adapter and REST tool catalog are exposed", async () => {
+
+test("multi-provider adapter and REST tool catalog are exposed", async () => {
   const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
   for (const route of ["/api/v1/tools", "/api/v1/adapters/openai", "/api/v1/adapters/anthropic", "/api/v1/adapters/gemini", "/api/v1/openapi.json", "/api/v1/tools/"]) assert.ok(bridge.includes(route));
   assert.ok(bridge.includes('kind === "openai"'));
