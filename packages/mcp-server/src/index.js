@@ -4,9 +4,10 @@ import { z } from "zod";
 import { getPage } from "../../runtime/src/browser.js";
 import { createPlan } from "../../runtime/src/ai-planner.js";
 import { getPageContext } from "../../runtime/src/task.js";
+import { executePlan } from "../../runtime/src/executor.js";
 import { validateHttpUrl, isSensitiveField, isIrreversibleAction } from "../../runtime/src/safety.js";
 
-const server = new McpServer({ name: "openfish-ai-browser", version: "1.0.3" });
+const server = new McpServer({ name: "openfish-ai-browser", version: "1.0.4" });
 const result = (value) => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
 
 server.tool("plan_task", "Use the configured local Ollama model to propose a safe, reviewable browser action plan. It never executes the plan.", {
@@ -16,6 +17,20 @@ server.tool("plan_task", "Use the configured local Ollama model to propose a saf
   const plan = await createPlan(goal, context);
   return result({ status: "plan_ready_for_review", ...plan, warning: "Review every step. This tool only plans; it does not execute actions." });
 });
+
+server.tool("execute_plan", "Execute a reviewed browser plan sequentially. Call only after the user explicitly approves the exact plan. High-risk and sensitive actions are blocked.", {
+  plan: z.object({
+    summary: z.string().optional(),
+    steps: z.array(z.object({
+      action: z.enum(["navigate", "click", "fill", "inspect"]),
+      url: z.string().optional(),
+      selector: z.string().optional(),
+      value: z.string().optional(),
+      reason: z.string().optional()
+    }).passthrough()).max(8)
+  }),
+  approved: z.literal(true).describe("Must be true only after the user has reviewed and explicitly approved this exact plan.")
+}, async ({ plan, approved }) => result(await executePlan(plan, { approved })));
 
 server.tool("open_page", "Open an HTTP(S) page in the controlled browser.", {
   url: z.string().url()
