@@ -5,6 +5,7 @@ import { createPlan } from "./ai-planner.js";
 import { validateHttpUrl } from "./safety.js";
 
 const PORT = Number(process.env.PORT || 8787);
+const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 
 function send(res, status, data) {
   const origin = res.reqOrigin;
@@ -41,7 +42,7 @@ function readBody(req) {
 const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin || "";
   const host = req.headers.host || "";
-  if (!["127.0.0.1:8787", "localhost:8787"].includes(host)) return send(res, 403, { error: "Unexpected Host header." });
+  if (!ALLOWED_HOSTS.has(host)) return send(res, 403, { error: "Unexpected Host header." });
   const allowedOrigin = process.env.ALLOWED_EXTENSION_ORIGIN || "";
   if (origin && (!origin.startsWith("chrome-extension://") || (allowedOrigin && origin !== allowedOrigin))) {
     return send(res, 403, { error: "Origin not allowed. Set ALLOWED_EXTENSION_ORIGIN to your extension ID origin." });
@@ -49,7 +50,7 @@ const server = http.createServer(async (req, res) => {
   res.reqOrigin = origin;
   if (req.method === "OPTIONS") return send(res, 200, { ok: true });
   try {
-    if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, name: "OpenFish AI Browser", version: "1.0.2" });
+    if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, name: "OpenFish AI Browser", version: "1.0.3" });
     if (req.method === "POST" && req.url === "/api/inspect") {
       const page = await getPage();
       return send(res, 200, { title: await page.title().catch(() => ""), url: page.url(), text: (await page.locator("body").innerText().catch(() => "")).slice(0, 12000) });
@@ -62,8 +63,7 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       if (!String(body.goal || "").trim()) return send(res, 400, { error: "Task description is required." });
       if (body.url) {
-        const parsed = new URL(body.url);
-        if (!["http:", "https:"].includes(parsed.protocol)) return send(res, 400, { error: "Only HTTP and HTTPS URLs are allowed." });
+        const parsed = validateHttpUrl(body.url);
         const page = await getPage();
         if (page.url() !== parsed.href) await page.goto(parsed.href, { waitUntil: "domcontentloaded" });
       }
