@@ -19,6 +19,14 @@ export async function getPage() {
   return page;
 }
 
+export function getBrowserStatus() {
+  return {
+    connected: Boolean(browser && browser.isConnected()),
+    remote: Boolean(process.env.BROWSER_WS_ENDPOINT),
+    url: page && !page.isClosed() ? page.url() : null
+  };
+}
+
 export async function closeBrowser() {
   if (browser && !process.env.BROWSER_WS_ENDPOINT) await browser.close();
   browser = context = page = undefined;
