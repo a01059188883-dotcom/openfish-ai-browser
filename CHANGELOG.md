@@ -24,3 +24,10 @@
 - Added a bounded timeout and clearer connection errors for local Ollama planning.
 - Expanded task context capture and input-length validation.
 - Fixed the Chrome side-panel version label and added a synchronization test.
+
+## 1.0.3 - 2026-11-13
+- Fixed the AI planning endpoint so supplied URLs use the same strict HTTP(S) validator as navigation and reject embedded credentials.
+- Return HTTP 400 for malformed, unsupported-protocol, or credential-bearing URLs.
+- Make local bridge Host validation follow the configured PORT instead of hard-coding 8787.
+- Corrected documentation to distinguish page inspection and plan generation from autonomous multi-step execution.
+- Synchronized all release version labels and expanded regression coverage.
