@@ -1,11 +1,13 @@
 export function validateHttpUrl(value) {
   let parsed;
   try { parsed = new URL(String(value || "")); }
-  catch { throw new Error("A valid HTTP(S) URL is required."); }
+  catch { throw Object.assign(new Error("A valid HTTP(S) URL is required."), { statusCode: 400 }); }
   if (!["http:", "https:"].includes(parsed.protocol)) {
-    throw new Error("Only HTTP and HTTPS URLs are allowed.");
+    throw Object.assign(new Error("Only HTTP and HTTPS URLs are allowed."), { statusCode: 400 });
   }
-  if (parsed.username || parsed.password) throw new Error("URLs containing embedded credentials are not allowed.");
+  if (parsed.username || parsed.password) {
+    throw Object.assign(new Error("URLs containing embedded credentials are not allowed."), { statusCode: 400 });
+  }
   return parsed;
 }
 
