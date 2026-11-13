@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 test("package and runtime report the same version", async () => {
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
   const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
-  assert.match(bridge, new RegExp(`version: "${pkg.version}"`));
+  assert.ok(bridge.includes(`const VERSION = "${pkg.version}"`));
 });
 
 test("planner prompt rejects unsafe irreversible actions", async () => {
