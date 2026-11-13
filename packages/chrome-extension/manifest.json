@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OpenFish AI Browser",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Open-source AI browser companion for inspecting pages and sending tasks to your local OpenFish runtime.",
   "permissions": ["activeTab", "sidePanel", "storage"],
   "host_permissions": ["http://127.0.0.1:8787/*"],
