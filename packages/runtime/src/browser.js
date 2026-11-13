@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { validateHttpUrl } from "./safety.js";
 
 let browser;
 let context;
@@ -14,6 +15,16 @@ export async function getPage() {
       ? browser.contexts()[0] || await browser.newContext()
       : await browser.newContext({ viewport: { width: 1440, height: 900 } });
     page = context.pages()[0] || await context.newPage();
+    await context.route("**/*", async route => {
+      const requestUrl = route.request().url();
+      try {
+        const parsed = new URL(requestUrl);
+        if (["http:", "https:"].includes(parsed.protocol)) validateHttpUrl(requestUrl);
+        await route.continue();
+      } catch {
+        await route.abort("blockedbyclient");
+      }
+    });
     page.setDefaultTimeout(12000);
   }
   return page;
