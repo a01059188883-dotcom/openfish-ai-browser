@@ -69,3 +69,10 @@
 
 ## 1.1.1
 - Correct version assertions in regression tests; keep all release markers synchronized.
+
+
+## 1.1.2 - 2026-11-13
+- Block navigation to loopback, private, link-local, metadata, and reserved IP literals and common local-only hostnames.
+- Apply destination checks to browser HTTP(S) subresources and redirects through a Playwright context route guard.
+- Add regression tests for private IPv4/IPv6, metadata endpoints, local hostnames, and public destinations.
+- Synchronize package, bridge, MCP, Chrome extension, dashboard documentation, and test version markers.
