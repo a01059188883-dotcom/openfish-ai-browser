@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { validateHttpUrl, isSensitiveField, isIrreversibleAction, validatePlan } from "../src/safety.js";
 
 test("package and runtime report the same version", async () => {
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
@@ -13,8 +14,6 @@ test("planner prompt rejects unsafe irreversible actions", async () => {
   const source = await readFile(resolve("packages/runtime/src/ai-planner.js"), "utf8");
   for (const term of ["purchases", "payments", "sending messages", "deleting", "submitting forms"]) assert.ok(source.includes(term));
 });
-
-import { validateHttpUrl, isSensitiveField, isIrreversibleAction, validatePlan } from "../src/safety.js";
 
 test("release version is synchronized across user-facing packages", async () => {
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
@@ -39,22 +38,22 @@ test("bridge applies strict URL validation to AI planning and uses the configure
   assert.ok(bridge.includes("const ALLOWED_HOSTS = new Set(["));
   assert.ok(bridge.includes("127.0.0.1:${PORT}"));
   assert.ok(bridge.includes("const parsed = validateHttpUrl(body.url)"));
-  assert.ok(bridge.includes("version: \"1.0.5\""));
+  assert.ok(bridge.includes('const VERSION = "1.0.6"'));
 });
 
 test("approved plan executor enforces explicit approval and stops on unsafe targets", async () => {
   const executor = await readFile(resolve("packages/runtime/src/executor.js"), "utf8");
   const mcp = await readFile(resolve("packages/mcp-server/src/index.js"), "utf8");
   const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
-  assert.ok(executor.includes('approved !== true'));
-  assert.ok(executor.includes('count !== 1'));
-  assert.ok(executor.includes('isIrreversibleAction(details)'));
-  assert.ok(executor.includes('isSensitiveField(details)'));
+  assert.ok(executor.includes("approved !== true"));
+  assert.ok(executor.includes("count !== 1"));
+  assert.ok(executor.includes("isIrreversibleAction(details)"));
+  assert.ok(executor.includes("isSensitiveField(details)"));
   assert.ok(executor.includes('return { status: "stopped"'));
   assert.ok(mcp.includes('server.tool("execute_plan"'));
-  assert.ok(mcp.includes('approved: z.literal(true)'));
+  assert.ok(mcp.includes("approved: z.literal(true)"));
   assert.ok(bridge.includes('req.url === "/api/execute"'));
-  assert.ok(bridge.includes('body.approved !== true'));
+  assert.ok(bridge.includes("body.approved !== true"));
 });
 
 test("safety helpers detect sensitive fields and irreversible actions", () => {
@@ -72,18 +71,17 @@ test("planner rejects unsafe URLs and malformed action plans", () => {
   assert.doesNotThrow(() => validatePlan({ summary: "Inspect", steps: [{ action: "inspect", reason: "Read current page" }] }));
 });
 
-
 test("side panel invalidates stale plans and locks execution while generating or executing", async () => {
   const source = await readFile(resolve("packages/chrome-extension/sidepanel.js"), "utf8");
   assert.ok(source.includes('$("goal").addEventListener("input"'));
-  assert.ok(source.includes('currentPlan = null;'));
+  assert.ok(source.includes("currentPlan = null;"));
   assert.ok(source.includes('$("execute").hidden = true;'));
   assert.ok(source.includes('$("run").disabled = true;'));
-  assert.ok(source.includes('const approvedPlan = currentPlan;'));
-  assert.ok(source.includes('finally { currentPlan = null;'));
+  assert.ok(source.includes("const approvedPlan = currentPlan;"));
+  assert.ok(source.includes("finally { currentPlan = null;"));
 });
 
-\ntest("visual admin dashboard is wired to local status and event APIs", async () => {
+test("visual admin dashboard is wired to local status and event APIs", async () => {
   const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
   const html = await readFile(resolve("packages/admin/index.html"), "utf8");
   const app = await readFile(resolve("packages/admin/app.js"), "utf8");
@@ -94,7 +92,7 @@ test("side panel invalidates stale plans and locks execution while generating or
   assert.ok(bridge.includes('["../../admin/index.html"'));
   assert.ok(html.includes('href="/admin/style.css"'));
   assert.ok(html.includes('src="/admin/app.js"'));
-  assert.ok(app.includes('/api/admin/status'));
-  assert.ok(app.includes('/api/admin/events'));
-  assert.ok(app.includes('/api/execute'));
+  assert.ok(app.includes("/api/admin/status"));
+  assert.ok(app.includes("/api/admin/events"));
+  assert.ok(app.includes("/api/execute"));
 });
