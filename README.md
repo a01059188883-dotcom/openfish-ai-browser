@@ -1,13 +1,13 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **1.0.3**.
+Open-source, free-first browser automation starter. Version: **1.0.4**.
 
 ## What is included
-- **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients.
-- **Chrome extension** (`packages/chrome-extension`): side panel that can inspect the current page and send a natural-language task to the local bridge.
+- **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
+- **Chrome extension** (`packages/chrome-extension`): side panel to inspect the current page, generate an AI plan, review it, and explicitly approve execution.
 - **Browser runtime** (`packages/runtime`): Playwright browser session, local by default; can connect to a remote Chromium endpoint with `BROWSER_WS_ENDPOINT`.
-- **Local AI planner**: optional Ollama integration (default model `qwen2.5:3b`) creates constrained JSON plans; it does not auto-run risky steps.
-- **Safety defaults**: no credential collection, no automatic purchases/submissions, confirmation required for sensitive actions.
+- **Local AI planner**: optional Ollama integration (default model `qwen2.5:3b`) creates constrained JSON plans.
+- **Safety defaults**: no credential collection; sensitive fields and potentially irreversible actions are blocked during plan execution.
 
 ## Requirements
 - Node.js 20+
@@ -32,13 +32,21 @@ npm run start:mcp
 ```
 Configure your MCP host to launch `node packages/mcp-server/src/index.js` from this project directory using stdio.
 
+## Review and execution flow
+1. Ask the local AI planner to generate a plan for the current page.
+2. Review the complete plan in the Chrome side panel or MCP response.
+3. Explicitly approve the exact plan using the side-panel confirmation or the MCP `execute_plan` tool with `approved: true`.
+4. The runtime executes steps in order and stops on the first failure or blocked action.
+
+The executor accepts at most 8 steps. It requires unique, visible, enabled targets; only button-like controls may be clicked, and only ordinary editable fields may be filled. Passwords, tokens, recovery codes, payment/identity fields, hidden fields, and potentially irreversible actions (such as payment, sending, deletion, publishing, and form submission) are blocked. Review each plan before approval. The executor does not bypass CAPTCHAs, access controls, paywalls, or site restrictions.
+
 ## Cloud browser
 Set `BROWSER_WS_ENDPOINT` to a Chromium Playwright-compatible WebSocket endpoint and run the bridge/MCP server in a trusted server environment. A free local setup is included; a permanently available cloud browser needs compute hosting and may not remain free.
 
-## Current 1.0 scope
-Working foundation: page navigation, page inspection, visible-element discovery, direct MCP click/fill tools, and AI-generated reviewable action plans. The AI planner does not execute its generated plan, and the task endpoint currently gathers page context rather than running a multi-step autonomous workflow. This is intentionally not yet a fully autonomous hosted SaaS. Add user authentication, per-user isolation, rate limits, a durable task queue, observability, and deployment secrets before exposing it publicly. Set `ALLOWED_EXTENSION_ORIGIN=chrome-extension://YOUR_EXTENSION_ID` in `.env` to pin the local bridge to your installed extension ID; leave it blank only during initial unpacked-extension setup.
+## Deployment readiness
+This is a local-first developer tool, not yet a hardened multi-user SaaS. Before public hosting, add authentication, per-user browser isolation, SSRF/private-network protections, rate limits, a durable task queue, observability, and deployment secret management. Set `ALLOWED_EXTENSION_ORIGIN=chrome-extension://YOUR_EXTENSION_ID` in `.env` to pin the local bridge to your extension ID; leave it blank only during initial unpacked-extension setup.
 
 ## Safety
-- Do not use it to bypass CAPTCHAs, access controls, paywalls, or site restrictions.
-- Review actions before submitting forms, sending messages, deleting data, or making purchases.
-- Never paste passwords, recovery codes, or API keys into task prompts.
+- Never paste passwords, recovery codes, payment details, or API keys into task prompts.
+- Manually complete any blocked high-risk action only after independently reviewing the page and consequences.
+- Stop if the page content or requested action differs from the plan you approved.
