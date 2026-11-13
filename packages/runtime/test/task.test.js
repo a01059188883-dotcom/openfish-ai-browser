@@ -38,7 +38,7 @@ test("bridge applies strict URL validation to AI planning and uses the configure
   assert.ok(bridge.includes("const ALLOWED_HOSTS = new Set(["));
   assert.ok(bridge.includes("127.0.0.1:${PORT}"));
   assert.ok(bridge.includes("const parsed = validateHttpUrl(body.url)"));
-  assert.ok(bridge.includes('const VERSION = "1.0.7"'));
+  assert.ok(bridge.includes('const VERSION = "1.0.8"'));
 });
 
 test("approved plan executor enforces explicit approval and stops on unsafe targets", async () => {
@@ -86,7 +86,7 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   const html = await readFile(resolve("packages/admin/index.html"), "utf8");
   const app = await readFile(resolve("packages/admin/app.js"), "utf8");
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "1.0.7");
+  assert.equal(pkg.version, "1.0.8");
   assert.ok(bridge.includes('req.url === "/api/admin/status"'));
   assert.ok(bridge.includes('req.url === "/api/admin/events"'));
   assert.ok(bridge.includes('["../../admin/index.html"'));
@@ -97,7 +97,8 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   assert.ok(app.includes("/api/execute"));
 });
 
-\ntest("MCP server proxies to the shared bridge instead of creating its own browser", async () => {
+
+test("MCP server proxies to the shared bridge instead of creating its own browser", async () => {
   const mcp = await readFile(resolve("packages/mcp-server/src/index.js"), "utf8");
   const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
   assert.ok(mcp.includes("OPENFISH_BRIDGE_URL"));
