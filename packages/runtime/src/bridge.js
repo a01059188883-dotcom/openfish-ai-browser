@@ -7,7 +7,7 @@ import { executePlan } from "./executor.js";
 import { validateHttpUrl } from "./safety.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const VERSION = "1.0.6";
+const VERSION = "1.0.7";
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 const startedAt = Date.now();
 const metrics = { requests: 0, errors: 0, events: [] };
@@ -95,6 +95,61 @@ const server = http.createServer(async (req, res) => {
       });
     }
     if (req.method === "GET" && req.url === "/api/admin/events") return send(res, 200, { events: metrics.events });
+
+    if (req.method === "GET" && req.url === "/api/mcp/read_page") {
+      const page = await getPage();
+      return send(res, 200, { title: await page.title().catch(() => ""), url: page.url(), text: (await page.locator("body").innerText().catch(() => "")).slice(0, 20000) });
+    }
+    if (req.method === "GET" && req.url === "/api/mcp/list_interactive_elements") {
+      const page = await getPage();
+      const items = await page.locator("a,button,input,textarea,select,[role=button]").evaluateAll(nodes => nodes.slice(0, 150).map((el, index) => ({
+        index, tag: el.tagName.toLowerCase(), role: el.getAttribute("role"),
+        text: (el.innerText || el.getAttribute("aria-label") || el.getAttribute("placeholder") || el.getAttribute("name") || "").trim().slice(0, 180),
+        type: el.getAttribute("type"), name: el.getAttribute("name"), id: el.id || null,
+        href: el.href || null, disabled: Boolean(el.disabled), visible: Boolean(el.getClientRects().length)
+      })).filter(item => item.visible));
+      return send(res, 200, items);
+    }
+    if (req.method === "GET" && req.url === "/api/mcp/get_accessibility_snapshot") {
+      const page = await getPage();
+      const snapshot = await page.locator("body").evaluate(body => ({
+        headings: [...body.querySelectorAll("h1,h2,h3")].slice(0, 60).map(el => ({ level: Number(el.tagName.slice(1)), text: (el.innerText || "").trim().slice(0, 240) })),
+        landmarks: [...body.querySelectorAll("main,nav,header,footer,form,[role=main],[role=navigation]")].slice(0, 30).map(el => ({ tag: el.tagName.toLowerCase(), role: el.getAttribute("role"), label: el.getAttribute("aria-label"), text: (el.innerText || "").trim().slice(0, 500) }))
+      }));
+      return send(res, 200, { title: await page.title(), url: page.url(), ...snapshot });
+    }
+    if (req.method === "POST" && req.url === "/api/mcp/open_page") {
+      const body = await readBody(req);
+      const parsed = validateHttpUrl(body.url);
+      const page = await getPage();
+      await page.goto(parsed.href, { waitUntil: "domcontentloaded" });
+      return send(res, 200, { title: await page.title(), url: page.url() });
+    }
+    if (req.method === "POST" && req.url === "/api/mcp/plan_task") {
+      const body = await readBody(req);
+      if (!String(body.goal || "").trim()) return send(res, 400, { error: "Task description is required." });
+      const plan = await createPlan(body.goal, await getPageContext());
+      return send(res, 200, { status: "plan_ready_for_review", ...plan, warning: "Review every step. No action has been executed." });
+    }
+    if (req.method === "POST" && req.url === "/api/mcp/execute_plan") {
+      const body = await readBody(req);
+      if (body.approved !== true) return send(res, 403, { error: "Explicit approval of the exact plan is required." });
+      return send(res, 200, await executePlan(body.plan, { approved: true }));
+    }
+    if (req.method === "POST" && req.url === "/api/mcp/click_element") {
+      const body = await readBody(req);
+      return send(res, 200, await executePlan({ steps: [{ action: "click", selector: body.selector }] }, { approved: true }));
+    }
+    if (req.method === "POST" && req.url === "/api/mcp/fill_element") {
+      const body = await readBody(req);
+      return send(res, 200, await executePlan({ steps: [{ action: "fill", selector: body.selector, value: body.value }] }, { approved: true }));
+    }
+    if (req.method === "POST" && req.url === "/api/mcp/take_screenshot") {
+      const page = await getPage();
+      const path = `openfish-${Date.now()}.png`;
+      await page.screenshot({ path, fullPage: false });
+      return send(res, 200, { path, url: page.url() });
+    }
     if (req.method === "POST" && req.url === "/api/inspect") {
       const page = await getPage();
       return send(res, 200, { title: await page.title().catch(() => ""), url: page.url(), text: (await page.locator("body").innerText().catch(() => "")).slice(0, 12000) });
