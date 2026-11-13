@@ -63,3 +63,6 @@
 - Add a unified REST tool invocation endpoint mapped to the existing shared browser runtime.
 - Require explicit approval for direct click/fill actions through the multi-provider API.
 - Synchronize all release version markers.
+
+## 1.1.0
+- Correct provider-adapter regression test formatting and synchronize release versions.
