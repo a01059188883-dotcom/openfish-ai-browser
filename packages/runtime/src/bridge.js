@@ -7,7 +7,7 @@ import { executePlan } from "./executor.js";
 import { validateHttpUrl } from "./safety.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const VERSION = "1.0.8";
+const VERSION = "1.0.9";
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 const startedAt = Date.now();
 const metrics = { requests: 0, errors: 0, events: [] };
@@ -67,6 +67,51 @@ function readBody(req) {
   });
 }
 
+
+const TOOL_CATALOG = [{"name":"open_page","description":"Navigate the shared browser to a public HTTP(S) URL.","inputSchema":{"type":"object","properties":{"url":{"type":"string","format":"uri"}},"required":["url"],"additionalProperties":false},"approval":"not_required"},{"name":"read_page","description":"Read title, URL, and visible page text.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"plan_task","description":"Create a proposed browser action plan. Does not execute it.","inputSchema":{"type":"object","properties":{"goal":{"type":"string","minLength":1,"maxLength":2000}},"required":["goal"],"additionalProperties":false},"approval":"not_required"},{"name":"execute_plan","description":"Execute a reviewed plan. Requires explicit approval of the exact plan.","inputSchema":{"type":"object","properties":{"plan":{"type":"object"},"approved":{"type":"boolean","const":true}},"required":["plan","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"list_interactive_elements","description":"List visible interactive page elements.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"get_accessibility_snapshot","description":"Read page headings and landmarks.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"click_element","description":"Click a unique visible button-like element; requires explicit approval.","inputSchema":{"type":"object","properties":{"selector":{"type":"string","minLength":1,"maxLength":500},"approved":{"type":"boolean","const":true}},"required":["selector","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"fill_element","description":"Fill a unique ordinary field; requires explicit approval.","inputSchema":{"type":"object","properties":{"selector":{"type":"string","minLength":1,"maxLength":500},"value":{"type":"string","maxLength":10000},"approved":{"type":"boolean","const":true}},"required":["selector","value","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"take_screenshot","description":"Capture the current browser viewport.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"}];
+function adapterTools(kind) {
+  if (kind === "openai") return TOOL_CATALOG.map(t => ({ type: "function", function: { name: t.name, description: t.description + (t.approval === "explicit" ? " Explicit user approval is required." : ""), parameters: t.inputSchema, strict: true } }));
+  if (kind === "anthropic") return TOOL_CATALOG.map(t => ({ name: t.name, description: t.description + (t.approval === "explicit" ? " Explicit user approval is required." : ""), input_schema: t.inputSchema }));
+  if (kind === "gemini") return [{ functionDeclarations: TOOL_CATALOG.map(t => ({ name: t.name, description: t.description + (t.approval === "explicit" ? " Explicit user approval is required." : ""), parameters: t.inputSchema })) }];
+  return TOOL_CATALOG;
+}
+async function invokeTool(name, args = {}) {
+  const a = args || {};
+  if (name === "open_page") {
+    const parsed = validateHttpUrl(a.url);
+    const page = await getPage(); await page.goto(parsed.href, { waitUntil: "domcontentloaded" });
+    return { title: await page.title(), url: page.url() };
+  }
+  if (name === "read_page") {
+    const page = await getPage(); return { title: await page.title().catch(() => ""), url: page.url(), text: (await page.locator("body").innerText().catch(() => "")).slice(0,20000) };
+  }
+  if (name === "plan_task") {
+    const plan = await createPlan(a.goal, await getPageContext());
+    return { status: "plan_ready_for_review", ...plan, warning: "No action has been executed." };
+  }
+  if (name === "execute_plan") {
+    if (a.approved !== true) throw Object.assign(new Error("Explicit approval of the exact plan is required."), { statusCode: 403 });
+    return executePlan(a.plan, { approved: true });
+  }
+  if (name === "click_element" || name === "fill_element") {
+    if (a.approved !== true) throw Object.assign(new Error("Explicit approval is required."), { statusCode: 403 });
+    const step = name === "click_element" ? { action: "click", selector: a.selector } : { action: "fill", selector: a.selector, value: a.value };
+    return executePlan({ steps: [step] }, { approved: true });
+  }
+  if (name === "list_interactive_elements") {
+    const page = await getPage();
+    return page.locator("a,button,input,textarea,select,[role=button]").evaluateAll(nodes => nodes.slice(0,150).map((el,index)=>({index,tag:el.tagName.toLowerCase(),role:el.getAttribute("role"),text:(el.innerText||el.getAttribute("aria-label")||el.getAttribute("placeholder")||el.getAttribute("name")||"").trim().slice(0,180),type:el.getAttribute("type"),name:el.getAttribute("name"),id:el.id||null,href:el.href||null,disabled:Boolean(el.disabled),visible:Boolean(el.getClientRects().length)})).filter(x=>x.visible));
+  }
+  if (name === "get_accessibility_snapshot") {
+    const page = await getPage();
+    return {title:await page.title(),url:page.url(),...(await page.locator("body").evaluate(body=>({headings:[...body.querySelectorAll("h1,h2,h3")].slice(0,60).map(el=>({level:Number(el.tagName.slice(1)),text:(el.innerText||"").trim().slice(0,240)})),landmarks:[...body.querySelectorAll("main,nav,header,footer,form,[role=main],[role=navigation]")].slice(0,30).map(el=>({tag:el.tagName.toLowerCase(),role:el.getAttribute("role"),label:el.getAttribute("aria-label"),text:(el.innerText||"").trim().slice(0,500)}))})))};
+  }
+  if (name === "take_screenshot") {
+    const page = await getPage(); const path = `openfish-${Date.now()}.png`; await page.screenshot({path,fullPage:false}); return {path,url:page.url()};
+  }
+  throw Object.assign(new Error("Unknown OpenFish tool."), { statusCode: 404 });
+}
+
 const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin || "";
   const host = req.headers.host || "";
@@ -82,6 +127,23 @@ const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") return send(res, 200, { ok: true });
   try {
     if (req.method === "GET" && adminAssets.has(res.reqPath)) return await sendAsset(res, adminAssets.get(res.reqPath));
+
+    if (req.method === "GET" && ["/api/v1/tools", "/.well-known/openfish-tools.json"].includes(res.reqPath)) {
+      return send(res, 200, { name: "OpenFish AI Browser", version: VERSION, protocol: "openfish-tools/1", tools: TOOL_CATALOG, adapters: ["/api/v1/adapters/openai", "/api/v1/adapters/anthropic", "/api/v1/adapters/gemini"], openapi: "/api/v1/openapi.json" });
+    }
+    if (req.method === "GET" && res.reqPath === "/api/v1/adapters/openai") return send(res, 200, { tools: adapterTools("openai") });
+    if (req.method === "GET" && res.reqPath === "/api/v1/adapters/anthropic") return send(res, 200, { tools: adapterTools("anthropic") });
+    if (req.method === "GET" && res.reqPath === "/api/v1/adapters/gemini") return send(res, 200, { tools: adapterTools("gemini") });
+    if (req.method === "GET" && res.reqPath === "/api/v1/openapi.json") {
+      const paths = {};
+      for (const tool of TOOL_CATALOG) paths[`/api/v1/tools/${tool.name}`] = { post: { operationId: tool.name, summary: tool.description, requestBody: { required: true, content: { "application/json": { schema: tool.inputSchema } } }, responses: { "200": { description: "Tool result" } } } };
+      return send(res, 200, { openapi: "3.1.0", info: { title: "OpenFish AI Browser API", version: VERSION }, servers: [{ url: `http://127.0.0.1:${PORT}` }], paths });
+    }
+    if (req.method === "POST" && res.reqPath.startsWith("/api/v1/tools/")) {
+      const name = res.reqPath.slice("/api/v1/tools/".length);
+      const body = await readBody(req);
+      return send(res, 200, { tool: name, result: await invokeTool(name, body) });
+    }
     if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, name: "OpenFish AI Browser", version: VERSION });
     if (req.method === "GET" && req.url === "/api/admin/status") {
       const browser = getBrowserStatus();
