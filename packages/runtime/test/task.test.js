@@ -39,7 +39,22 @@ test("bridge applies strict URL validation to AI planning and uses the configure
   assert.ok(bridge.includes("const ALLOWED_HOSTS = new Set(["));
   assert.ok(bridge.includes("127.0.0.1:${PORT}"));
   assert.ok(bridge.includes("const parsed = validateHttpUrl(body.url)"));
-  assert.ok(bridge.includes("version: \"1.0.3\""));
+  assert.ok(bridge.includes("version: \"1.0.4\""));
+});
+
+test("approved plan executor enforces explicit approval and stops on unsafe targets", async () => {
+  const executor = await readFile(resolve("packages/runtime/src/executor.js"), "utf8");
+  const mcp = await readFile(resolve("packages/mcp-server/src/index.js"), "utf8");
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  assert.ok(executor.includes('approved !== true'));
+  assert.ok(executor.includes('count !== 1'));
+  assert.ok(executor.includes('isIrreversibleAction(details)'));
+  assert.ok(executor.includes('isSensitiveField(details)'));
+  assert.ok(executor.includes('return { status: "stopped"'));
+  assert.ok(mcp.includes('server.tool("execute_plan"'));
+  assert.ok(mcp.includes('approved: z.literal(true)'));
+  assert.ok(bridge.includes('req.url === "/api/execute"'));
+  assert.ok(bridge.includes('body.approved !== true'));
 });
 
 test("safety helpers detect sensitive fields and irreversible actions", () => {
