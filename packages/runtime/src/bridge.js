@@ -2,6 +2,7 @@ import http from "node:http";
 import { getPage } from "./browser.js";
 import { runTask, getPageContext } from "./task.js";
 import { createPlan } from "./ai-planner.js";
+import { executePlan } from "./executor.js";
 import { validateHttpUrl } from "./safety.js";
 
 const PORT = Number(process.env.PORT || 8787);
@@ -50,7 +51,7 @@ const server = http.createServer(async (req, res) => {
   res.reqOrigin = origin;
   if (req.method === "OPTIONS") return send(res, 200, { ok: true });
   try {
-    if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, name: "OpenFish AI Browser", version: "1.0.3" });
+    if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, name: "OpenFish AI Browser", version: "1.0.4" });
     if (req.method === "POST" && req.url === "/api/inspect") {
       const page = await getPage();
       return send(res, 200, { title: await page.title().catch(() => ""), url: page.url(), text: (await page.locator("body").innerText().catch(() => "")).slice(0, 12000) });
@@ -69,6 +70,11 @@ const server = http.createServer(async (req, res) => {
       }
       const plan = await createPlan(body.goal, await getPageContext());
       return send(res, 200, { status: "plan_ready_for_review", ...plan, warning: "Review every step. No action has been executed." });
+    }
+    if (req.method === "POST" && req.url === "/api/execute") {
+      const body = await readBody(req);
+      if (body.approved !== true) return send(res, 403, { error: "Explicit approval of the exact plan is required." });
+      return send(res, 200, await executePlan(body.plan, { approved: true }));
     }
     if (req.method === "POST" && req.url === "/api/navigate") {
       const { url } = await readBody(req);
