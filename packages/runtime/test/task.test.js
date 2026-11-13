@@ -82,3 +82,19 @@ test("side panel invalidates stale plans and locks execution while generating or
   assert.ok(source.includes('const approvedPlan = currentPlan;'));
   assert.ok(source.includes('finally { currentPlan = null;'));
 });
+
+\ntest("visual admin dashboard is wired to local status and event APIs", async () => {
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  const html = await readFile(resolve("packages/admin/index.html"), "utf8");
+  const app = await readFile(resolve("packages/admin/app.js"), "utf8");
+  const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
+  assert.equal(pkg.version, "1.0.6");
+  assert.ok(bridge.includes('req.url === "/api/admin/status"'));
+  assert.ok(bridge.includes('req.url === "/api/admin/events"'));
+  assert.ok(bridge.includes('["../../admin/index.html"'));
+  assert.ok(html.includes('href="/admin/style.css"'));
+  assert.ok(html.includes('src="/admin/app.js"'));
+  assert.ok(app.includes('/api/admin/status'));
+  assert.ok(app.includes('/api/admin/events'));
+  assert.ok(app.includes('/api/execute'));
+});
