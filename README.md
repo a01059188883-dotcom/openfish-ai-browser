@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **1.1.0**.
+Open-source, free-first browser automation starter. Version: **1.1.1**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -32,7 +32,7 @@ npm run start:mcp
 ```
 Configure your MCP host to launch `node packages/mcp-server/src/index.js` from this project directory using stdio.
 
-## Visual admin dashboard\nOpen `http://127.0.0.1:8787/admin` after starting the bridge to open the local control panel. It displays bridge uptime, API request/error counts, browser connection mode, recent API activity, and a task planner with explicit approval before execution. Dashboard telemetry is held in process memory and resets when the bridge restarts. The panel is served only by the local bridge; it is not a public cloud admin site.\n\n## Unified local runtime (v1.1.0)\nThe bridge is the single owner of the Playwright browser. Both the Chrome side panel and the stdio MCP server call the same local bridge API; MCP no longer launches a second browser process. Start `npm run start:bridge` before launching either client. The MCP server exposes `open_page`, `read_page`, `plan_task`, `execute_plan`, `click_element`, `fill_element`, `take_screenshot`, `list_interactive_elements`, and `get_accessibility_snapshot`.\n\n## Review and execution flow
+## Visual admin dashboard\nOpen `http://127.0.0.1:8787/admin` after starting the bridge to open the local control panel. It displays bridge uptime, API request/error counts, browser connection mode, recent API activity, and a task planner with explicit approval before execution. Dashboard telemetry is held in process memory and resets when the bridge restarts. The panel is served only by the local bridge; it is not a public cloud admin site.\n\n## Unified local runtime (v1.1.1)\nThe bridge is the single owner of the Playwright browser. Both the Chrome side panel and the stdio MCP server call the same local bridge API; MCP no longer launches a second browser process. Start `npm run start:bridge` before launching either client. The MCP server exposes `open_page`, `read_page`, `plan_task`, `execute_plan`, `click_element`, `fill_element`, `take_screenshot`, `list_interactive_elements`, and `get_accessibility_snapshot`.\n\n## Review and execution flow
 1. Ask the local AI planner to generate a plan for the current page.
 2. Review the complete plan in the Chrome side panel or MCP response.
 3. Explicitly approve the exact plan using the side-panel confirmation or the MCP `execute_plan` tool with `approved: true`.
@@ -51,7 +51,7 @@ This is a local-first developer tool, not yet a hardened multi-user SaaS. Before
 - Manually complete any blocked high-risk action only after independently reviewing the page and consequences.
 - Stop if the page content or requested action differs from the plan you approved.
 
-## Multi-platform AI integration (v1.1.0)
+## Multi-platform AI integration (v1.1.1)
 OpenFish provides a provider-neutral tool catalog and schema adapters so AI clients can integrate without changing the browser runtime:
 - `GET /api/v1/tools` or `GET /.well-known/openfish-tools.json`: canonical tool catalog and discovery metadata.
 - `GET /api/v1/adapters/openai`: OpenAI function-tool schema.
