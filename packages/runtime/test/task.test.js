@@ -30,8 +30,16 @@ test("release version is synchronized across user-facing packages", async () => 
 
 test("URL validation permits HTTP(S) and rejects embedded credentials or other protocols", () => {
   assert.equal(validateHttpUrl("https://example.com/path").hostname, "example.com");
-  assert.throws(() => validateHttpUrl("javascript:alert(1)"));
-  assert.throws(() => validateHttpUrl("https://user:pass@example.com"));
+  assert.throws(() => validateHttpUrl("javascript:alert(1)"), error => error.statusCode === 400);
+  assert.throws(() => validateHttpUrl("https://user:pass@example.com"), error => error.statusCode === 400);
+});
+
+test("bridge applies strict URL validation to AI planning and uses the configured port for Host checks", async () => {
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  assert.ok(bridge.includes("const ALLOWED_HOSTS = new Set(["));
+  assert.ok(bridge.includes("127.0.0.1:${PORT}"));
+  assert.ok(bridge.includes("const parsed = validateHttpUrl(body.url)"));
+  assert.ok(bridge.includes("version: \"1.0.3\""));
 });
 
 test("safety helpers detect sensitive fields and irreversible actions", () => {
