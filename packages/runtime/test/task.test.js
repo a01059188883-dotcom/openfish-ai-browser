@@ -39,7 +39,7 @@ test("bridge applies strict URL validation to AI planning and uses the configure
   assert.ok(bridge.includes("const ALLOWED_HOSTS = new Set(["));
   assert.ok(bridge.includes("127.0.0.1:${PORT}"));
   assert.ok(bridge.includes("const parsed = validateHttpUrl(body.url)"));
-  assert.ok(bridge.includes("version: \"1.0.4\""));
+  assert.ok(bridge.includes("version: \"1.0.5\""));
 });
 
 test("approved plan executor enforces explicit approval and stops on unsafe targets", async () => {
@@ -70,4 +70,15 @@ test("planner rejects unsafe URLs and malformed action plans", () => {
   assert.throws(() => validatePlan({ steps: [{ action: "execute_shell" }] }));
   assert.throws(() => validatePlan({ steps: [{ action: "fill", selector: "#password", value: "secret" }] }));
   assert.doesNotThrow(() => validatePlan({ summary: "Inspect", steps: [{ action: "inspect", reason: "Read current page" }] }));
+});
+
+
+test("side panel invalidates stale plans and locks execution while generating or executing", async () => {
+  const source = await readFile(resolve("packages/chrome-extension/sidepanel.js"), "utf8");
+  assert.ok(source.includes('$("goal").addEventListener("input"'));
+  assert.ok(source.includes('currentPlan = null;'));
+  assert.ok(source.includes('$("execute").hidden = true;'));
+  assert.ok(source.includes('$("run").disabled = true;'));
+  assert.ok(source.includes('const approvedPlan = currentPlan;'));
+  assert.ok(source.includes('finally { currentPlan = null;'));
 });
