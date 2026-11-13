@@ -7,7 +7,7 @@ import { getPageContext } from "../../runtime/src/task.js";
 import { executePlan } from "../../runtime/src/executor.js";
 import { validateHttpUrl, isSensitiveField, isIrreversibleAction } from "../../runtime/src/safety.js";
 
-const server = new McpServer({ name: "openfish-ai-browser", version: "1.0.5" });
+const server = new McpServer({ name: "openfish-ai-browser", version: "1.0.6" });
 const result = (value) => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
 
 server.tool("plan_task", "Use the configured local Ollama model to propose a safe, reviewable browser action plan. It never executes the plan.", {
