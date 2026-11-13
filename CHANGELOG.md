@@ -31,3 +31,11 @@
 - Make local bridge Host validation follow the configured PORT instead of hard-coding 8787.
 - Corrected documentation to distinguish page inspection and plan generation from autonomous multi-step execution.
 - Synchronized all release version labels and expanded regression coverage.
+
+## 1.0.4 - 2026-11-13
+- Added a sequential browser plan executor with explicit user approval required.
+- Added MCP `execute_plan` and local bridge `/api/execute` entry points.
+- Added Chrome side-panel review-and-execute button with an approval confirmation.
+- Require unique, visible, enabled targets; restrict clicks to button-like controls and fills to ordinary editable fields.
+- Stop immediately on the first failed or blocked step; continue blocking sensitive and potentially irreversible actions.
+- Synchronized release version metadata and expanded syntax/test coverage.
