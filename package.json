@@ -1,13 +1,13 @@
 {
   "name": "openfish-ai-browser",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "private": true,
   "type": "module",
   "description": "Free-first open-source AI browser automation with MCP and Chrome extension",
   "scripts": {
     "start:bridge": "node packages/runtime/src/bridge.js",
     "start:mcp": "node packages/mcp-server/src/index.js",
-    "check": "node --check packages/runtime/src/bridge.js && node --check packages/runtime/src/ai-planner.js && node --check packages/runtime/src/safety.js && node --check packages/runtime/src/executor.js && node --check packages/mcp-server/src/index.js && node --check packages/chrome-extension/sidepanel.js",
+    "check": "node --check packages/runtime/src/bridge.js && node --check packages/runtime/src/browser.js && node --check packages/runtime/src/ai-planner.js && node --check packages/runtime/src/safety.js && node --check packages/runtime/src/executor.js && node --check packages/mcp-server/src/index.js && node --check packages/chrome-extension/sidepanel.js && node --check packages/admin/app.js",
     "test": "node --test packages/runtime/test/*.test.js"
   },
   "dependencies": {
@@ -15,7 +15,5 @@
     "playwright": "^1.48.0",
     "zod": "^3.23.8"
   },
-  "engines": {
-    "node": ">=20"
-  }
+  "engines": { "node": ">=20" }
 }
