@@ -1,5 +1,6 @@
 const API = "http://127.0.0.1:8787";
 const $ = id => document.getElementById(id);
+let currentPlan = null;
 async function request(path, body = {}) {
   const response = await fetch(API + path, { method:"POST", headers:{"content-type":"application/json"}, body:JSON.stringify(body) });
   const data = await response.json();
@@ -18,7 +19,20 @@ $("inspect").addEventListener("click", async () => {
 $("run").addEventListener("click", async () => {
   const goal = $("goal").value.trim(); if (!goal) return $("result").textContent = "请先输入任务。";
   $("result").textContent = "正在调用本地 AI 生成计划…";
-  try { const [tab] = await chrome.tabs.query({active:true,currentWindow:true}); const data = await request("/api/plan",{goal,url:tab?.url?.startsWith("http") ? tab.url : undefined}); $("result").textContent = JSON.stringify(data,null,2); }
+  try { const [tab] = await chrome.tabs.query({active:true,currentWindow:true}); const data = await request("/api/plan",{goal,url:tab?.url?.startsWith("http") ? tab.url : undefined}); currentPlan = data; $("result").textContent = JSON.stringify(data,null,2); $("execute").hidden = !Array.isArray(data.steps) || data.steps.length === 0; }
   catch(e) { $("result").textContent = e.message; }
 });
 health();
+
+$("execute").addEventListener("click", async () => {
+  if (!currentPlan || !Array.isArray(currentPlan.steps) || currentPlan.steps.length === 0) return;
+  const approved = window.confirm("请确认：你已逐条检查上方计划，并同意执行这些普通网页操作？付款、发送、删除、提交等高风险操作仍会被系统拦截。");
+  if (!approved) return;
+  $("result").textContent = "正在按审核计划逐步执行…";
+  $("execute").disabled = true;
+  try {
+    const data = await request("/api/execute", { plan: currentPlan, approved: true });
+    $("result").textContent = JSON.stringify(data, null, 2);
+  } catch (e) { $("result").textContent = e.message; }
+  finally { $("execute").disabled = false; }
+});
