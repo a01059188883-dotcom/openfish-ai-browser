@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **1.0.2**.
+Open-source, free-first browser automation starter. Version: **1.0.3**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients.
@@ -36,7 +36,7 @@ Configure your MCP host to launch `node packages/mcp-server/src/index.js` from t
 Set `BROWSER_WS_ENDPOINT` to a Chromium Playwright-compatible WebSocket endpoint and run the bridge/MCP server in a trusted server environment. A free local setup is included; a permanently available cloud browser needs compute hosting and may not remain free.
 
 ## Current 1.0 scope
-Working foundation: page navigation, snapshots, clicking, filling, task execution with a constrained action loop, Chrome side panel page inspection, and local HTTP bridge. It is a starter, not yet a fully autonomous hosted SaaS. Add user authentication, per-user isolation, rate limits, a durable task queue, observability, and deployment secrets before exposing it publicly. Set `ALLOWED_EXTENSION_ORIGIN=chrome-extension://YOUR_EXTENSION_ID` in `.env` to pin the local bridge to your installed extension ID; leave it blank only during initial unpacked-extension setup.
+Working foundation: page navigation, page inspection, visible-element discovery, direct MCP click/fill tools, and AI-generated reviewable action plans. The AI planner does not execute its generated plan, and the task endpoint currently gathers page context rather than running a multi-step autonomous workflow. This is intentionally not yet a fully autonomous hosted SaaS. Add user authentication, per-user isolation, rate limits, a durable task queue, observability, and deployment secrets before exposing it publicly. Set `ALLOWED_EXTENSION_ORIGIN=chrome-extension://YOUR_EXTENSION_ID` in `.env` to pin the local bridge to your installed extension ID; leave it blank only during initial unpacked-extension setup.
 
 ## Safety
 - Do not use it to bypass CAPTCHAs, access controls, paywalls, or site restrictions.
