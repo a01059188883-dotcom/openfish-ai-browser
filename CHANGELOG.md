@@ -39,3 +39,10 @@
 - Require unique, visible, enabled targets; restrict clicks to button-like controls and fills to ordinary editable fields.
 - Stop immediately on the first failed or blocked step; continue blocking sensitive and potentially irreversible actions.
 - Synchronized release version metadata and expanded syntax/test coverage.
+
+
+## 1.0.5 - 2026-11-13
+- Invalidate a pending plan whenever the task text changes or a new plan request starts, preventing accidental execution of stale plans.
+- Disable execution until a fresh valid plan is available; lock conflicting plan generation during execution.
+- Clear the approved plan after execution and hide the execute control on failures.
+- Synchronize all version metadata and add regression coverage for stale-plan handling.
