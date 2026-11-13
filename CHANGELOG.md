@@ -46,3 +46,4 @@
 - Disable execution until a fresh valid plan is available; lock conflicting plan generation during execution.
 - Clear the approved plan after execution and hide the execute control on failures.
 - Synchronize all version metadata and add regression coverage for stale-plan handling.
+\n\n## 1.0.6 - 2026-11-13\n- Added a visual local admin dashboard at `/admin` with service uptime, API counters, browser session state, recent activity, and a task planning/execution interface.\n- Added read-only admin status and event endpoints and in-memory request/error telemetry.\n- Kept the dashboard bound to the local bridge; it is not exposed as a public multi-user admin service.\n- Synchronized package, MCP, extension, bridge, and documentation version metadata.\n
