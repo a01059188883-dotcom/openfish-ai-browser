@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **1.1.1**.
+Open-source, free-first browser automation starter. Version: **1.1.2**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -32,7 +32,7 @@ npm run start:mcp
 ```
 Configure your MCP host to launch `node packages/mcp-server/src/index.js` from this project directory using stdio.
 
-## Visual admin dashboard\nOpen `http://127.0.0.1:8787/admin` after starting the bridge to open the local control panel. It displays bridge uptime, API request/error counts, browser connection mode, recent API activity, and a task planner with explicit approval before execution. Dashboard telemetry is held in process memory and resets when the bridge restarts. The panel is served only by the local bridge; it is not a public cloud admin site.\n\n## Unified local runtime (v1.1.1)\nThe bridge is the single owner of the Playwright browser. Both the Chrome side panel and the stdio MCP server call the same local bridge API; MCP no longer launches a second browser process. Start `npm run start:bridge` before launching either client. The MCP server exposes `open_page`, `read_page`, `plan_task`, `execute_plan`, `click_element`, `fill_element`, `take_screenshot`, `list_interactive_elements`, and `get_accessibility_snapshot`.\n\n## Review and execution flow
+## Visual admin dashboard\nOpen `http://127.0.0.1:8787/admin` after starting the bridge to open the local control panel. It displays bridge uptime, API request/error counts, browser connection mode, recent API activity, and a task planner with explicit approval before execution. Dashboard telemetry is held in process memory and resets when the bridge restarts. The panel is served only by the local bridge; it is not a public cloud admin site.\n\n## Unified local runtime (v1.1.2)\nThe bridge is the single owner of the Playwright browser. Both the Chrome side panel and the stdio MCP server call the same local bridge API; MCP no longer launches a second browser process. Start `npm run start:bridge` before launching either client. The MCP server exposes `open_page`, `read_page`, `plan_task`, `execute_plan`, `click_element`, `fill_element`, `take_screenshot`, `list_interactive_elements`, and `get_accessibility_snapshot`.\n\n## Review and execution flow
 1. Ask the local AI planner to generate a plan for the current page.
 2. Review the complete plan in the Chrome side panel or MCP response.
 3. Explicitly approve the exact plan using the side-panel confirmation or the MCP `execute_plan` tool with `approved: true`.
@@ -51,7 +51,7 @@ This is a local-first developer tool, not yet a hardened multi-user SaaS. Before
 - Manually complete any blocked high-risk action only after independently reviewing the page and consequences.
 - Stop if the page content or requested action differs from the plan you approved.
 
-## Multi-platform AI integration (v1.1.1)
+## Multi-platform AI integration (v1.1.2)
 OpenFish provides a provider-neutral tool catalog and schema adapters so AI clients can integrate without changing the browser runtime:
 - `GET /api/v1/tools` or `GET /.well-known/openfish-tools.json`: canonical tool catalog and discovery metadata.
 - `GET /api/v1/adapters/openai`: OpenAI function-tool schema.
@@ -60,3 +60,7 @@ OpenFish provides a provider-neutral tool catalog and schema adapters so AI clie
 - `GET /api/v1/openapi.json`: OpenAPI 3.1 document for REST clients, SDKs, LangChain/LlamaIndex wrappers, and custom agents.
 - `POST /api/v1/tools/{tool_name}`: provider-neutral tool invocation endpoint. Send the tool's JSON arguments as the request body.
 These are schema and REST compatibility interfaces, not direct hosted integrations with every vendor SDK. Clients must call the tool endpoint from their own agent runtime. The local bridge remains bound to loopback and is not safe to expose publicly without authentication, per-user isolation, rate limits, and network/SSRF hardening. Actions that change page state require `approved: true`; sensitive and irreversible targets remain blocked.
+
+
+## Network destination protection (v1.1.2)
+The runtime rejects loopback, private, link-local, metadata, and reserved IP literals plus common local-only hostnames. A Playwright context request guard applies the same checks to HTTP(S) subresources and redirect destinations, not only the first navigation URL. This is defense in depth, not a complete network sandbox: DNS rebinding and private-address resolution behind an otherwise public hostname require deployment-level egress filtering or a hardened outbound proxy. Keep the bridge bound to loopback and do not expose it directly to the internet.
