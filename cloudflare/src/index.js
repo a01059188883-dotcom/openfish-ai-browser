@@ -3,10 +3,14 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp/server";
 import { env } from "cloudflare:workers";
 import { z } from "zod";
-import { validatePublicUrl, validateSteps, IRREVERSIBLE } from "./safety.js";
+import { validatePublicUrl, validateSteps, IRREVERSIBLE, SENSITIVE } from "./safety.js";
 
 const VERSION = "1.2.0-cloudflare-preview";
 const MAX_TEXT = 20000;
+const MAX_STEPS = 8;
+function json(value, status = 200, headers = {}) {
+  return new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json; charset=utf-8", ...headers } });
+}
 function sessionKey(id) {
   if (typeof id !== "string" || !/^[a-zA-Z0-9_-]{8,80}$/.test(id)) throw new Error("session_id must be 8-80 safe characters.");
   return "session:" + id;
