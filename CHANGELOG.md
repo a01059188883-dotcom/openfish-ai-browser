@@ -76,3 +76,10 @@
 - Apply destination checks to browser HTTP(S) subresources and redirects through a Playwright context route guard.
 - Add regression tests for private IPv4/IPv6, metadata endpoints, local hostnames, and public destinations.
 - Synchronize package, bridge, MCP, Chrome extension, dashboard documentation, and test version markers.
+
+
+## 1.1.3 - 2026-11-15
+- Refresh the admin console navigation and correct its stale version label.
+- Add responsive AI provider integration cards with copyable endpoint paths.
+- Load the canonical browser tool catalog live from the local bridge and show each tool's approval requirement.
+- Synchronize package, bridge, MCP, extension, side panel, README, changelog, and regression test version markers.
