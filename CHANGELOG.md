@@ -138,3 +138,9 @@
 - Added Wrangler dev/deploy scripts and setup/security documentation.
 - Synchronized all active application version markers to 1.7.0.
 - Cloudflare deployment is not performed by this source release; account secrets and a deployment check are still required.
+
+
+## 1.7.1 - 2026-11-15
+- Added a manually triggered GitHub Actions workflow to deploy the Cloudflare relay and set its Worker secret without exposing secret values in logs.
+- Documented the exact repository Actions secrets and one-click deployment path.
+- Synchronized active application version markers and regression assertions to 1.7.1.
