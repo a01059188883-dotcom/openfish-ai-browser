@@ -40,7 +40,7 @@ async function withBrowser(sessionId, operation, requireSaved = false) {
   if (!browser) {
     // acquire() creates a Browser Run session and returns its durable session ID.
     // Subsequent requests connect() to this ID instead of launching another instance.
-    const acquired = await acquire(env.BROWSER, { keep_alive: 1200000 });
+    const acquired = await acquire(env.BROWSER);
     browserSessionId = acquired.sessionId;
     browser = await connect(env.BROWSER, browserSessionId);
   }
