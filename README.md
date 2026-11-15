@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **1.6.0**.
+Open-source, free-first browser automation starter. Version: **1.7.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -92,3 +92,36 @@ The HTTP endpoint uses the MCP Streamable HTTP transport. It is stateless at the
 
 ## AI client registry and rate limits (v1.6.0)
 The local bridge records authenticated API/MCP client activity by API key identity, client ID, platform label, and browser session. The admin console shows recent clients and estimates online state from activity within the last 90 seconds. Client metadata is stored in `.openfish/clients.json` with restrictive local file permissions. Tool invocations are rate-limited per API key to 120 requests per minute by default; configure `OPENFISH_RATE_LIMIT_PER_MINUTE` to change the limit. Rate counters are process-memory state and reset on restart. This is operational visibility for a trusted local runtime, not tenant isolation or a public SaaS security boundary.
+
+
+## Secure Cloudflare relay (v1.7.0)
+
+The optional Cloudflare relay lets a local OpenFish runtime make an **outbound-only** WebSocket connection to a Cloudflare Worker. The browser and Playwright remain on the local computer; the Worker does not run Chromium and does not open inbound access to the local machine. A SQLite-backed Durable Object holds the relay WebSocket and forwards a small allowlist of authenticated HTTP/MCP requests to the connected local agent.
+
+### Configure and deploy the relay
+
+1. Install dependencies: `npm install`.
+2. Create a long random relay secret (at least 32 characters) and store it securely.
+3. Set the Worker secret: `npx wrangler secret put OPENFISH_RELAY_TOKEN --config cloudflare/wrangler.toml`.
+4. Deploy: `npm run deploy:relay`. Wrangler provisions the SQLite-backed Durable Object namespace from the migration in `cloudflare/wrangler.toml`.
+5. On the computer running OpenFish, create a local API key in the admin panel with **read and write** scopes. Keep it separate from the relay token.
+6. Set these environment variables on that computer:
+   - `OPENFISH_RELAY_URL=wss://YOUR-WORKER.workers.dev/agent/connect`
+   - `OPENFISH_RELAY_TOKEN=the-same-long-random-relay-secret`
+   - `OPENFISH_LOCAL_API_KEY=your-local-OpenFish-API-key`
+   - optionally `OPENFISH_BRIDGE_URL=http://127.0.0.1:8787` and `OPENFISH_MCP_URL=http://127.0.0.1:8788/mcp`
+7. Start the bridge, HTTP MCP server, and then `npm run start:relay-agent`.
+
+Remote MCP endpoint: `https://YOUR-WORKER.workers.dev/mcp`. Remote clients use `Authorization: Bearer RELAY_TOKEN`; the local agent injects its separately stored local API key when forwarding to the local MCP server. The relay currently supports stateless JSON MCP requests and allowlisted REST discovery/tool routes; it buffers responses and caps request/response bodies at 512 KB with a 45-second relay timeout. It is not a general-purpose TCP tunnel or arbitrary URL proxy.
+
+### Relay security and limitations
+
+- Only the local agent initiates an outbound `wss://` connection; no inbound port forwarding is required.
+- The Worker requires the relay Bearer secret for both agent connections and remote requests. Use a unique random secret and rotate it if exposed.
+- The agent only forwards fixed local bridge/MCP paths and never accepts a destination URL from the remote caller.
+- The relay currently represents one trusted local browser owner; anyone holding the relay token can use that owner's browser/API-key permissions. Do not share the relay token with untrusted users.
+- This does not yet provide per-remote-user tenants, per-client delegated API keys, admin-console remote access, or a complete DNS/egress security boundary for arbitrary websites opened by the local browser.
+- Cloudflare Durable Objects use SQLite-backed storage for this new namespace. Cloudflare account plan, usage limits, and billing eligibility depend on the account; check the Cloudflare dashboard before enabling production traffic.
+- No Cloudflare deployment is claimed by this repository change. Deploy only after setting the Worker secret and verifying the relay health endpoint.
+
+After deployment, check `GET https://YOUR-WORKER.workers.dev/health` with the relay Bearer token. It reports whether a local agent is connected.

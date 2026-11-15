@@ -128,3 +128,13 @@
 - Added per-API-key rate limiting for REST browser tool calls (120 requests/minute by default; configurable).
 - Forwarded MCP HTTP client metadata through the bridge and registered client activity on authenticated MCP requests.
 - Synchronized package, bridge, MCP HTTP, Chrome extension, admin UI, README, changelog, and tests to 1.6.0.
+
+
+## 1.7.0 - 2026-11-15
+- Added an optional Cloudflare Worker + SQLite Durable Object WebSocket relay for remote MCP and allowlisted REST calls.
+- Added a local outbound-only relay agent with authenticated reconnect, exponential backoff, WebSocket ping keepalive, and fixed local MCP/bridge targets.
+- Added separate relay-secret and local OpenFish API-key handling; remote callers never choose arbitrary local destinations.
+- Added request/response size caps, a bounded in-flight request queue, timeout handling, endpoint allowlists, and authenticated relay health status.
+- Added Wrangler dev/deploy scripts and setup/security documentation.
+- Synchronized all active application version markers to 1.7.0.
+- Cloudflare deployment is not performed by this source release; account secrets and a deployment check are still required.
