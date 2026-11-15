@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validatePublicUrl, validateSteps } from "../src/index.js";
+import { validatePublicUrl, validateSteps } from "../src/safety.js";
 
 test("accepts public HTTPS URL", () => {
   assert.equal(validatePublicUrl("https://example.com/path").hostname, "example.com");
