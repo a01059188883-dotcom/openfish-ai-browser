@@ -1,0 +1,21 @@
+{
+  "name": "openfish-cloudflare-worker",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "scripts": {
+    "check": "node --check src/index.js",
+    "test": "node --test test/*.test.js",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@cloudflare/playwright": "1.4.0",
+    "@modelcontextprotocol/server": "2.4.0",
+    "agents": "0.33.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "wrangler": "^4.50.0"
+  }
+}
