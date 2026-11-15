@@ -13,3 +13,9 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run check
       - run: npm test
+      - name: Install Cloudflare worker dependencies
+        run: npm install --prefix cloudflare --no-audit --no-fund
+      - name: Check Cloudflare worker
+        run: npm --prefix cloudflare run check
+      - name: Test Cloudflare safety rules
+        run: npm --prefix cloudflare test
