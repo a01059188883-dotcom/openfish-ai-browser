@@ -24,6 +24,15 @@ async function withBrowser(sessionId, operation) {
   let context;
   try {
     context = await browser.newContext(saved.storageState ? { storageState: saved.storageState } : {});
+    await context.route("**/*", async route => {
+      try {
+        const requestUrl = new URL(route.request().url());
+        if (["http:", "https:"].includes(requestUrl.protocol)) validatePublicUrl(requestUrl.href);
+        await route.continue();
+      } catch {
+        await route.abort();
+      }
+    });
     const page = await context.newPage();
     if (saved.url) await page.goto(validatePublicUrl(saved.url).href, { waitUntil: "domcontentloaded", timeout: 30000 });
     const result = await operation(page);
