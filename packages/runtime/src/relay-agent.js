@@ -70,12 +70,13 @@ async function handleRequest(socket, message) {
 
 function connect() {
   const socket = new WebSocket(RELAY_URL, { headers: { authorization: `Bearer ${RELAY_TOKEN}` }, handshakeTimeout: 15000, maxPayload: 1024 * 1024 });
-  let heartbeat;
+  let heartbeat, stableTimer;
   socket.on("open", () => {
     process.stdout.write("OpenFish relay agent connected. Local browser remains on this device.\n");
     heartbeat = setInterval(() => {
-      if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "heartbeat", at: Date.now() }));
+      if (socket.readyState === WebSocket.OPEN) socket.ping();
     }, 25000);
+    stableTimer = setTimeout(() => { attempts = 0; }, 60000);
   });
   socket.on("message", raw => {
     let message;
@@ -84,6 +85,7 @@ function connect() {
   });
   socket.on("close", () => {
     if (heartbeat) clearInterval(heartbeat);
+    if (stableTimer) clearTimeout(stableTimer);
     process.stderr.write("OpenFish relay disconnected; reconnecting shortly.\n");
     scheduleReconnect();
   });
@@ -98,3 +100,6 @@ function scheduleReconnect() {
 }
 validateConfig();
 connect();
+
+process.on("SIGINT", () => process.exit(0));
+process.on("SIGTERM", () => process.exit(0));
