@@ -29,7 +29,12 @@ The local Worker dashboard is shown at the URL printed by Wrangler. The Browser 
 2. Create a Worker secret named `OPENFISH_API_TOKEN` with a randomly generated value of at least 24 characters. Never commit this token.
 3. Optional: create a KV namespace named `OPENFISH_SESSIONS`, bind it to this Worker as `SESSIONS`, and configure the same binding for preview and production. This stores browser cookies/localStorage for up to 24 hours. Use a separate namespace per environment.
 4. Set `ALLOWED_EXTENSION_ORIGIN` to the exact Chrome extension origin when the extension is connected. Leave empty for same-origin dashboard requests.
-5. Deploy the preview Worker from this directory:
+5. For automatic preview deployment, add these three repository Actions secrets under GitHub → Settings → Secrets and variables → Actions:
+   - `CLOUDFLARE_API_TOKEN`: Cloudflare API token with Workers Scripts Edit and Browser Rendering Edit permissions.
+   - `CLOUDFLARE_ACCOUNT_ID`: your Cloudflare account ID.
+   - `OPENFISH_API_TOKEN`: a new random secret with at least 24 characters. Do not paste it into chat or commit it.
+   Then push a commit to `feature/cloudflare-browser-run-v1`; the gated workflow will deploy the preview Worker and set its API token. If the secrets are absent, the workflow skips deployment without exposing credentials.
+6. Or deploy manually from this directory:
 
 ```bash
 npx wrangler deploy
