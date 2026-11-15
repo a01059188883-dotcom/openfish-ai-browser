@@ -46,7 +46,11 @@ The Worker uses Cloudflare's Browser Run binding. No Cloudflare account ID or Br
 
 - `GET /health` — unauthenticated health/version check.
 - `GET /api/v1/tools` — authenticated tool catalog.
-- `POST /api/v1/execute` — authenticated, bounded browser action sequence.
+- `POST /api/v1/execute` — authenticated, bounded browser action sequence (navigate, inspect, back/forward, reload, elements, accessibility, screenshot, approved click/fill).
+- `POST /api/v1/plan` — deterministic, non-LLM task draft.
+- `GET /api/v1/session?session_id=...` — current session metadata and redacted activity.
+- `POST /api/v1/session/clear` — clears saved KV metadata/state only; it does not terminate a live Browser Run instance.
+- `GET /api/v1/browser-status` — Browser Run quota and acquisition capacity.
 - `/mcp` — authenticated MCP Streamable HTTP endpoint.
 
 All API/MCP routes require `Authorization: Bearer <OPENFISH_API_TOKEN>`.
@@ -61,7 +65,7 @@ All API/MCP routes require `Authorization: Bearer <OPENFISH_API_TOKEN>`.
 
 ## Important preview limitations
 
-The cloud planner currently creates a deterministic draft, not an LLM-generated plan. The existing local planner continues to use Ollama. The cloud worker runs one browser context per tool call; with KV enabled, cookies and local storage are restored, but open tabs and live in-memory page state are not preserved between calls. This preview is designed to validate remote execution and MCP connectivity before a durable per-user browser-session layer is added.
+The cloud planner currently creates a deterministic draft, not an LLM-generated plan. The existing local planner continues to use Ollama. The cloud worker reconstructs the saved navigation history and restores cookies/local storage for each tool call; open tabs and live in-memory JavaScript state are not preserved between calls. The dashboard includes browser controls, screenshot capture, interactive-element discovery, accessibility inspection, editable task drafts, session metadata, redacted activity, quota diagnostics, and a one-click smoke test. This preview is designed to validate remote execution and MCP connectivity before a durable per-user browser-session layer is added.
 
 ## Relationship to local mode
 

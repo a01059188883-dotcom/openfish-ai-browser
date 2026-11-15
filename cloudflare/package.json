@@ -2,7 +2,7 @@
   "name": "openfish-cloudflare-worker",
   "private": true,
   "type": "module",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "scripts": {
     "check": "node --check src/index.js",
     "test": "node --test test/*.test.js",

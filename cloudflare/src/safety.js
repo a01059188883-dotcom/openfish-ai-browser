@@ -26,7 +26,7 @@ export const IRREVERSIBLE = /submit|purchase|buy now|pay|checkout|send|delete|re
 export function validateSteps(steps, approved = false) {
   if (!Array.isArray(steps) || steps.length < 1 || steps.length > 8) throw new Error("A plan must contain 1 to 8 steps.");
   for (const step of steps) {
-    if (!step || !["navigate","inspect","click","fill"].includes(step.action)) throw new Error("Unsupported browser action.");
+    if (!step || !["navigate","inspect","click","fill","back","forward","reload","elements","accessibility","screenshot"].includes(step.action)) throw new Error("Unsupported browser action.");
     if (["click","fill"].includes(step.action) && approved !== true) throw new Error("Explicit approval of the exact plan is required.");
     if (step.action === "navigate") validatePublicUrl(step.url);
     if (["click","fill"].includes(step.action) && (typeof step.selector !== "string" || !step.selector.trim() || step.selector.length > 500)) throw new Error("Invalid selector.");
