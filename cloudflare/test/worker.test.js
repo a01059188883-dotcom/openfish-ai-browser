@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { validatePublicUrl, validateSteps } from "../src/safety.js";
+import { summarizeBrowserLimits, isBrowserRateLimited, retryAfterMs } from "../src/browser-status.js";
 
 test("accepts public HTTPS URL", () => {
   assert.equal(validatePublicUrl("https://example.com/path").hostname, "example.com");
@@ -21,4 +22,29 @@ test("requires explicit approval for mutating actions", () => {
 test("rejects sensitive fills and oversized plans", () => {
   assert.throws(() => validateSteps([{ action: "fill", selector: "input[name=password]", value: "x" }], true));
   assert.throws(() => validateSteps(Array(9).fill({ action: "inspect" }), true));
+});
+
+test("summarizes Browser Run limits without exposing session identifiers", () => {
+  const status = summarizeBrowserLimits({
+    activeSessions: [{ id: "secret-session-id" }],
+    allowedBrowserAcquisitions: 0,
+    maxConcurrentSessions: 2,
+    timeUntilNextAllowedBrowserAcquisition: 4200
+  });
+  assert.deepEqual(status, {
+    active_sessions: 1,
+    max_concurrent_sessions: 2,
+    allowed_browser_acquisitions: 0,
+    time_until_next_allowed_acquisition_ms: 4200,
+    capacity_available: false
+  });
+  assert.equal(JSON.stringify(status).includes("secret-session-id"), false);
+});
+
+test("identifies Browser Run rate-limit errors and retry timing", () => {
+  assert.equal(isBrowserRateLimited(new Error("code: 429: Rate limit exceeded")), true);
+  assert.equal(isBrowserRateLimited(new Error("Target closed")), false);
+  assert.equal(retryAfterMs({ timeUntilNextAllowedBrowserAcquisition: 5000 }), 5000);
+  assert.equal(retryAfterMs({ timeUntilNextAllowedBrowserAcquisition: 0 }), 0);
+  assert.equal(retryAfterMs({}), null);
 });
