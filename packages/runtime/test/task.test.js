@@ -103,6 +103,16 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   assert.ok(html.includes('id="toolCatalog"'));
   assert.ok(app.includes("/api/v1/tools"));
   assert.ok(app.includes("navigator.clipboard.writeText"));
+  assert.ok(html.includes('id="eventFilter"'));
+  assert.ok(app.includes('$("eventFilter").addEventListener("input"'));
+  assert.ok(app.includes("filtered = events.filter"));
+  const adminCss = await readFile(resolve("packages/admin/style.css"), "utf8");
+  const extensionCss = await readFile(resolve("packages/chrome-extension/style.css"), "utf8");
+  assert.ok(adminCss.includes("prefers-reduced-motion"));
+  assert.ok(adminCss.includes("skip-link"));
+  assert.ok(adminCss.includes("@media(max-width:440px)"));
+  assert.ok(extensionCss.includes("prefers-reduced-motion"));
+  assert.ok(extensionCss.includes("@media(min-width:560px)"));
   for (const control of ["templateSelect", "templateLoad", "templateCreate", "templateUpdate", "templateDelete"]) assert.ok(html.includes(`id="${control}"`));
   for (const operation of ["templateCreate", "templateLoad", "templateUpdate", "templateDelete"]) assert.ok(app.includes(`$("${operation}")`));
   assert.ok(app.includes("textContent = String(value ?? \"\""));
