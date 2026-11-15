@@ -21,7 +21,7 @@ export function validatePublicUrl(value) {
   }
   return url;
 }
-const SENSITIVE = /password|passwd|secret|token|otp|recovery|credit.?card|card.?number|cvv|cvc|ssn|social.?security/i;
+export const SENSITIVE = /password|passwd|secret|token|otp|recovery|credit.?card|card.?number|cvv|cvc|ssn|social.?security/i;
 export const IRREVERSIBLE = /submit|purchase|buy now|pay|checkout|send|delete|remove|confirm|publish|post|transfer|付款|支付|购买|提交|发送|删除|确认|发布|转账|결제|구매|삭제|전송|게시/i;
 export function validateSteps(steps, approved = false) {
   if (!Array.isArray(steps) || steps.length < 1 || steps.length > 8) throw new Error("A plan must contain 1 to 8 steps.");
