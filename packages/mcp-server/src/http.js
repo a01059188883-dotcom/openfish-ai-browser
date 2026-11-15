@@ -76,7 +76,7 @@ function createMcpServer(token, sessionId, clientMeta) {
   const server = new McpServer({ name: "openfish-ai-browser-http", version: VERSION });
   const call = async (name, args = {}, write = false) => {
     if (write) {
-      await verifyKey(token, "browser:write");
+      await verifyKey(token, "browser:write", { ...clientMeta, sessionId });
     }
     return toolResult(await bridgeRequest(`/api/v1/tools/${name}`, { token, sessionId, ...clientMeta, body: args }));
   };
