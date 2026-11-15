@@ -113,7 +113,11 @@ async function invokeTool(name, args = {}) {
   throw Object.assign(new Error("Unknown OpenFish tool."), { statusCode: 404 });
 }
 
-const server = http.createServer(async (req, res) => {\n  const requestedSession = req.headers["x-openfish-session"] || "default";\n  if (requestedSession !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(requestedSession)) return send(res, 400, { error: "Invalid browser session ID." });\n  if (requestedSession !== "default" && !hasBrowserSession(requestedSession)) return send(res, 404, { error: "Browser session not found or expired." });\n  return runWithBrowserSession(requestedSession, async () => {
+const server = http.createServer(async (req, res) => {
+  const requestedSession = req.headers["x-openfish-session"] || "default";
+  if (requestedSession !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(requestedSession)) return send(res, 400, { error: "Invalid browser session ID." });
+  if (requestedSession !== "default" && !hasBrowserSession(requestedSession)) return send(res, 404, { error: "Browser session not found or expired." });
+  return runWithBrowserSession(requestedSession, async () => {
   const origin = req.headers.origin || "";
   const host = req.headers.host || "";
   res.reqPath = (req.url || "").split("?")[0];
