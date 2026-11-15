@@ -10,7 +10,7 @@ test("rejects non-http protocols and embedded credentials", () => {
   assert.throws(() => validatePublicUrl("https://user:pass@example.com"));
 });
 test("rejects localhost and private IPv4", () => {
-  for (const url of ["http://localhost", "http://127.0.0.1", "http://10.0.0.2", "http://192.168.1.2", "http://169.254.169.254"]) {
+  for (const url of ["http://localhost", "http://127.0.0.1", "http://10.0.0.2", "http://192.168.1.2", "http://169.254.169.254", "http://[::1]", "http://[fe80::1]"]) {
     assert.throws(() => validatePublicUrl(url), url);
   }
 });
