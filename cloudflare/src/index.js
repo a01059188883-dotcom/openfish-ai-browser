@@ -41,7 +41,7 @@ async function withBrowser(sessionId, operation, requireSaved = false) {
     let storageState;
     try { storageState = await context.storageState(); } catch { storageState = saved.storageState; }
     await saveSession(sessionId, { url, storageState, updatedAt: new Date().toISOString() });
-    return { ...result, session_id: sessionId, current_url: url, session_persistence: env.SESSIONS ? "KV (24h)" : "per-request only; bind SESSIONS KV to persist cookies and tabs" };
+    return { ...result, session_id: sessionId, current_url: url, session_persistence: env.SESSIONS ? "KV (24h)" : "per-request only; bind SESSIONS KV to persist cookies, local storage, and the last URL" };
   } finally {
     try { if (context) await context.close(); } catch {}
     try { await browser.close(); } catch {}
