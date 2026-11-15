@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const server = new McpServer({ name: "openfish-ai-browser", version: "1.1.3" });
+const server = new McpServer({ name: "openfish-ai-browser", version: "1.2.0" });
 const result = value => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
 
 async function bridgeRequest(path, options = {}) {
@@ -47,14 +47,16 @@ server.tool("execute_plan", "Execute a reviewed browser plan in the shared brows
   approved: z.literal(true).describe("Must be true only after the user has reviewed and explicitly approved this exact plan.")
 }, async ({ plan, approved }) => result(await bridgeRequest("/api/mcp/execute_plan", { method: "POST", body: { plan, approved } })));
 
-server.tool("click_element", "Click a unique visible button-like target in the shared browser. Potentially irreversible actions are blocked.", {
-  selector: z.string().min(1).max(500)
-}, async ({ selector }) => result(await bridgeRequest("/api/mcp/click_element", { method: "POST", body: { selector } })));
-
-server.tool("fill_element", "Fill a unique ordinary editable field in the shared browser. Credential, payment, identity, hidden, and sensitive fields are blocked.", {
+server.tool("click_element", "Click a unique visible button-like target in the shared browser. Requires explicit user approval; potentially irreversible actions remain blocked.", {
   selector: z.string().min(1).max(500),
-  value: z.string().max(10000)
-}, async ({ selector, value }) => result(await bridgeRequest("/api/mcp/fill_element", { method: "POST", body: { selector, value } })));
+  approved: z.literal(true).describe("Must be true only after the user explicitly approves this exact click.")
+}, async ({ selector, approved }) => result(await bridgeRequest("/api/mcp/click_element", { method: "POST", body: { selector, approved } })));
+
+server.tool("fill_element", "Fill a unique ordinary editable field in the shared browser. Requires explicit user approval; credential, payment, identity, hidden, and sensitive fields remain blocked.", {
+  selector: z.string().min(1).max(500),
+  value: z.string().max(10000),
+  approved: z.literal(true).describe("Must be true only after the user explicitly approves this exact field and value.")
+}, async ({ selector, value, approved }) => result(await bridgeRequest("/api/mcp/fill_element", { method: "POST", body: { selector, value, approved } })));
 
 server.tool("take_screenshot", "Capture the current page in the shared browser and return the screenshot file path.", {}, async () => result(await bridgeRequest("/api/mcp/take_screenshot", { method: "POST" })));
 

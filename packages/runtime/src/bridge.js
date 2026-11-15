@@ -7,7 +7,7 @@ import { executePlan } from "./executor.js";
 import { validateHttpUrl } from "./safety.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const VERSION = "1.1.3";
+const VERSION = "1.2.0";
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 const startedAt = Date.now();
 const metrics = { requests: 0, errors: 0, events: [] };
@@ -200,10 +200,12 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "POST" && req.url === "/api/mcp/click_element") {
       const body = await readBody(req);
+      if (body.approved !== true) return send(res, 403, { error: "Explicit approval of this exact click is required." });
       return send(res, 200, await executePlan({ steps: [{ action: "click", selector: body.selector }] }, { approved: true }));
     }
     if (req.method === "POST" && req.url === "/api/mcp/fill_element") {
       const body = await readBody(req);
+      if (body.approved !== true) return send(res, 403, { error: "Explicit approval of this exact field and value is required." });
       return send(res, 200, await executePlan({ steps: [{ action: "fill", selector: body.selector, value: body.value }] }, { approved: true }));
     }
     if (req.method === "POST" && req.url === "/api/mcp/take_screenshot") {

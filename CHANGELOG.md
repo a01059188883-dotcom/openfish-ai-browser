@@ -83,3 +83,13 @@
 - Add responsive AI provider integration cards with copyable endpoint paths.
 - Load the canonical browser tool catalog live from the local bridge and show each tool's approval requirement.
 - Synchronize package, bridge, MCP, extension, side panel, README, changelog, and regression test version markers.
+
+
+## 1.2.0 - 2026-11-15
+- Fixed an approval bypass in the MCP direct click/fill routes: both MCP schemas and bridge handlers now require explicit approval for the exact action.
+- Added regression tests covering MCP click/fill approval requirements.
+- Added local task-template create, read, update, and delete controls to the admin dashboard; templates remain in the current browser's local storage.
+- Hardened dashboard activity rendering by replacing HTML string interpolation with safe text nodes.
+- Prevented overlapping status refreshes and made failed/empty AI plans non-executable.
+- Fixed the stale dashboard version label and synchronized release metadata across runtime, MCP, extension, README, and tests.
+- Improved responsive layout for task-template controls.
