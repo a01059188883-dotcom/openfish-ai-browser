@@ -38,7 +38,7 @@ test("bridge applies strict URL validation to AI planning and uses the configure
   assert.ok(bridge.includes("const ALLOWED_HOSTS = new Set(["));
   assert.ok(bridge.includes("127.0.0.1:${PORT}"));
   assert.ok(bridge.includes("const parsed = validateHttpUrl(body.url)"));
-  assert.ok(bridge.includes('const VERSION = "1.2.0"'));
+  assert.ok(bridge.includes('const VERSION = "1.3.0"'));
 });
 
 test("approved plan executor enforces explicit approval and stops on unsafe targets", async () => {
@@ -90,7 +90,7 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   const html = await readFile(resolve("packages/admin/index.html"), "utf8");
   const app = await readFile(resolve("packages/admin/app.js"), "utf8");
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "1.2.0");
+  assert.equal(pkg.version, "1.3.0");
   assert.ok(bridge.includes('req.url === "/api/admin/status"'));
   assert.ok(bridge.includes('req.url === "/api/admin/events"'));
   assert.ok(bridge.includes('["../../admin/index.html"'));
@@ -103,6 +103,16 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   assert.ok(html.includes('id="toolCatalog"'));
   assert.ok(app.includes("/api/v1/tools"));
   assert.ok(app.includes("navigator.clipboard.writeText"));
+  assert.ok(html.includes('id="eventFilter"'));
+  assert.ok(app.includes('$("eventFilter").addEventListener("input"'));
+  assert.ok(app.includes("filtered = events.filter"));
+  const adminCss = await readFile(resolve("packages/admin/style.css"), "utf8");
+  const extensionCss = await readFile(resolve("packages/chrome-extension/style.css"), "utf8");
+  assert.ok(adminCss.includes("prefers-reduced-motion"));
+  assert.ok(adminCss.includes("skip-link"));
+  assert.ok(adminCss.includes("@media(max-width:440px)"));
+  assert.ok(extensionCss.includes("prefers-reduced-motion"));
+  assert.ok(extensionCss.includes("@media(min-width:560px)"));
   for (const control of ["templateSelect", "templateLoad", "templateCreate", "templateUpdate", "templateDelete"]) assert.ok(html.includes(`id="${control}"`));
   for (const operation of ["templateCreate", "templateLoad", "templateUpdate", "templateDelete"]) assert.ok(app.includes(`$("${operation}")`));
   assert.ok(app.includes("textContent = String(value ?? \"\""));

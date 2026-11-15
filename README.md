@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **1.2.0**.
+Open-source, free-first browser automation starter. Version: **1.3.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -32,7 +32,7 @@ npm run start:mcp
 ```
 Configure your MCP host to launch `node packages/mcp-server/src/index.js` from this project directory using stdio.
 
-## Visual admin dashboard\nOpen `http://127.0.0.1:8787/admin` after starting the bridge to open the local control panel. It displays bridge uptime, API request/error counts, browser connection mode, recent API activity, and a task planner with explicit approval before execution. Dashboard telemetry is held in process memory and resets when the bridge restarts. The panel is served only by the local bridge; it is not a public cloud admin site.\n\n## Unified local runtime (v1.2.0)\nThe bridge is the single owner of the Playwright browser. Both the Chrome side panel and the stdio MCP server call the same local bridge API; MCP no longer launches a second browser process. Start `npm run start:bridge` before launching either client. The MCP server exposes `open_page`, `read_page`, `plan_task`, `execute_plan`, `click_element`, `fill_element`, `take_screenshot`, `list_interactive_elements`, and `get_accessibility_snapshot`.\n\n## Review and execution flow
+## Visual admin dashboard\nOpen `http://127.0.0.1:8787/admin` after starting the bridge to open the local control panel. It displays bridge uptime, API request/error counts, browser connection mode, recent API activity, and a task planner with explicit approval before execution. Dashboard telemetry is held in process memory and resets when the bridge restarts. The panel is served only by the local bridge; it is not a public cloud admin site.\n\n## Unified local runtime (v1.3.0)\nThe bridge is the single owner of the Playwright browser. Both the Chrome side panel and the stdio MCP server call the same local bridge API; MCP no longer launches a second browser process. Start `npm run start:bridge` before launching either client. The MCP server exposes `open_page`, `read_page`, `plan_task`, `execute_plan`, `click_element`, `fill_element`, `take_screenshot`, `list_interactive_elements`, and `get_accessibility_snapshot`.\n\n## Review and execution flow
 1. Ask the local AI planner to generate a plan for the current page.
 2. Review the complete plan in the Chrome side panel or MCP response.
 3. Explicitly approve the exact plan using the side-panel confirmation or the MCP `execute_plan` tool with `approved: true`.
@@ -51,7 +51,7 @@ This is a local-first developer tool, not yet a hardened multi-user SaaS. Before
 - Manually complete any blocked high-risk action only after independently reviewing the page and consequences.
 - Stop if the page content or requested action differs from the plan you approved.
 
-## Multi-platform AI integration (v1.2.0)
+## Multi-platform AI integration (v1.3.0)
 OpenFish provides a provider-neutral tool catalog and schema adapters so AI clients can integrate without changing the browser runtime:
 - `GET /api/v1/tools` or `GET /.well-known/openfish-tools.json`: canonical tool catalog and discovery metadata.
 - `GET /api/v1/adapters/openai`: OpenAI function-tool schema.
@@ -62,18 +62,18 @@ OpenFish provides a provider-neutral tool catalog and schema adapters so AI clie
 These are schema and REST compatibility interfaces, not direct hosted integrations with every vendor SDK. Clients must call the tool endpoint from their own agent runtime. The local bridge remains bound to loopback and is not safe to expose publicly without authentication, per-user isolation, rate limits, and network/SSRF hardening. Actions that change page state require `approved: true`; sensitive and irreversible targets remain blocked.
 
 
-## Network destination protection (v1.2.0)
+## Network destination protection (v1.3.0)
 The runtime rejects loopback, private, link-local, metadata, and reserved IP literals plus common local-only hostnames. A Playwright context request guard applies the same checks to HTTP(S) subresources and redirect destinations, not only the first navigation URL. This is defense in depth, not a complete network sandbox: DNS rebinding and private-address resolution behind an otherwise public hostname require deployment-level egress filtering or a hardened outbound proxy. Keep the bridge bound to loopback and do not expose it directly to the internet.
 
 
-## Admin console AI integration panel (v1.2.0)
+## Admin console AI integration panel (v1.3.0)
 The local dashboard now displays provider-specific integration endpoints for OpenAI-compatible function tools, Anthropic tool use, Gemini function declarations, and the OpenFish tool discovery manifest. Endpoint paths can be copied from the console, and the available tool catalog is loaded live from the bridge. These are local compatibility interfaces, not hosted vendor connections.
 
 
-## Admin task templates (v1.2.0)
+## Admin task templates (v1.3.0)
 The dashboard supports creating, reading/loading, updating, and deleting reusable task templates. Templates are stored in the current browser's local storage only; they are not synced to the MCP process or other devices. The dashboard activity feed remains process-memory telemetry and is not a durable task-history database.
 
-## Approval boundary (v1.2.0)
+## Approval boundary (v1.3.0)
 MCP `click_element` and `fill_element` now require an explicit `approved: true` argument for the exact action. The bridge independently checks this value before execution. Existing plan execution continues to require explicit approval. Sensitive fields and irreversible actions remain blocked by runtime policy.
 
 ## Current scope and deployment limitations
