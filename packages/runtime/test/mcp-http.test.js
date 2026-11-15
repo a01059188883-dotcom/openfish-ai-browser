@@ -10,7 +10,7 @@ test("Streamable HTTP MCP endpoint is authenticated and loopback-bound by defaul
   assert.ok(source.includes('transport.handleRequest(req, res, body)'));
   assert.ok(source.includes('process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1"'));
   assert.ok(source.includes('Authorization: Bearer API_KEY'));
-  assert.ok(source.includes('verifyKey(bearer[1], "browser:read")'));
+  assert.ok(source.includes('await verifyKey(bearer[1], "browser:read")'));
   assert.ok(source.includes('verifyKey(token, "browser:write")'));
   assert.ok(source.includes('"x-openfish-session": sessionId'));
 });
@@ -41,5 +41,5 @@ test("release metadata includes HTTP MCP entry point", async () => {
   assert.equal(pkg.version, "1.5.0");
   assert.equal(pkg.scripts["start:mcp:http"], "node packages/mcp-server/src/http.js");
   assert.ok(pkg.scripts.check.includes("node --check packages/mcp-server/src/http.js"));
-  assert.ok(httpMcp.includes('version: "1.5.0"'));
+  assert.ok(httpMcp.includes('const VERSION = "1.5.0"'));
 });
