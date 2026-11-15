@@ -1,6 +1,6 @@
 import http from "node:http";
 import { readFile } from "node:fs/promises";
-import { getPage, getBrowserStatus } from "./browser.js";
+import { getPage, getBrowserStatus, runWithBrowserSession, createBrowserSession, listBrowserSessions, closeBrowserSession } from "./browser.js";
 import { runTask, getPageContext } from "./task.js";
 import { createPlan } from "./ai-planner.js";
 import { executePlan } from "./executor.js";
@@ -8,7 +8,7 @@ import { validateHttpUrl } from "./safety.js";
 import { authenticateApiKey, createApiKey, listApiKeys, revokeApiKey } from "./api-keys.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const VERSION = "1.4.0";
+const VERSION = "1.5.0";
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 const startedAt = Date.now();
 const metrics = { requests: 0, errors: 0, events: [] };
@@ -113,7 +113,7 @@ async function invokeTool(name, args = {}) {
   throw Object.assign(new Error("Unknown OpenFish tool."), { statusCode: 404 });
 }
 
-const server = http.createServer(async (req, res) => {
+const server = http.createServer(async (req, res) => {\n  const requestedSession = req.headers["x-openfish-session"] || "default";\n  if (requestedSession !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(requestedSession)) return send(res, 400, { error: "Invalid browser session ID." });\n  return runWithBrowserSession(requestedSession, async () => {
   const origin = req.headers.origin || "";
   const host = req.headers.host || "";
   res.reqPath = (req.url || "").split("?")[0];
@@ -139,6 +139,17 @@ const server = http.createServer(async (req, res) => {
       const paths = {};
       for (const tool of TOOL_CATALOG) paths[`/api/v1/tools/${tool.name}`] = { post: { operationId: tool.name, summary: tool.description, requestBody: { required: true, content: { "application/json": { schema: tool.inputSchema } } }, responses: { "200": { description: "Tool result" } } } };
       return send(res, 200, { openapi: "3.1.0", info: { title: "OpenFish AI Browser API", version: VERSION }, servers: [{ url: `http://127.0.0.1:${PORT}` }], paths });
+    }
+    if (req.method === "GET" && res.reqPath === "/api/browser/sessions") {
+      return send(res, 200, { sessions: listBrowserSessions(), ttlMs: Number(process.env.OPENFISH_SESSION_TTL_MS || 30 * 60 * 1000) });
+    }
+    if (req.method === "POST" && res.reqPath === "/api/browser/sessions") {
+      const body = await readBody(req);
+      return send(res, 201, { session: await createBrowserSession(body.name) });
+    }
+    if (req.method === "POST" && res.reqPath.startsWith("/api/browser/sessions/") && res.reqPath.endsWith("/close")) {
+      const id = res.reqPath.slice("/api/browser/sessions/".length, -"/close".length);
+      return send(res, 200, await closeBrowserSession(id));
     }
     if (req.method === "GET" && res.reqPath === "/api/admin/keys") {
       return send(res, 200, { keys: await listApiKeys() });
@@ -267,5 +278,6 @@ const server = http.createServer(async (req, res) => {
   } catch (error) {
     return send(res, error.statusCode || 500, { error: error.message || "Internal error" });
   }
+  });
 });
 server.listen(PORT, "127.0.0.1", () => console.log(`OpenFish bridge listening on http://127.0.0.1:${PORT} (admin: /admin)`));
