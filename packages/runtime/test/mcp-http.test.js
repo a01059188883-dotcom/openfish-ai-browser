@@ -40,10 +40,10 @@ test("browser sessions use separate contexts and unknown session IDs are rejecte
 test("release metadata includes HTTP MCP entry point", async () => {
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
   const httpMcp = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
-  assert.equal(pkg.version, "1.7.0");
+  assert.equal(pkg.version, "1.7.1");
   assert.equal(pkg.scripts["start:mcp:http"], "node packages/mcp-server/src/http.js");
   assert.ok(pkg.scripts.check.includes("node --check packages/mcp-server/src/http.js"));
-  assert.ok(httpMcp.includes('const VERSION = "1.7.0"'));
+  assert.ok(httpMcp.includes('const VERSION = "1.7.1"'));
 });
 
 
@@ -62,7 +62,7 @@ test("AI client registry persists client metadata and enforces per-key rate limi
   assert.ok(httpMcp.includes('clientId: String(req.headers["x-openfish-client"] || "mcp-http")'));
   assert.ok(admin.includes('api("/api/admin/clients")'));
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "1.7.0");
+  assert.equal(pkg.version, "1.7.1");
   assert.ok(pkg.scripts.check.includes("packages/runtime/src/client-registry.js"));
 });
 
@@ -85,7 +85,20 @@ test("Cloudflare relay is authenticated, allowlisted, bounded, and outbound-only
   assert.ok(agent.includes('http://127.0.0.1:8787'));
   assert.ok(agent.includes('AbortSignal.timeout(40000)'));
   assert.ok(!agent.includes('new URL(message.destination'));
-  assert.equal(pkg.version, "1.7.0");
+  assert.equal(pkg.version, "1.7.1");
   assert.equal(pkg.scripts["start:relay-agent"], "node packages/runtime/src/relay-agent.js");
   assert.ok(pkg.scripts.check.includes("node --check cloudflare/worker.js"));
+});
+
+
+test("GitHub Actions relay deployment requires all Cloudflare secrets and installs Worker secret", async () => {
+  const workflow = await readFile(resolve(".github/workflows/deploy-relay.yml"), "utf8");
+  assert.ok(workflow.includes("workflow_dispatch"));
+  assert.ok(workflow.includes("secrets.CLOUDFLARE_API_TOKEN"));
+  assert.ok(workflow.includes("secrets.CLOUDFLARE_ACCOUNT_ID"));
+  assert.ok(workflow.includes("secrets.OPENFISH_RELAY_TOKEN"));
+  assert.ok(workflow.includes("wrangler@4 deploy"));
+  assert.ok(workflow.includes("wrangler@4 secret put OPENFISH_RELAY_TOKEN"));
+  assert.ok(workflow.includes("npm run check"));
+  assert.ok(workflow.includes("npm test"));
 });
