@@ -6,7 +6,7 @@ import { z } from "zod";
 const PORT = Number(process.env.OPENFISH_MCP_HTTP_PORT || 8788);
 const HOST = process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1";
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const VERSION = "1.5.0";
+const VERSION = "1.6.0";
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -31,7 +31,7 @@ function sendError(res, status, message) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
   res.end(JSON.stringify({ error: message }));
 }
-async function bridgeRequest(path, { token, sessionId, body, method = "POST" }) {
+async function bridgeRequest(path, { token, sessionId, clientId, platform, body, method = "POST" }) {
   let response;
   try {
     response = await fetch(`${BRIDGE}${path}`, {
@@ -39,6 +39,8 @@ async function bridgeRequest(path, { token, sessionId, body, method = "POST" }) 
       headers: {
         authorization: `Bearer ${token}`,
         "x-openfish-session": sessionId,
+        "x-openfish-client": clientId,
+        "x-openfish-platform": platform,
         ...(body === undefined ? {} : { "content-type": "application/json" })
       },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -51,13 +53,13 @@ async function bridgeRequest(path, { token, sessionId, body, method = "POST" }) 
   if (!response.ok) throw new Error(data.error || `OpenFish bridge returned HTTP ${response.status}`);
   return data.result ?? data;
 }
-async function verifyKey(token, scope = "browser:read") {
+async function verifyKey(token, scope = "browser:read", metadata = {}) {
   let response;
   try {
     response = await fetch(`${BRIDGE}/api/auth/verify`, {
       method: "POST",
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({ scope }),
+      body: JSON.stringify({ scope, ...metadata }),
       signal: AbortSignal.timeout(10000)
     });
   } catch {
@@ -70,13 +72,13 @@ async function verifyKey(token, scope = "browser:read") {
 function toolResult(value) {
   return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
 }
-function createMcpServer(token, sessionId) {
+function createMcpServer(token, sessionId, clientMeta) {
   const server = new McpServer({ name: "openfish-ai-browser-http", version: VERSION });
   const call = async (name, args = {}, write = false) => {
     if (write) {
       await verifyKey(token, "browser:write");
     }
-    return toolResult(await bridgeRequest(`/api/v1/tools/${name}`, { token, sessionId, body: args }));
+    return toolResult(await bridgeRequest(`/api/v1/tools/${name}`, { token, sessionId, ...clientMeta, body: args }));
   };
   server.tool("open_page", "Navigate the isolated browser session to a public HTTP(S) URL.", { url: z.string().url() }, args => call("open_page", args, true));
   server.tool("read_page", "Read the current page title, URL, and visible text.", {}, args => call("read_page", args));
@@ -108,14 +110,18 @@ const httpServer = http.createServer(async (req, res) => {
   }
   const bearer = /^Bearer (.+)$/i.exec(req.headers.authorization || "");
   if (!bearer) return sendError(res, 401, "Authorization: Bearer API_KEY is required.");
-  try { await verifyKey(bearer[1], "browser:read"); }
+  try { await verifyKey(bearer[1], "browser:read", { ...clientMeta, sessionId }); }
   catch (error) { return sendError(res, error.statusCode || 401, error.message); }
   const sessionId = req.headers["x-openfish-session"] || "default";
+  const clientMeta = {
+    clientId: String(req.headers["x-openfish-client"] || "mcp-http").slice(0, 80),
+    platform: String(req.headers["x-openfish-platform"] || "mcp-http").slice(0, 40)
+  };
   if (sessionId !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) return sendError(res, 400, "Invalid browser session ID.");
   try {
     const body = req.method === "POST" ? await readBody(req) : undefined;
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-    const server = createMcpServer(bearer[1], sessionId);
+    const server = createMcpServer(bearer[1], sessionId, clientMeta);
     await server.connect(transport);
     await transport.handleRequest(req, res, body);
   } catch (error) {
