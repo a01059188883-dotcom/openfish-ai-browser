@@ -71,7 +71,11 @@ export async function createBrowserSession(name = "New session") {
   touch(session);
   return publicSession(session);
 }
-export function hasBrowserSession(id) {\n  listBrowserSessions();\n  return sessions.has(id);\n}\nexport function listBrowserSessions() {
+export function hasBrowserSession(id) {
+  listBrowserSessions();
+  return sessions.has(id);
+}
+export function listBrowserSessions() {
   const now = Date.now();
   for (const [id, session] of sessions) {
     if (id !== "default" && Date.parse(session.expiresAt || 0) <= now) {
