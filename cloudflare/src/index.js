@@ -4,8 +4,9 @@ import { createMcpHandler } from "agents/mcp/server";
 import { env } from "cloudflare:workers";
 import { z } from "zod";
 import { validatePublicUrl, validateSteps, IRREVERSIBLE, SENSITIVE } from "./safety.js";
+import { summarizeBrowserLimits, isBrowserRateLimited, retryAfterMs } from "./browser-status.js";
 
-const VERSION = "1.2.0-cloudflare-preview";
+const VERSION = "1.2.1-cloudflare-preview";
 const MAX_TEXT = 20000;
 const MAX_STEPS = 8;
 function json(value, status = 200, headers = {}) {
@@ -158,9 +159,26 @@ export default {
       if (request.method === "GET" && url.pathname === "/api/v1/tools") {
         return json({ name: "OpenFish AI Browser", version: VERSION, transport: "MCP Streamable HTTP", mcp: "/mcp", tools: ["open_page","read_page","plan_task","execute_plan","list_interactive_elements","get_accessibility_snapshot","click_element","fill_element","take_screenshot"] }, 200, corsHeaders(request, bindings));
       }
+      if (request.method === "GET" && url.pathname === "/api/v1/browser-status") {
+        try {
+          const limits = await bindings.BROWSER.limits();
+          return json({ ok: true, version: VERSION, browser_run: summarizeBrowserLimits(limits) }, 200, corsHeaders(request, bindings));
+        } catch (error) {
+          return json({ ok: false, error: error.message || "Browser Run status unavailable." }, 503, corsHeaders(request, bindings));
+        }
+      }
       if (request.method === "POST" && url.pathname === "/api/v1/execute") {
         try { const body = await request.json(); return json(await executeSteps(body), 200, corsHeaders(request, bindings)); }
-        catch (error) { return json({ error: error.message || "Browser task failed." }, 400, corsHeaders(request, bindings)); }
+        catch (error) {
+          const message = error.message || "Browser task failed.";
+          if (isBrowserRateLimited(error)) {
+            let waitMs = null;
+            try { waitMs = retryAfterMs(await bindings.BROWSER.limits()); } catch {}
+            const headers = waitMs === null ? corsHeaders(request, bindings) : { ...corsHeaders(request, bindings), "retry-after": String(Math.max(1, Math.ceil(waitMs / 1000))) };
+            return json({ error: message, code: "BROWSER_RATE_LIMITED", retry_after_ms: waitMs, guidance: waitMs === null ? "Do not repeatedly retry. Check Browser Run limits in the dashboard before trying again." : "Wait for the indicated interval, then retry once." }, 429, headers);
+          }
+          return json({ error: message }, 400, corsHeaders(request, bindings));
+        }
       }
       return json({ error: "Not found." }, 404, corsHeaders(request, bindings));
     }
