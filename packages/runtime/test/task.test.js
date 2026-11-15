@@ -52,10 +52,10 @@ test("approved plan executor enforces explicit approval and stops on unsafe targ
   assert.ok(executor.includes('return { status: "stopped"'));
   assert.ok(mcp.includes('server.tool("execute_plan"'));
   assert.ok(mcp.includes("approved: z.literal(true)"));
-  assert.match(mcp, /click_element[\\s\\S]*?approved: z\\.literal\\(true\\)/);
-  assert.match(mcp, /fill_element[\\s\\S]*?approved: z\\.literal\\(true\\)/);
-  assert.match(bridge, /api\\/mcp\\/click_element[\\s\\S]*?body\\.approved !== true/);
-  assert.match(bridge, /api\\/mcp\\/fill_element[\\s\\S]*?body\\.approved !== true/);
+  assert.ok(mcp.includes('approved: z.literal(true).describe("Must be true only after the user explicitly approves this exact click.")'));
+  assert.ok(mcp.includes('approved: z.literal(true).describe("Must be true only after the user explicitly approves this exact field and value.")'));
+  assert.ok(bridge.includes("Explicit approval of this exact click is required."));
+  assert.ok(bridge.includes("Explicit approval of this exact field and value is required."));
   assert.ok(bridge.includes('req.url === "/api/execute"'));
   assert.ok(bridge.includes("body.approved !== true"));
 });
