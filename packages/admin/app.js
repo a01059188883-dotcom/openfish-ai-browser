@@ -2,6 +2,7 @@ const $ = id => document.getElementById(id);
 const TEMPLATE_KEY = "openfish.taskTemplates.v1";
 let plan = null;
 let pollBusy = false;
+let latestEvents = [];
 
 async function api(path, body) {
   const response = await fetch(path, {
@@ -37,17 +38,20 @@ function drawBars(events) {
   });
 }
 function renderEvents(events) {
+  const filter = ($("eventFilter")?.value || "").trim().toLocaleLowerCase();
+  const filtered = events.filter(event => !filter || String(event.path || "").toLocaleLowerCase().includes(filter) || String(event.status ?? "").includes(filter));
+  $("eventCount").textContent = `${filtered.length} / ${events.length} 条记录`;
   const body = $("events");
   body.replaceChildren();
-  if (!events.length) {
+  if (!filtered.length) {
     const row = document.createElement("tr");
-    const cell = textNode("td", "暂无活动记录，执行操作后会显示在这里", "muted");
+    const cell = textNode("td", filter ? "没有匹配的日志记录" : "暂无活动记录，执行操作后会显示在这里", "muted");
     cell.colSpan = 4;
     row.append(cell);
     body.append(row);
     return;
   }
-  for (const event of events) {
+  for (const event of filtered) {
     const row = document.createElement("tr");
     row.append(
       textNode("td", fmtTime(event.time)),
@@ -76,8 +80,8 @@ async function refresh() {
     $("model").textContent = status.model || "未配置";
     $("mode").textContent = status.browser?.remote ? "远程" : "本地";
     $("version").textContent = status.version || "1.2.0";
-    const events = Array.isArray(activity.events) ? activity.events : [];
-    renderEvents(events);
+    latestEvents = Array.isArray(activity.events) ? activity.events : [];
+    renderEvents(latestEvents);
     drawBars(events);
   } catch (error) {
     $("connection").textContent = "连接失败";
@@ -143,6 +147,7 @@ $("clear").addEventListener("click", () => {
 });
 $("refresh").addEventListener("click", refresh);
 $("refreshLog").addEventListener("click", refresh);
+$("eventFilter").addEventListener("input", () => renderEvents(latestEvents));
 
 async function loadToolCatalog() {
   const host = $("toolCatalog");
