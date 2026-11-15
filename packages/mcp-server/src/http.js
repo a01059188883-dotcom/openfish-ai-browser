@@ -2,7 +2,6 @@ import http from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { authenticateApiKey } from "../../runtime/src/api-keys.js";
 
 const PORT = Number(process.env.OPENFISH_MCP_HTTP_PORT || 8788);
 const HOST = process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1";
@@ -51,6 +50,22 @@ async function bridgeRequest(path, { token, sessionId, body, method = "POST" }) 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || `OpenFish bridge returned HTTP ${response.status}`);
   return data.result ?? data;
+}
+async function verifyKey(token, scope = "browser:read") {
+  let response;
+  try {
+    response = await fetch(`${BRIDGE}/api/auth/verify`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ scope }),
+      signal: AbortSignal.timeout(10000)
+    });
+  } catch {
+    throw new Error("Cannot verify API key with the local OpenFish bridge. Is the bridge running?");
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw Object.assign(new Error(data.error || "API key verification failed."), { statusCode: response.status });
+  return data.identity;
 }
 function toolResult(value) {
   return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
