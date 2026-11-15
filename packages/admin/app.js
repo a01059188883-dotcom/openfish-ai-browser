@@ -80,7 +80,7 @@ async function refresh() {
     $("model").textContent = status.model || "未配置";
     if ($("clientCount")) $("clientCount").textContent = status.clientCount ?? 0;
     $("mode").textContent = status.browser?.remote ? "远程" : "本地";
-    $("version").textContent = status.version || "1.6.0";
+    $("version").textContent = status.version || "1.7.0";
     latestEvents = Array.isArray(activity.events) ? activity.events : [];
     renderEvents(latestEvents);
     drawBars(latestEvents);
