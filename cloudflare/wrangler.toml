@@ -8,6 +8,10 @@ workers_dev = true
 binding = "BROWSER"
 remote = true
 
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "b46d41f9057c41f683b9b91ca08d8bb2"
+
 [assets]
 directory = "./public"
 binding = "ASSETS"
