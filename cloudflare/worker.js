@@ -1,3 +1,4 @@
+const VERSION = "1.7.0";
 const MAX_BODY_BYTES = 512 * 1024;
 const ALLOWED_PATH = path => path === "/mcp" || path === "/health" ||
   path === "/.well-known/openfish-tools.json" ||
@@ -13,6 +14,13 @@ function constantTimeEqual(a, b) {
   let diff = a.length ^ b.length;
   for (let i = 0; i < length; i++) diff |= (a.charCodeAt(i % a.length) || 0) ^ (b.charCodeAt(i % b.length) || 0);
   return diff === 0;
+}
+function bytesToBase64(bytes) {
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+  }
+  return btoa(binary);
 }
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
@@ -57,7 +65,7 @@ export default {
     if (request.method !== "GET" && request.method !== "HEAD") {
       const bytes = await request.arrayBuffer();
       if (bytes.byteLength > MAX_BODY_BYTES) return json({ error: "Request body exceeds 512 KB relay limit." }, 413);
-      body = btoa(String.fromCharCode(...new Uint8Array(bytes)));
+      body = bytesToBase64(new Uint8Array(bytes));
     }
     const payload = {
       path: url.pathname + url.search,
@@ -107,7 +115,7 @@ export class OpenFishRelay {
     }
     if (url.pathname === "/status") {
       const agents = this.ctx.getWebSockets().filter(socket => (socket.deserializeAttachment() || {}).role === "agent");
-      return json({ ok: true, connected: agents.length > 0, agents: agents.length, protocol: "openfish-relay/1" });
+      return json({ ok: true, version: VERSION, connected: agents.length > 0, agents: agents.length, protocol: "openfish-relay/1" });
     }
     if (url.pathname !== "/proxy" || request.method !== "POST") return new Response("Not found", { status: 404 });
     const agents = this.ctx.getWebSockets().filter(socket => (socket.deserializeAttachment() || {}).role === "agent");
