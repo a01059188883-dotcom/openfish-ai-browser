@@ -32,7 +32,7 @@ test("browser sessions use separate contexts and unknown session IDs are rejecte
   assert.ok(bridge.includes('res.reqPath === "/api/auth/verify"'));
   assert.ok(html.includes('id="sessions"'));
   assert.ok(app.includes('api("/api/browser/sessions")'));
-  assert.ok(app.includes('X-OpenFish-Session') === false); // Client supplies this header when configuring its MCP endpoint.
+  assert.ok(html.includes("X-OpenFish-Session"));
 });
 
 test("release metadata includes HTTP MCP entry point", async () => {
