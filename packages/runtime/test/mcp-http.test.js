@@ -1,0 +1,45 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
+test("Streamable HTTP MCP endpoint is authenticated and loopback-bound by default", async () => {
+  const source = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
+  assert.ok(source.includes('from "@modelcontextprotocol/sdk/server/streamableHttp.js"'));
+  assert.ok(source.includes('new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })'));
+  assert.ok(source.includes('transport.handleRequest(req, res, body)'));
+  assert.ok(source.includes('process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1"'));
+  assert.ok(source.includes('Authorization: Bearer API_KEY'));
+  assert.ok(source.includes('verifyKey(bearer[1], "browser:read")'));
+  assert.ok(source.includes('verifyKey(token, "browser:write")'));
+  assert.ok(source.includes('"x-openfish-session": sessionId'));
+});
+
+test("browser sessions use separate contexts and unknown session IDs are rejected", async () => {
+  const browser = await readFile(resolve("packages/runtime/src/browser.js"), "utf8");
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  const html = await readFile(resolve("packages/admin/index.html"), "utf8");
+  const app = await readFile(resolve("packages/admin/app.js"), "utf8");
+  assert.ok(browser.includes("new Map()"));
+  assert.ok(browser.includes("instance.newContext("));
+  assert.ok(browser.includes("runWithBrowserSession"));
+  assert.ok(browser.includes("SESSION_TTL_MS"));
+  assert.ok(browser.includes("MAX_SESSIONS"));
+  assert.ok(browser.includes("closeBrowserSession"));
+  assert.ok(bridge.includes("hasBrowserSession(requestedSession)"));
+  assert.ok(bridge.includes('res.reqPath === "/api/browser/sessions"'));
+  assert.ok(bridge.includes('res.reqPath.endsWith("/close")'));
+  assert.ok(bridge.includes('res.reqPath === "/api/auth/verify"'));
+  assert.ok(html.includes('id="sessions"'));
+  assert.ok(app.includes('api("/api/browser/sessions")'));
+  assert.ok(app.includes('X-OpenFish-Session') === false); // Client supplies this header when configuring its MCP endpoint.
+});
+
+test("release metadata includes HTTP MCP entry point", async () => {
+  const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
+  const httpMcp = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
+  assert.equal(pkg.version, "1.5.0");
+  assert.equal(pkg.scripts["start:mcp:http"], "node packages/mcp-server/src/http.js");
+  assert.ok(pkg.scripts.check.includes("node --check packages/mcp-server/src/http.js"));
+  assert.ok(httpMcp.includes('version: "1.5.0"'));
+});
