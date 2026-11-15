@@ -102,3 +102,11 @@
 - Added accessible skip navigation, visible keyboard focus, reduced-motion support, and narrow-screen layout refinements.
 - Refined the Chrome extension side panel with a compact header, clearer task sections, improved output readability, and responsive spacing.
 - Synchronized package, bridge, MCP, extension, dashboard, README, and regression-test version markers to 1.3.0.
+
+ 
+## 1.4.0 - 2026-11-15
+- Added local API key create/list/revoke management with cryptographically random tokens, SHA-256-only persistence, expiry, and read/write scopes.
+- Protected REST tool invocation endpoints with Bearer authentication and scope checks; expired and revoked keys are rejected.
+- Added responsive API key management UI with one-time key display and copy action.
+- Fixed dashboard activity chart refresh using the latest event collection.
+- Synchronized package, bridge, MCP, extension, dashboard, README, and test versions to 1.4.0.

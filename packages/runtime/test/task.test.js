@@ -38,7 +38,7 @@ test("bridge applies strict URL validation to AI planning and uses the configure
   assert.ok(bridge.includes("const ALLOWED_HOSTS = new Set(["));
   assert.ok(bridge.includes("127.0.0.1:${PORT}"));
   assert.ok(bridge.includes("const parsed = validateHttpUrl(body.url)"));
-  assert.ok(bridge.includes('const VERSION = "1.3.0"'));
+  assert.ok(bridge.includes('const VERSION = "1.4.0"'));
 });
 
 test("approved plan executor enforces explicit approval and stops on unsafe targets", async () => {
@@ -90,7 +90,7 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   const html = await readFile(resolve("packages/admin/index.html"), "utf8");
   const app = await readFile(resolve("packages/admin/app.js"), "utf8");
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "1.3.0");
+  assert.equal(pkg.version, "1.4.0");
   assert.ok(bridge.includes('req.url === "/api/admin/status"'));
   assert.ok(bridge.includes('req.url === "/api/admin/events"'));
   assert.ok(bridge.includes('["../../admin/index.html"'));
@@ -150,4 +150,19 @@ test("browser context applies destination validation to HTTP requests", async ()
   assert.ok(browser.includes('context.route("**/*"'));
   assert.ok(browser.includes("validateHttpUrl(requestUrl)"));
   assert.ok(browser.includes('route.abort("blockedbyclient")'));
+});
+
+test("API key routes require scoped Bearer authentication and admin CRUD is present", async () => {
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  const html = await readFile(resolve("packages/admin/index.html"), "utf8");
+  const app = await readFile(resolve("packages/admin/app.js"), "utf8");
+  assert.ok(bridge.includes("authenticateApiKey(bearer?.[1], requiredScope)"));
+  assert.ok(bridge.includes('"browser:write" : "browser:read"'));
+  assert.ok(bridge.includes('res.reqPath === "/api/admin/keys"'));
+  assert.ok(bridge.includes('res.reqPath.endsWith("/revoke")'));
+  assert.ok(html.includes('id="apiKeys"'));
+  assert.ok(html.includes('id="createKey"'));
+  assert.ok(app.includes('api("/api/admin/keys")'));
+  assert.ok(app.includes('api("/api/admin/keys/" + encodeURIComponent(key.id) + "/revoke"'));
+  assert.ok(app.includes("仅显示这一次"));
 });

@@ -5,9 +5,10 @@ import { runTask, getPageContext } from "./task.js";
 import { createPlan } from "./ai-planner.js";
 import { executePlan } from "./executor.js";
 import { validateHttpUrl } from "./safety.js";
+import { authenticateApiKey, createApiKey, listApiKeys, revokeApiKey } from "./api-keys.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const VERSION = "1.3.0";
+const VERSION = "1.4.0";
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 const startedAt = Date.now();
 const metrics = { requests: 0, errors: 0, events: [] };
@@ -31,7 +32,7 @@ function send(res, status, data) {
     "content-type": "application/json; charset=utf-8",
     ...(origin ? { "access-control-allow-origin": origin, "vary": "Origin" } : {}),
     "access-control-allow-methods": "GET,POST,OPTIONS",
-    "access-control-allow-headers": "content-type"
+    "access-control-allow-headers": "content-type, authorization"
   });
   res.end(JSON.stringify(data));
 }
@@ -139,9 +140,26 @@ const server = http.createServer(async (req, res) => {
       for (const tool of TOOL_CATALOG) paths[`/api/v1/tools/${tool.name}`] = { post: { operationId: tool.name, summary: tool.description, requestBody: { required: true, content: { "application/json": { schema: tool.inputSchema } } }, responses: { "200": { description: "Tool result" } } } };
       return send(res, 200, { openapi: "3.1.0", info: { title: "OpenFish AI Browser API", version: VERSION }, servers: [{ url: `http://127.0.0.1:${PORT}` }], paths });
     }
+    if (req.method === "GET" && res.reqPath === "/api/admin/keys") {
+      return send(res, 200, { keys: await listApiKeys() });
+    }
+    if (req.method === "POST" && res.reqPath === "/api/admin/keys") {
+      const body = await readBody(req);
+      return send(res, 201, await createApiKey(body));
+    }
+    if (req.method === "POST" && res.reqPath.startsWith("/api/admin/keys/") && res.reqPath.endsWith("/revoke")) {
+      const id = res.reqPath.slice("/api/admin/keys/".length, -"/revoke".length);
+      return send(res, 200, { key: await revokeApiKey(id) });
+    }
     if (req.method === "POST" && res.reqPath.startsWith("/api/v1/tools/")) {
       const name = res.reqPath.slice("/api/v1/tools/".length);
       const body = await readBody(req);
+      const writeTools = new Set(["open_page", "execute_plan", "click_element", "fill_element"]);
+      const requiredScope = writeTools.has(name) ? "browser:write" : "browser:read";
+      const bearer = /^Bearer (.+)$/i.exec(req.headers.authorization || "");
+      const identity = await authenticateApiKey(bearer?.[1], requiredScope);
+      if (!identity) return send(res, 401, { error: "A valid OpenFish API key is required.", code: "API_KEY_REQUIRED" });
+      if (identity.forbidden) return send(res, 403, { error: `API key lacks the ${requiredScope} scope.`, code: "INSUFFICIENT_SCOPE" });
       return send(res, 200, { tool: name, result: await invokeTool(name, body) });
     }
     if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, name: "OpenFish AI Browser", version: VERSION });
