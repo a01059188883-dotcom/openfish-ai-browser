@@ -68,3 +68,13 @@ The runtime rejects loopback, private, link-local, metadata, and reserved IP lit
 
 ## Admin console AI integration panel (v1.2.0)
 The local dashboard now displays provider-specific integration endpoints for OpenAI-compatible function tools, Anthropic tool use, Gemini function declarations, and the OpenFish tool discovery manifest. Endpoint paths can be copied from the console, and the available tool catalog is loaded live from the bridge. These are local compatibility interfaces, not hosted vendor connections.
+
+
+## Admin task templates (v1.2.0)
+The dashboard supports creating, reading/loading, updating, and deleting reusable task templates. Templates are stored in the current browser's local storage only; they are not synced to the MCP process or other devices. The dashboard activity feed remains process-memory telemetry and is not a durable task-history database.
+
+## Approval boundary (v1.2.0)
+MCP `click_element` and `fill_element` now require an explicit `approved: true` argument for the exact action. The bridge independently checks this value before execution. Existing plan execution continues to require explicit approval. Sensitive fields and irreversible actions remain blocked by runtime policy.
+
+## Current scope and deployment limitations
+This release remains local-first. The admin task templates are browser-local; there is no server-side CRUD database, API-key/user management, per-user browser isolation, or public remote MCP gateway in this release. Provider adapters expose compatible tool schemas and REST endpoints; they do not establish vendor account connections or proxy vendor credentials. A public deployment still requires authentication, durable storage, session isolation, rate limiting, and deployment-level outbound network controls.
