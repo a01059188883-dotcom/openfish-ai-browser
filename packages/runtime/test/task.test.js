@@ -103,6 +103,9 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   assert.ok(html.includes('id="toolCatalog"'));
   assert.ok(app.includes("/api/v1/tools"));
   assert.ok(app.includes("navigator.clipboard.writeText"));
+  for (const control of ["templateSelect", "templateLoad", "templateCreate", "templateUpdate", "templateDelete"]) assert.ok(html.includes(`id="${control}"`));
+  for (const operation of ["templateCreate", "templateLoad", "templateUpdate", "templateDelete"]) assert.ok(app.includes(`$("${operation}")`));
+  assert.ok(app.includes("textContent = String(value ?? \"\""));
 });
 
 
