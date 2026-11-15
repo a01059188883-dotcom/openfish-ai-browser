@@ -66,3 +66,8 @@ The cloud planner currently creates a deterministic draft, not an LLM-generated 
 ## Relationship to local mode
 
 The existing `npm run start:bridge`, `npm run start:mcp`, and Chrome extension local flow are unchanged. This worker is an additional remote mode.
+
+
+## Preview deployment trigger
+
+- Trigger commit: request preview deployment after repository Actions secrets are configured.
