@@ -13,7 +13,8 @@ export function validatePublicUrl(value) {
   try { url = new URL(String(value || "")); } catch { throw new Error("A valid public HTTP(S) URL is required."); }
   if (!["http:", "https:"].includes(url.protocol)) throw new Error("Only HTTP and HTTPS URLs are allowed.");
   if (url.username || url.password) throw new Error("URLs containing embedded credentials are not allowed.");
-  const host = url.hostname.toLowerCase().replace(/^\\[|\\]$/g, "").replace(/\\.$/, "");
+  let host = url.hostname.toLowerCase().replaceAll("[", "").replaceAll("]", "");
+  if (host.endsWith(".")) host = host.slice(0, -1);
   if (!host || host === "localhost" || host === "metadata" || PRIVATE_SUFFIXES.some(s => host.endsWith(s)) ||
       isPrivateIPv4(host) || host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:") || host.startsWith("ff")) {
     throw new Error("Private, loopback, link-local, and reserved destinations are blocked.");
