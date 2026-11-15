@@ -18,8 +18,9 @@ async function loadSession(id) {
 async function saveSession(id, data) {
   if (env.SESSIONS) await env.SESSIONS.put(sessionKey(id), JSON.stringify(data), { expirationTtl: 86400 });
 }
-async function withBrowser(sessionId, operation) {
+async function withBrowser(sessionId, operation, requireSaved = false) {
   const saved = await loadSession(sessionId);
+  if (requireSaved && !saved.url) throw new Error("No saved page for this session. First open a URL in the same task, or bind a SESSIONS KV namespace to persist sessions between calls.");
   const browser = await launch(env.BROWSER);
   let context;
   try {
@@ -48,6 +49,7 @@ async function withBrowser(sessionId, operation) {
 }
 async function executeSteps({ session_id = "openfish-default-session", steps, approved = false }) {
   validateSteps(steps, approved);
+  const requireSaved = !steps.some(step => step.action === "navigate");
   return withBrowser(session_id, async page => {
     const results = [];
     for (const step of steps) {
@@ -76,7 +78,7 @@ async function executeSteps({ session_id = "openfish-default-session", steps, ap
       }
     }
     return { results, title: await page.title(), text: (await page.locator("body").innerText().catch(() => "")).slice(0, MAX_TEXT) };
-  });
+  }, requireSaved);
 }
 function textResult(value) {
   return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
@@ -84,18 +86,18 @@ function textResult(value) {
 function createServer() {
   const server = new McpServer({ name: "openfish-ai-browser-cloud", version: VERSION });
   server.registerTool("open_page", { description: "Open a public HTTP(S) URL in an isolated Cloudflare Browser Run session.", inputSchema: { url: z.string().url(), session_id: z.string().min(8).max(80).optional() } }, async ({ url, session_id }) => textResult(await executeSteps({ session_id: session_id || "openfish-default-session", steps: [{ action: "navigate", url }, { action: "inspect" }] })));
-  server.registerTool("read_page", { description: "Read the current page title, URL, and visible text from the saved session.", inputSchema: { session_id: z.string().min(8).max(80).optional() } }, async ({ session_id }) => textResult(await withBrowser(session_id || "openfish-default-session", async page => ({ title: await page.title(), url: page.url(), text: (await page.locator("body").innerText().catch(() => "")).slice(0, MAX_TEXT) }))));
+  server.registerTool("read_page", { description: "Read the current page title, URL, and visible text from the saved session.", inputSchema: { session_id: z.string().min(8).max(80).optional() } }, async ({ session_id }) => textResult(await withBrowser(session_id || "openfish-default-session", async page => ({ title: await page.title(), url: page.url(), text: (await page.locator("body").innerText().catch(() => "")).slice(0, MAX_TEXT) }), true)));
   server.registerTool("plan_task", { description: "Create a non-executing review plan. The user must inspect and explicitly approve any mutating plan.", inputSchema: { goal: z.string().min(1).max(2000), url: z.string().url().optional(), session_id: z.string().min(8).max(80).optional() } }, async ({ goal, url, session_id }) => {
     const steps = url ? [{ action: "navigate", url }, { action: "inspect" }] : [{ action: "inspect" }];
     return textResult({ status: "plan_ready_for_review", summary: goal, steps, session_id: session_id || "openfish-default-session", warning: "This is a deterministic draft, not an AI-generated plan. No action has been executed." });
   });
   server.registerTool("execute_plan", { description: "Execute a reviewed plan. Explicit approval is required for clicks and form fills; high-risk actions remain blocked.", inputSchema: { steps: z.array(z.object({ action: z.enum(["navigate","inspect","click","fill"]), url: z.string().optional(), selector: z.string().optional(), value: z.string().optional(), reason: z.string().optional() })).min(1).max(MAX_STEPS), approved: z.boolean(), session_id: z.string().min(8).max(80).optional() } }, async ({ steps, approved, session_id }) => textResult(await executeSteps({ session_id: session_id || "openfish-default-session", steps, approved })));
   server.registerTool("list_interactive_elements", { description: "List visible links, buttons, and ordinary form controls.", inputSchema: { session_id: z.string().min(8).max(80).optional() } }, async ({ session_id }) => textResult(await withBrowser(session_id || "openfish-default-session", async page => ({ elements: await page.locator("a,button,input:not([type=password]),textarea,select,[role=button]").evaluateAll(nodes => nodes.slice(0,150).filter(el => el.getClientRects().length).map((el,index) => ({ index, tag: el.tagName.toLowerCase(), text: (el.innerText || el.getAttribute("aria-label") || el.getAttribute("placeholder") || "").trim().slice(0,180), type: el.getAttribute("type"), id: el.id || null, href: el.href || null, disabled: Boolean(el.disabled) }))) }))));
-  server.registerTool("get_accessibility_snapshot", { description: "Read headings and landmarks from the current page.", inputSchema: { session_id: z.string().min(8).max(80).optional() } }, async ({ session_id }) => textResult(await withBrowser(session_id || "openfish-default-session", async page => page.locator("body").evaluate(body => ({ headings: [...body.querySelectorAll("h1,h2,h3")].slice(0,60).map(el => ({ level: Number(el.tagName.slice(1)), text: (el.innerText || "").trim().slice(0,240) })), landmarks: [...body.querySelectorAll("main,nav,header,footer,form,[role=main],[role=navigation]")].slice(0,30).map(el => ({ tag: el.tagName.toLowerCase(), role: el.getAttribute("role"), label: el.getAttribute("aria-label"), text: (el.innerText || "").trim().slice(0,500) })) })))));
+  server.registerTool("get_accessibility_snapshot", { description: "Read headings and landmarks from the current page.", inputSchema: { session_id: z.string().min(8).max(80).optional() } }, async ({ session_id }) => textResult(await withBrowser(session_id || "openfish-default-session", async page => page.locator("body").evaluate(body => ({ headings: [...body.querySelectorAll("h1,h2,h3")].slice(0,60).map(el => ({ level: Number(el.tagName.slice(1)), text: (el.innerText || "").trim().slice(0,240) })), landmarks: [...body.querySelectorAll("main,nav,header,footer,form,[role=main],[role=navigation]")].slice(0,30).map(el => ({ tag: el.tagName.toLowerCase(), role: el.getAttribute("role"), label: el.getAttribute("aria-label"), text: (el.innerText || "").trim().slice(0,500) })) }), true)));
   server.registerTool("click_element", { description: "Click one unique visible button-like element after explicit user approval.", inputSchema: { selector: z.string().min(1).max(500), approved: z.boolean(), session_id: z.string().min(8).max(80).optional() } }, async ({ selector, approved, session_id }) => textResult(await executeSteps({ session_id: session_id || "openfish-default-session", approved, steps: [{ action: "click", selector }] })));
   server.registerTool("fill_element", { description: "Fill one ordinary text field after explicit user approval. Sensitive fields are blocked.", inputSchema: { selector: z.string().min(1).max(500), value: z.string().max(10000), approved: z.boolean(), session_id: z.string().min(8).max(80).optional() } }, async ({ selector, value, approved, session_id }) => textResult(await executeSteps({ session_id: session_id || "openfish-default-session", approved, steps: [{ action: "fill", selector, value }] })));
   server.registerTool("take_screenshot", { description: "Capture the current browser viewport.", inputSchema: { session_id: z.string().min(8).max(80).optional() } }, async ({ session_id }) => {
-    const result = await withBrowser(session_id || "openfish-default-session", async page => ({ image: await page.screenshot({ type: "png" }) }));
+    const result = await withBrowser(session_id || "openfish-default-session", async page => ({ image: await page.screenshot({ type: "png" }) }), true);
     const bytes = result.image;
     let binary = "";
     for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
