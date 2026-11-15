@@ -1,4 +1,4 @@
-import { launch, connect } from "@cloudflare/playwright";
+import { acquire, connect } from "@cloudflare/playwright";
 import { McpServer } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp/server";
 import { env } from "cloudflare:workers";
@@ -26,24 +26,23 @@ async function withBrowser(sessionId, operation, requireSaved = false) {
   const saved = await loadSession(sessionId);
   if (requireSaved && !saved.url) throw new Error("No saved page for this session. First open a URL in the same task.");
   let browser;
-  let launched = false;
-  // Reconnect to the Cloudflare Browser Run instance saved for this logical session.
-  // Only launch a new instance when this session has never had one or has expired.
-  if (saved.browserSessionId) {
-    try { browser = await connect(env.BROWSER, saved.browserSessionId); }
-    catch { browser = undefined; }
+  let browserSessionId = saved.browserSessionId;
+  let reused = false;
+  if (browserSessionId) {
+    try {
+      browser = await connect(env.BROWSER, browserSessionId);
+      reused = true;
+    } catch {
+      browser = undefined;
+      browserSessionId = undefined;
+    }
   }
   if (!browser) {
-    try {
-      browser = await launch(env.BROWSER);
-      launched = true;
-    } catch (error) {
-      const message = String(error?.message || error);
-      if (/429|rate.?limit|too many requests/i.test(message)) {
-        throw new Error("Cloudflare Browser Run refused a new browser instance (429). OpenFish now reuses active Browser Run sessions; if this persists, check the Workers Free daily 10-minute quota or instance-rate limit in Cloudflare Dashboard. KV data is preserved.");
-      }
-      throw error;
-    }
+    // acquire() creates a Browser Run session and returns its durable session ID.
+    // Subsequent requests connect() to this ID instead of launching another instance.
+    const acquired = await acquire(env.BROWSER, { keep_alive: 1200000 });
+    browserSessionId = acquired.sessionId;
+    browser = await connect(env.BROWSER, browserSessionId);
   }
   let context;
   try {
@@ -63,13 +62,13 @@ async function withBrowser(sessionId, operation, requireSaved = false) {
     const url = page.url();
     let storageState;
     try { storageState = await context.storageState(); } catch { storageState = saved.storageState; }
-    const browserSessionId = typeof browser.sessionId === "function" ? browser.sessionId() : saved.browserSessionId;
     await saveSession(sessionId, { url, storageState, browserSessionId, updatedAt: new Date().toISOString() });
-    return { ...result, session_id: sessionId, current_url: url, browser_session_reused: !launched, session_persistence: env.SESSIONS ? "Cloudflare Browser Run session + KV (24h)" : "per-request only; bind SESSIONS KV to persist session metadata" };
+    return { ...result, session_id: sessionId, current_url: url, browser_session_reused: reused, browser_run_session_id: browserSessionId, session_persistence: env.SESSIONS ? "Browser Run session + KV (24h)" : "per-request metadata only; bind SESSIONS KV to persist session metadata" };
   } finally {
     try { if (context) await context.close(); } catch {}
-    // Disconnect this Worker request without terminating the shared remote browser.
-    try { if (browser && typeof browser.disconnect === "function") await browser.disconnect(); else if (browser) await browser.close(); } catch {}
+    // For a connected Playwright session, close() disconnects this client but keeps
+    // the remote Browser Run instance alive for the next request.
+    try { if (browser) await browser.close(); } catch {}
   }
 }
 async function executeSteps({ session_id, steps, approved = false }) {
