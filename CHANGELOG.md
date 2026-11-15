@@ -93,3 +93,12 @@
 - Prevented overlapping status refreshes and made failed/empty AI plans non-executable.
 - Fixed the stale dashboard version label and synchronized release metadata across runtime, MCP, extension, README, and tests.
 - Improved responsive layout for task-template controls.
+
+
+## 1.3.0 - 2026-11-15
+- Redesigned the local admin dashboard visual hierarchy, card spacing, navigation, typography, focus states, and mobile breakpoints.
+- Made the admin sidebar sticky on desktop and converted navigation into a compact horizontal strip on mobile.
+- Added live client-side filtering for recent API activity by endpoint path or HTTP status.
+- Added accessible skip navigation, visible keyboard focus, reduced-motion support, and narrow-screen layout refinements.
+- Refined the Chrome extension side panel with a compact header, clearer task sections, improved output readability, and responsive spacing.
+- Synchronized package, bridge, MCP, extension, dashboard, README, and regression-test version markers to 1.3.0.
