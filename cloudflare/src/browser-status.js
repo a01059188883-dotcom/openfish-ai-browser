@@ -16,7 +16,7 @@ export function summarizeBrowserLimits(limits = {}) {
 
 export function isBrowserRateLimited(error) {
   const message = String(error?.message || error || "");
-  return /(?:\\b429\\b|rate.?limit|too many requests|quota exceeded)/i.test(message);
+  return /(?:\b429\b|rate.?limit|too many requests|quota exceeded)/i.test(message);
 }
 
 export function retryAfterMs(limits = {}) {
