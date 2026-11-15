@@ -13,7 +13,7 @@ test("Streamable HTTP MCP endpoint is authenticated and loopback-bound by defaul
   assert.ok(source.includes('process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1"'));
   assert.ok(source.includes('Authorization: Bearer API_KEY'));
   assert.ok(source.includes('await verifyKey(bearer[1], "browser:read", { ...clientMeta, sessionId })'));
-  assert.ok(source.includes('verifyKey(token, "browser:write")'));
+  assert.ok(source.includes('verifyKey(token, "browser:write", { ...clientMeta, sessionId })'));
   assert.ok(source.includes('"x-openfish-session": sessionId'));
 });
 
