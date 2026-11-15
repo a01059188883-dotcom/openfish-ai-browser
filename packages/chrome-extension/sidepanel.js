@@ -100,5 +100,4 @@ $("execute").addEventListener("click", async () => {
   } catch (e) { $("result").textContent = e.message; }
   finally { currentPlan = null; $("execute").hidden = true; $("execute").disabled = true; $("run").disabled = false; }
 });
-await loadCloud();
-health();
+loadCloud().then(health).catch(error => { $("status").textContent = error.message; });
