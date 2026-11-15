@@ -5,7 +5,7 @@ import { validateHttpUrl } from "./safety.js";
 
 const sessionContext = new AsyncLocalStorage();
 const sessions = new Map();
-const SESSION_TTL_MS = Math.max(60000, Number(process.env.OPENFISH_SESSION_TTL_MS || 30 * 60 * 1000));
+const SESSION_TTL_MS = Math.max(60000, Number(process.env.OPENFISH_SESSION_TTL_MS || 30 * 60 * 1000));\nconst MAX_SESSIONS = Math.max(2, Math.min(50, Number(process.env.OPENFISH_MAX_SESSIONS || 20)));
 let browser;
 let browserConnectPromise;
 
@@ -70,7 +70,7 @@ export async function createBrowserSession(name = "New session") {
   touch(session);
   return publicSession(session);
 }
-export function listBrowserSessions() {
+export function hasBrowserSession(id) {\n  listBrowserSessions();\n  return sessions.has(id);\n}\nexport function listBrowserSessions() {
   const now = Date.now();
   for (const [id, session] of sessions) {
     if (id !== "default" && Date.parse(session.expiresAt || 0) <= now) {
