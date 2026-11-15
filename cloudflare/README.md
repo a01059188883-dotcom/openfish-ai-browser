@@ -71,3 +71,5 @@ The existing `npm run start:bridge`, `npm run start:mcp`, and Chrome extension l
 ## Preview deployment trigger
 
 - Trigger commit: request preview deployment after repository Actions secrets are configured.
+
+- Health endpoint fix deployed via the preview workflow after the Worker JSON helper was added.
