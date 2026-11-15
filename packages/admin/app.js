@@ -78,8 +78,9 @@ async function refresh() {
     $("bridgeHealth").className = "status-good";
     $("browserHealth").textContent = status.browser?.connected ? "已连接" : "待启动";
     $("model").textContent = status.model || "未配置";
+    if ($("clientCount")) $("clientCount").textContent = status.clientCount ?? 0;
     $("mode").textContent = status.browser?.remote ? "远程" : "本地";
-    $("version").textContent = status.version || "1.4.0";
+    $("version").textContent = status.version || "1.6.0";
     latestEvents = Array.isArray(activity.events) ? activity.events : [];
     renderEvents(latestEvents);
     drawBars(latestEvents);
@@ -365,9 +366,30 @@ $("createSession")?.addEventListener("click", async () => {
 });
 $("refreshSessions")?.addEventListener("click", loadSessions);
 
+async function loadClients() {
+  const host = $("clientList");
+  if (!host) return;
+  try {
+    const data = await api("/api/admin/clients");
+    host.replaceChildren();
+    const clients = Array.isArray(data.clients) ? data.clients : [];
+    if (!clients.length) { host.append(textNode("p", "尚无 AI 客户端连接记录。客户端首次通过 MCP HTTP 或 REST 接口访问后会显示在这里。", "muted")); return; }
+    for (const client of clients) {
+      const row = document.createElement("div"); row.className = "session-row";
+      const details = document.createElement("div"); details.className = "session-details";
+      details.append(textNode("b", client.keyName + " · " + client.clientId), textNode("small", client.platform + " · 会话 " + client.sessionId), textNode("small", "最近活动：" + fmtTime(client.lastSeenAt) + " · 请求 " + client.requestCount + " 次"));
+      const state = textNode("span", client.status === "connected" ? "在线" : "空闲", client.status === "connected" ? "status-good" : "muted");
+      row.append(details, state); host.append(row);
+    }
+  } catch (error) { host.replaceChildren(textNode("p", "读取客户端失败：" + error.message, "muted")); }
+}
+$("refreshClients")?.addEventListener("click", loadClients);
+
 renderTemplates();
 loadToolCatalog();
 loadApiKeys();
 loadSessions();
+loadClients();
 refresh();
 window.setInterval(refresh, 10000);
+window.setInterval(loadClients, 15000);

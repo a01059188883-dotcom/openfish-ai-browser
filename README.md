@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **1.5.0**.
+Open-source, free-first browser automation starter. Version: **1.6.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -88,3 +88,7 @@ This release remains a local-first single-user runtime, not a hardened public mu
 5. Keep the endpoint local unless you put it behind a separately hardened TLS/authenticated gateway.
 
 The HTTP endpoint uses the MCP Streamable HTTP transport. It is stateless at the protocol transport layer; browser state is selected separately by the session header. Stdio MCP remains available for local MCP hosts.
+
+
+## AI client registry and rate limits (v1.6.0)
+The local bridge records authenticated API/MCP client activity by API key identity, client ID, platform label, and browser session. The admin console shows recent clients and estimates online state from activity within the last 90 seconds. Client metadata is stored in `.openfish/clients.json` with restrictive local file permissions. Tool invocations are rate-limited per API key to 120 requests per minute by default; configure `OPENFISH_RATE_LIMIT_PER_MINUTE` to change the limit. Rate counters are process-memory state and reset on restart. This is operational visibility for a trusted local runtime, not tenant isolation or a public SaaS security boundary.

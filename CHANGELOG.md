@@ -120,3 +120,11 @@
 - Added explicit read/write scope checks to HTTP MCP tool calls while retaining exact-action approval and existing safety policy.
 - Added responsive session management UI and endpoint/version information.
 - Synchronized package, bridge, stdio MCP, HTTP MCP, Chrome extension, dashboard, README, and tests to 1.5.0.
+
+
+## 1.6.0 - 2026-11-15
+- Added a persistent local registry for authenticated AI clients, including client ID, platform, API key identity, browser session, scopes, request count, and last activity.
+- Added admin console visibility for connected/idle AI clients with a 90-second activity window.
+- Added per-API-key rate limiting for REST browser tool calls (120 requests/minute by default; configurable).
+- Forwarded MCP HTTP client metadata through the bridge and registered client activity on authenticated MCP requests.
+- Synchronized package, bridge, MCP HTTP, Chrome extension, admin UI, README, changelog, and tests to 1.6.0.

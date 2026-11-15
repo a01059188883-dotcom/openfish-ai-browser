@@ -12,8 +12,8 @@ test("Streamable HTTP MCP endpoint is authenticated and loopback-bound by defaul
   assert.ok(source.includes('transport.handleRequest(req, res, body)'));
   assert.ok(source.includes('process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1"'));
   assert.ok(source.includes('Authorization: Bearer API_KEY'));
-  assert.ok(source.includes('await verifyKey(bearer[1], "browser:read")'));
-  assert.ok(source.includes('verifyKey(token, "browser:write")'));
+  assert.ok(source.includes('await verifyKey(bearer[1], "browser:read", { ...clientMeta, sessionId })'));
+  assert.ok(source.includes('verifyKey(token, "browser:write", { ...clientMeta, sessionId })'));
   assert.ok(source.includes('"x-openfish-session": sessionId'));
 });
 
@@ -40,8 +40,28 @@ test("browser sessions use separate contexts and unknown session IDs are rejecte
 test("release metadata includes HTTP MCP entry point", async () => {
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
   const httpMcp = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
-  assert.equal(pkg.version, "1.5.0");
+  assert.equal(pkg.version, "1.6.0");
   assert.equal(pkg.scripts["start:mcp:http"], "node packages/mcp-server/src/http.js");
   assert.ok(pkg.scripts.check.includes("node --check packages/mcp-server/src/http.js"));
-  assert.ok(httpMcp.includes('const VERSION = "1.5.0"'));
+  assert.ok(httpMcp.includes('const VERSION = "1.6.0"'));
+});
+
+
+test("AI client registry persists client metadata and enforces per-key rate limits", async () => {
+  const registry = await readFile(resolve("packages/runtime/src/client-registry.js"), "utf8");
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  const httpMcp = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
+  const admin = await readFile(resolve("packages/admin/app.js"), "utf8");
+  assert.ok(registry.includes("clients.json"));
+  assert.ok(registry.includes("ACTIVE_WINDOW_MS = 90 * 1000"));
+  assert.ok(registry.includes("checkClientRateLimit"));
+  assert.ok(bridge.includes('res.reqPath === "/api/admin/clients"'));
+  assert.ok(bridge.includes("checkClientRateLimit(identity.id"));
+  assert.ok(bridge.includes("registerClient(identity"));
+  assert.ok(httpMcp.includes('"x-openfish-client": clientId'));
+  assert.ok(httpMcp.includes('clientId: String(req.headers["x-openfish-client"] || "mcp-http")'));
+  assert.ok(admin.includes('api("/api/admin/clients")'));
+  const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
+  assert.equal(pkg.version, "1.6.0");
+  assert.ok(pkg.scripts.check.includes("packages/runtime/src/client-registry.js"));
 });
