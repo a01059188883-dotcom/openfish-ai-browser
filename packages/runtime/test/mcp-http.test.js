@@ -40,10 +40,10 @@ test("browser sessions use separate contexts and unknown session IDs are rejecte
 test("release metadata includes HTTP MCP entry point", async () => {
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
   const httpMcp = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
-  assert.equal(pkg.version, "1.6.0");
+  assert.equal(pkg.version, "1.7.0");
   assert.equal(pkg.scripts["start:mcp:http"], "node packages/mcp-server/src/http.js");
   assert.ok(pkg.scripts.check.includes("node --check packages/mcp-server/src/http.js"));
-  assert.ok(httpMcp.includes('const VERSION = "1.6.0"'));
+  assert.ok(httpMcp.includes('const VERSION = "1.7.0"'));
 });
 
 
@@ -62,6 +62,30 @@ test("AI client registry persists client metadata and enforces per-key rate limi
   assert.ok(httpMcp.includes('clientId: String(req.headers["x-openfish-client"] || "mcp-http")'));
   assert.ok(admin.includes('api("/api/admin/clients")'));
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "1.6.0");
+  assert.equal(pkg.version, "1.7.0");
   assert.ok(pkg.scripts.check.includes("packages/runtime/src/client-registry.js"));
+});
+
+
+test("Cloudflare relay is authenticated, allowlisted, bounded, and outbound-only", async () => {
+  const worker = await readFile(resolve("cloudflare/worker.js"), "utf8");
+  const agent = await readFile(resolve("packages/runtime/src/relay-agent.js"), "utf8");
+  const wrangler = await readFile(resolve("cloudflare/wrangler.toml"), "utf8");
+  const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
+  assert.ok(worker.includes('url.pathname === "/agent/connect"'));
+  assert.ok(worker.includes("OPENFISH_RELAY_TOKEN"));
+  assert.ok(worker.includes("MAX_BODY_BYTES = 512 * 1024"));
+  assert.ok(worker.includes("this.maxPending = 32"));
+  assert.ok(worker.includes("this.requestTimeoutMs = 45000"));
+  assert.ok(worker.includes("new_sqlite_classes") || wrangler.includes("new_sqlite_classes"));
+  assert.ok(worker.includes('this.ctx.acceptWebSocket(server)'));
+  assert.ok(worker.includes('path.startsWith("/api/v1/tools/")'));
+  assert.ok(agent.includes('new WebSocket(RELAY_URL'));
+  assert.ok(agent.includes('OPENFISH_LOCAL_API_KEY'));
+  assert.ok(agent.includes('http://127.0.0.1:8787'));
+  assert.ok(agent.includes('AbortSignal.timeout(40000)'));
+  assert.ok(!agent.includes('new URL(message.destination'));
+  assert.equal(pkg.version, "1.7.0");
+  assert.equal(pkg.scripts["start:relay-agent"], "node packages/runtime/src/relay-agent.js");
+  assert.ok(pkg.scripts.check.includes("node --check cloudflare/worker.js"));
 });
