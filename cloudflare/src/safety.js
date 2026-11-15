@@ -16,7 +16,7 @@ export function validatePublicUrl(value) {
   let host = url.hostname.toLowerCase().replaceAll("[", "").replaceAll("]", "");
   if (host.endsWith(".")) host = host.slice(0, -1);
   if (!host || host === "localhost" || host === "metadata" || PRIVATE_SUFFIXES.some(s => host.endsWith(s)) ||
-      isPrivateIPv4(host) || host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:") || host.startsWith("ff")) {
+      isPrivateIPv4(host) || host === "::1" || host.startsWith("::") || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:") || host.startsWith("ff")) {
     throw new Error("Private, loopback, link-local, and reserved destinations are blocked.");
   }
   return url;
