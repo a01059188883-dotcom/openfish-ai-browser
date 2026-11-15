@@ -12,7 +12,7 @@ test("API keys are generated once, stored hashed, scoped, expiring, and revocabl
   try {
     const created = await keys.createApiKey({
       name: "integration test",
-      scopes: ["browser:read", "tools:read"],
+      scopes: ["browser:read"],
       expiresInDays: 30
     });
     assert.match(created.key, /^ofb_live_[A-Za-z0-9_-]+$/);
