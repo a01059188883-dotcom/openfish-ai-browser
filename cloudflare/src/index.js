@@ -90,7 +90,7 @@ function textResult(value) {
 }
 function createServer() {
   const server = new McpServer({ name: "openfish-ai-browser-cloud", version: VERSION });
-  server.registerTool("open_page", { description: "Open a public HTTP(S) URL in an isolated Cloudflare Browser Run session.", inputSchema: { url: z.string().url(), session_id: z.string().min(8).max(80).optional() } }, async ({ url, session_id }) => textResult(await executeSteps({ session_id: session_id, steps: [{ action: "navigate", url }, { action: "inspect" }] })));
+  server.registerTool("open_page", { description: "Open a public HTTP(S) URL in an isolated Cloudflare Browser Run session.", inputSchema: { url: z.string().url(), session_id: z.string().min(8).max(80).optional() } }, async ({ url, session_id }) => textResult(await executeSteps({ session_id: session_id || crypto.randomUUID(), steps: [{ action: "navigate", url }, { action: "inspect" }] })));
   server.registerTool("read_page", { description: "Read the current page title, URL, and visible text from the saved session.", inputSchema: { session_id: z.string().min(8).max(80) } }, async ({ session_id }) => textResult(await withBrowser(session_id, async page => ({ title: await page.title(), url: page.url(), text: (await page.locator("body").innerText().catch(() => "")).slice(0, MAX_TEXT) }), true)));
   server.registerTool("plan_task", { description: "Create a non-executing review plan. The user must inspect and explicitly approve any mutating plan.", inputSchema: { goal: z.string().min(1).max(2000), url: z.string().url().optional(), session_id: z.string().min(8).max(80).optional() } }, async ({ goal, url, session_id }) => {
     const steps = url ? [{ action: "navigate", url }, { action: "inspect" }] : [{ action: "inspect" }];
