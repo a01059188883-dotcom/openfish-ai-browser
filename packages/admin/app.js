@@ -79,7 +79,7 @@ async function refresh() {
     $("browserHealth").textContent = status.browser?.connected ? "已连接" : "待启动";
     $("model").textContent = status.model || "未配置";
     $("mode").textContent = status.browser?.remote ? "远程" : "本地";
-    $("version").textContent = status.version || "1.2.0";
+    $("version").textContent = status.version || "1.3.0";
     latestEvents = Array.isArray(activity.events) ? activity.events : [];
     renderEvents(latestEvents);
     drawBars(events);
