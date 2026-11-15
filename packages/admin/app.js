@@ -305,8 +305,69 @@ $("createKey")?.addEventListener("click", async () => {
   } finally { button.disabled = false; }
 });
 
+
+async function loadSessions() {
+  const host = $("sessionList");
+  if (!host) return;
+  try {
+    const data = await api("/api/browser/sessions");
+    host.replaceChildren();
+    if (!data.sessions?.length) {
+      host.append(textNode("p", "尚无已创建的浏览器会话。", "muted"));
+      return;
+    }
+    for (const session of data.sessions) {
+      const row = document.createElement("div");
+      row.className = "session-row";
+      const details = document.createElement("div");
+      details.className = "session-details";
+      details.append(textNode("b", session.name || "浏览器会话"));
+      details.append(textNode("code", session.id));
+      details.append(textNode("small", "状态：" + (session.active ? "已启动" : "待启动") + " · 最近活动：" + (session.lastUsedAt ? fmtTime(session.lastUsedAt) : "尚无活动")));
+      const actions = document.createElement("div");
+      actions.className = "session-actions";
+      const copy = textNode("button", "复制会话 ID");
+      copy.type = "button";
+      copy.addEventListener("click", async () => {
+        await navigator.clipboard.writeText(session.id);
+        copy.textContent = "已复制";
+      });
+      actions.append(copy);
+      if (session.id !== "default") {
+        const close = textNode("button", "关闭", "danger");
+        close.type = "button";
+        close.addEventListener("click", async () => {
+          if (!window.confirm("确定关闭此会话？会清除该会话的页面与 Cookie。")) return;
+          close.disabled = true;
+          try {
+            await api("/api/browser/sessions/" + encodeURIComponent(session.id) + "/close", {});
+            await loadSessions();
+          } catch (error) { window.alert("关闭会话失败：" + error.message); close.disabled = false; }
+        });
+        actions.append(close);
+      }
+      row.append(details, actions);
+      host.append(row);
+    }
+  } catch (error) {
+    host.replaceChildren(textNode("p", "读取会话失败：" + error.message, "muted"));
+  }
+}
+$("createSession")?.addEventListener("click", async () => {
+  const button = $("createSession");
+  button.disabled = true;
+  try {
+    await api("/api/browser/sessions", { name: $("sessionName").value.trim() || "AI Client" });
+    $("sessionName").value = "";
+    await loadSessions();
+  } catch (error) { window.alert("创建会话失败：" + error.message); }
+  finally { button.disabled = false; }
+});
+$("refreshSessions")?.addEventListener("click", loadSessions);
+
 renderTemplates();
 loadToolCatalog();
 loadApiKeys();
+loadSessions();
 refresh();
 window.setInterval(refresh, 10000);
