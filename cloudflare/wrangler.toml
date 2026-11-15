@@ -6,6 +6,7 @@ workers_dev = true
 
 [browser]
 binding = "BROWSER"
+remote = true
 
 [assets]
 directory = "./public"
