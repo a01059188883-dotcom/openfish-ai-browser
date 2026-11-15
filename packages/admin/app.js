@@ -242,7 +242,71 @@ document.querySelectorAll("[data-copy]").forEach(button => button.addEventListen
     button.textContent = "复制失败，请手动复制";
   }
 }));
+
+async function loadApiKeys() {
+  const host = $("keyList");
+  if (!host) return;
+  try {
+    const data = await api("/api/admin/keys");
+    host.replaceChildren();
+    if (!data.keys?.length) {
+      host.append(textNode("p", "还没有 API 密钥。创建后可供外部 AI 客户端调用 REST 工具接口。", "muted"));
+      return;
+    }
+    for (const key of data.keys) {
+      const row = document.createElement("div");
+      row.className = "key-row";
+      const details = document.createElement("div");
+      details.className = "key-details";
+      details.append(textNode("b", key.name), textNode("code", key.prefix + "••••••••"),
+        textNode("small", "权限：" + key.scopes.join(", ") + " · 到期：" + fmtTime(key.expiresAt)));
+      const status = key.revokedAt ? "已撤销" : Date.parse(key.expiresAt) <= Date.now() ? "已过期" : "有效";
+      details.append(textNode("small", "状态：" + status + " · 最近使用：" + (key.lastUsedAt ? fmtTime(key.lastUsedAt) : "从未使用")));
+      row.append(details);
+      if (!key.revokedAt && Date.parse(key.expiresAt) > Date.now()) {
+        const revoke = textNode("button", "撤销", "danger");
+        revoke.type = "button";
+        revoke.addEventListener("click", async () => {
+          if (!window.confirm("确定撤销密钥“" + key.name + "”？撤销后无法恢复。")) return;
+          revoke.disabled = true;
+          try { await api("/api/admin/keys/" + encodeURIComponent(key.id) + "/revoke", {}); await loadApiKeys(); }
+          catch (error) { window.alert("撤销失败：" + error.message); revoke.disabled = false; }
+        });
+        row.append(revoke);
+      }
+      host.append(row);
+    }
+  } catch (error) {
+    host.replaceChildren(textNode("p", "读取密钥失败：" + error.message, "muted"));
+  }
+}
+$("createKey")?.addEventListener("click", async () => {
+  const name = $("keyName").value.trim();
+  if (!name) return window.alert("请先填写密钥名称。");
+  const scopes = $("keyScopes").value === "write" ? ["browser:read", "browser:write"] : ["browser:read"];
+  const button = $("createKey");
+  button.disabled = true;
+  try {
+    const result = await api("/api/admin/keys", { name, scopes, expiresInDays: Number($("keyExpiry").value) });
+    const notice = $("newKeyNotice");
+    notice.hidden = false;
+    notice.replaceChildren(textNode("b", "密钥已生成，请立即复制保存（仅显示这一次）"), textNode("code", result.key, "new-key-value"));
+    const copy = textNode("button", "复制密钥", "primary");
+    copy.type = "button";
+    copy.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(result.key);
+      copy.textContent = "已复制";
+    });
+    notice.append(copy);
+    $("keyName").value = "";
+    await loadApiKeys();
+  } catch (error) {
+    window.alert("生成失败：" + error.message);
+  } finally { button.disabled = false; }
+});
+
 renderTemplates();
 loadToolCatalog();
+loadApiKeys();
 refresh();
 window.setInterval(refresh, 10000);
