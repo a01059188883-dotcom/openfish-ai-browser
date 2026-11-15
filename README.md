@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **1.4.0**.
+Open-source, free-first browser automation starter. Version: **1.5.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -78,3 +78,13 @@ MCP `click_element` and `fill_element` now require an explicit `approved: true` 
 
 ## Current scope and deployment limitations
 This release remains local-first. The admin task templates are browser-local; there is no server-side CRUD database, API-key/user management, per-user browser isolation, or public remote MCP gateway in this release. Provider adapters expose compatible tool schemas and REST endpoints; they do not establish vendor account connections or proxy vendor credentials. A public deployment still requires authentication, durable storage, session isolation, rate limiting, and deployment-level outbound network controls.
+
+
+## Local MCP HTTP setup
+1. Start the bridge: `npm run start:bridge`.
+2. Start the HTTP MCP endpoint in another terminal: `npm run start:mcp:http`.
+3. Create a key with read or read/write scope in `http://127.0.0.1:8787/admin`.
+4. Configure your MCP client with endpoint `http://127.0.0.1:8788/mcp` and HTTP Bearer authentication. Add `X-OpenFish-Session` as a request header if using a named session.
+5. Keep the endpoint local unless you put it behind a separately hardened TLS/authenticated gateway.
+
+The HTTP endpoint uses the MCP Streamable HTTP transport. It is stateless at the protocol transport layer; browser state is selected separately by the session header. Stdio MCP remains available for local MCP hosts.
