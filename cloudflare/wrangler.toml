@@ -1,0 +1,14 @@
+name = "openfish-ai-browser-relay"
+main = "cloudflare/worker.js"
+compatibility_date = "2026-11-15"
+
+[[durable_objects.bindings]]
+name = "OPENFISH_RELAY"
+class_name = "OpenFishRelay"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["OpenFishRelay"]
+
+[vars]
+OPENFISH_RELAY_PROTOCOL = "openfish-relay/1"
