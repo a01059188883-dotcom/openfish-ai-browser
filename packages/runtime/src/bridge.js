@@ -1,6 +1,6 @@
 import http from "node:http";
 import { readFile } from "node:fs/promises";
-import { getPage, getBrowserStatus, runWithBrowserSession, createBrowserSession, listBrowserSessions, closeBrowserSession } from "./browser.js";
+import { getPage, getBrowserStatus, runWithBrowserSession, createBrowserSession, listBrowserSessions, closeBrowserSession, hasBrowserSession } from "./browser.js";
 import { runTask, getPageContext } from "./task.js";
 import { createPlan } from "./ai-planner.js";
 import { executePlan } from "./executor.js";
@@ -113,7 +113,7 @@ async function invokeTool(name, args = {}) {
   throw Object.assign(new Error("Unknown OpenFish tool."), { statusCode: 404 });
 }
 
-const server = http.createServer(async (req, res) => {\n  const requestedSession = req.headers["x-openfish-session"] || "default";\n  if (requestedSession !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(requestedSession)) return send(res, 400, { error: "Invalid browser session ID." });\n  return runWithBrowserSession(requestedSession, async () => {
+const server = http.createServer(async (req, res) => {\n  const requestedSession = req.headers["x-openfish-session"] || "default";\n  if (requestedSession !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(requestedSession)) return send(res, 400, { error: "Invalid browser session ID." });\n  if (requestedSession !== "default" && !hasBrowserSession(requestedSession)) return send(res, 404, { error: "Browser session not found or expired." });\n  return runWithBrowserSession(requestedSession, async () => {
   const origin = req.headers.origin || "";
   const host = req.headers.host || "";
   res.reqPath = (req.url || "").split("?")[0];
@@ -139,6 +139,15 @@ const server = http.createServer(async (req, res) => {\n  const requestedSession
       const paths = {};
       for (const tool of TOOL_CATALOG) paths[`/api/v1/tools/${tool.name}`] = { post: { operationId: tool.name, summary: tool.description, requestBody: { required: true, content: { "application/json": { schema: tool.inputSchema } } }, responses: { "200": { description: "Tool result" } } } };
       return send(res, 200, { openapi: "3.1.0", info: { title: "OpenFish AI Browser API", version: VERSION }, servers: [{ url: `http://127.0.0.1:${PORT}` }], paths });
+    }
+    if (req.method === "POST" && res.reqPath === "/api/auth/verify") {
+      const body = await readBody(req);
+      const bearer = /^Bearer (.+)$/i.exec(req.headers.authorization || "");
+      const scope = body.scope === "browser:write" ? "browser:write" : "browser:read";
+      const identity = await authenticateApiKey(bearer?.[1], scope);
+      if (!identity) return send(res, 401, { error: "Invalid, expired, or revoked API key." });
+      if (identity.forbidden) return send(res, 403, { error: `API key lacks ${scope} scope.` });
+      return send(res, 200, { ok: true, identity });
     }
     if (req.method === "GET" && res.reqPath === "/api/browser/sessions") {
       return send(res, 200, { sessions: listBrowserSessions(), ttlMs: Number(process.env.OPENFISH_SESSION_TTL_MS || 30 * 60 * 1000) });
