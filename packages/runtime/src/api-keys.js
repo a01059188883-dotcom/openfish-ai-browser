@@ -3,7 +3,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 const STORE = resolve(process.env.OPENFISH_DATA_DIR || ".openfish", "api-keys.json");
-const SCOPES = new Set(["tools:read", "browser:read", "browser:write"]);
+const SCOPES = new Set(["browser:read", "browser:write"]);
 let cache;
 let writeQueue = Promise.resolve();
 
