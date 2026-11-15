@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **1.1.2**.
+Open-source, free-first browser automation starter. Version: **1.2.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -64,3 +64,7 @@ These are schema and REST compatibility interfaces, not direct hosted integratio
 
 ## Network destination protection (v1.1.2)
 The runtime rejects loopback, private, link-local, metadata, and reserved IP literals plus common local-only hostnames. A Playwright context request guard applies the same checks to HTTP(S) subresources and redirect destinations, not only the first navigation URL. This is defense in depth, not a complete network sandbox: DNS rebinding and private-address resolution behind an otherwise public hostname require deployment-level egress filtering or a hardened outbound proxy. Keep the bridge bound to loopback and do not expose it directly to the internet.
+
+
+## Cloudflare Browser Run preview (v1.2.0)
+An additional Worker deployment target is available in `cloudflare/`. It provides a mobile-friendly dashboard, a protected REST interface, and a remote MCP Streamable HTTP endpoint at `/mcp`. The Chrome side panel can now be configured for either the existing local bridge or a Cloudflare Worker URL. See [cloudflare/README.md](cloudflare/README.md) for setup, secrets, Browser Run binding, and preview limitations. Local mode remains the default.
