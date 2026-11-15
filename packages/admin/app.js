@@ -144,6 +144,31 @@ $("clear").addEventListener("click", () => {
 $("refresh").addEventListener("click", refresh);
 $("refreshLog").addEventListener("click", refresh);
 
+async function loadToolCatalog() {
+  const host = $("toolCatalog");
+  const count = $("toolCount");
+  if (!host || !count) return;
+  try {
+    const data = await api("/api/v1/tools");
+    const tools = Array.isArray(data.tools) ? data.tools : [];
+    count.textContent = tools.length + " 项工具";
+    host.replaceChildren();
+    for (const tool of tools) {
+      const item = document.createElement("div");
+      item.className = "tool-item";
+      item.append(
+        textNode("b", tool.name),
+        textNode("span", tool.description),
+        textNode("small", tool.approval === "explicit" ? "需要明确批准" : "只读 / 规划")
+      );
+      host.append(item);
+    }
+    if (!tools.length) host.append(textNode("p", "当前没有可用工具", "muted"));
+  } catch (error) {
+    count.textContent = "读取失败";
+    host.replaceChildren(textNode("p", error.message, "muted"));
+  }
+}
 function readTemplates() {
   try {
     const parsed = JSON.parse(localStorage.getItem(TEMPLATE_KEY) || "[]");
@@ -213,5 +238,6 @@ document.querySelectorAll("[data-copy]").forEach(button => button.addEventListen
   }
 }));
 renderTemplates();
+loadToolCatalog();
 refresh();
 window.setInterval(refresh, 10000);
