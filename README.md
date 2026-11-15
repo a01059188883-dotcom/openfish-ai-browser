@@ -77,7 +77,7 @@ The dashboard supports creating, reading/loading, updating, and deleting reusabl
 MCP `click_element` and `fill_element` now require an explicit `approved: true` argument for the exact action. The bridge independently checks this value before execution. Existing plan execution continues to require explicit approval. Sensitive fields and irreversible actions remain blocked by runtime policy.
 
 ## Current scope and deployment limitations
-This release remains local-first. The admin task templates are browser-local; there is no server-side CRUD database, API-key/user management, per-user browser isolation, or public remote MCP gateway in this release. Provider adapters expose compatible tool schemas and REST endpoints; they do not establish vendor account connections or proxy vendor credentials. A public deployment still requires authentication, durable storage, session isolation, rate limiting, and deployment-level outbound network controls.
+This release remains a local-first single-user runtime, not a hardened public multi-user SaaS. API keys and named browser sessions are now supported locally. Session state is in memory and is cleared when the bridge restarts; the HTTP MCP listener is loopback-bound by default and authenticated with scoped API keys. Provider adapters expose compatible tool schemas and REST endpoints; they do not establish vendor account connections or proxy vendor credentials. A public deployment still requires TLS termination, tenant-level isolation, durable storage, rate limiting, DNS-rebinding-resistant egress controls, and deployment-level network protections.
 
 
 ## Local MCP HTTP setup
