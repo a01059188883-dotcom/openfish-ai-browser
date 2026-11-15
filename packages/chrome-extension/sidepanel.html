@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>OpenFish</title><link rel="stylesheet" href="style.css"></head>
 <body>
-  <header><div class="logo">◉</div><div><h1>OpenFish</h1><small>AI Browser · 1.2.0</small></div><span id="status" class="status">检查连接中</span></header>
+  <header><div class="logo">◉</div><div><h1>OpenFish</h1><small>AI Browser · 1.2.1</small></div><span id="status" class="status">检查连接中</span></header>
   <main>
     <section class="panel"><h2>云端连接（可选）</h2><label for="cloudUrl">Cloudflare Worker URL</label><input id="cloudUrl" type="url" placeholder="https://openfish-browser-preview.<account>.workers.dev"><label for="cloudToken">API Token</label><input id="cloudToken" type="password" autocomplete="off" placeholder="部署时设置的 Bearer Token"><button id="saveCloud">保存并授权云端连接</button><p class="hint">不填写云端地址时继续使用本地模式。Token 保存在 Chrome 扩展本地存储。</p></section>
     <section class="panel"><h2>当前网页</h2><button id="inspect">读取网页内容</button><div id="page" class="output">尚未读取</div></section>
