@@ -7,3 +7,28 @@ $("makePlan").addEventListener("click",async()=>{const goal=$("goal").value.trim
 $("approve").addEventListener("click",async()=>{if(!plan)return;if(!confirm("请确认你已检查完整计划，并批准执行。高风险操作仍会被拦截。"))return;const approvedPlan=plan;$("approve").disabled=true;$("makePlan").disabled=true;$("plan").textContent="执行中…";try{const result=await api("/api/execute",{plan:approvedPlan,approved:true});$("plan").textContent=JSON.stringify(result,null,2)}catch(err){$("plan").textContent="执行失败："+err.message}finally{plan=null;$("makePlan").disabled=false;refresh()}});
 $("clear").addEventListener("click",()=>{plan=null;$("goal").value="";$("plan").textContent="等待生成任务计划…";$("plan").className="plan empty";$("approve").disabled=true});
 $("refresh").addEventListener("click",refresh);$("refreshLog").addEventListener("click",refresh);refresh();setInterval(refresh,10000);
+
+async function loadToolCatalog(){
+  const host=$("toolCatalog"),count=$("toolCount");
+  if(!host||!count)return;
+  try{
+    const data=await api("/api/v1/tools");
+    const tools=data.tools||[];
+    count.textContent=tools.length+" 项工具";
+    host.replaceChildren();
+    for(const tool of tools){
+      const item=document.createElement("div");
+      item.className="tool-item";
+      const title=document.createElement("b");title.textContent=tool.name;
+      const desc=document.createElement("span");desc.textContent=tool.description;
+      const approval=document.createElement("small");approval.textContent=tool.approval==="explicit"?"需要明确批准":"只读 / 规划";
+      item.append(title,desc,approval);host.append(item);
+    }
+  }catch(error){count.textContent="读取失败";host.textContent=error.message}
+}
+document.querySelectorAll("[data-copy]").forEach(button=>button.addEventListener("click",async()=>{
+  const value=location.origin+button.dataset.copy;
+  try{await navigator.clipboard.writeText(value);const old=button.textContent;button.textContent="已复制";setTimeout(()=>button.textContent=old,1400)}
+  catch{button.textContent="复制失败，请手动复制"}
+}));
+loadToolCatalog();
