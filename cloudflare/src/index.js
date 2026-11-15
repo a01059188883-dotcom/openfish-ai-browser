@@ -1,4 +1,4 @@
-import { launch } from "@cloudflare/playwright";
+import { launch, connect } from "@cloudflare/playwright";
 import { McpServer } from "@modelcontextprotocol/server";
 import { createMcpHandler } from "agents/mcp/server";
 import { env } from "cloudflare:workers";
@@ -24,25 +24,27 @@ async function saveSession(id, data) {
 }
 async function withBrowser(sessionId, operation, requireSaved = false) {
   const saved = await loadSession(sessionId);
-  if (requireSaved && !saved.url) throw new Error("No saved page for this session. First open a URL in the same task, or bind a SESSIONS KV namespace to persist sessions between calls.");
-  // Browser Run may temporarily reject launches under load. Retry only rate-limit failures,
-  // with bounded exponential backoff and jitter; never create overlapping browser instances.
+  if (requireSaved && !saved.url) throw new Error("No saved page for this session. First open a URL in the same task.");
   let browser;
-  let lastLaunchError;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try { browser = await launch(env.BROWSER); break; }
-    catch (error) {
-      lastLaunchError = error;
+  let launched = false;
+  // Reconnect to the Cloudflare Browser Run instance saved for this logical session.
+  // Only launch a new instance when this session has never had one or has expired.
+  if (saved.browserSessionId) {
+    try { browser = await connect(env.BROWSER, saved.browserSessionId); }
+    catch { browser = undefined; }
+  }
+  if (!browser) {
+    try {
+      browser = await launch(env.BROWSER);
+      launched = true;
+    } catch (error) {
       const message = String(error?.message || error);
-      if (!/429|rate.?limit|too many requests/i.test(message) || attempt === 2) {
-        if (/429|rate.?limit|too many requests/i.test(message)) throw new Error("Cloudflare Browser Run is rate-limiting new browser sessions (429). Wait briefly and retry; saved KV session data is preserved.");
-        throw error;
+      if (/429|rate.?limit|too many requests/i.test(message)) {
+        throw new Error("Cloudflare Browser Run refused a new browser instance (429). OpenFish now reuses active Browser Run sessions; if this persists, check the Workers Free daily 10-minute quota or instance-rate limit in Cloudflare Dashboard. KV data is preserved.");
       }
-      const delay = 700 * (2 ** attempt) + Math.floor(Math.random() * 300);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      throw error;
     }
   }
-  if (!browser) throw lastLaunchError || new Error("Unable to create browser.");
   let context;
   try {
     context = await browser.newContext(saved.storageState ? { storageState: saved.storageState } : {});
@@ -61,11 +63,13 @@ async function withBrowser(sessionId, operation, requireSaved = false) {
     const url = page.url();
     let storageState;
     try { storageState = await context.storageState(); } catch { storageState = saved.storageState; }
-    await saveSession(sessionId, { url, storageState, updatedAt: new Date().toISOString() });
-    return { ...result, session_id: sessionId, current_url: url, session_persistence: env.SESSIONS ? "KV (24h)" : "per-request only; bind SESSIONS KV to persist cookies, local storage, and the last URL" };
+    const browserSessionId = typeof browser.sessionId === "function" ? browser.sessionId() : saved.browserSessionId;
+    await saveSession(sessionId, { url, storageState, browserSessionId, updatedAt: new Date().toISOString() });
+    return { ...result, session_id: sessionId, current_url: url, browser_session_reused: !launched, session_persistence: env.SESSIONS ? "Cloudflare Browser Run session + KV (24h)" : "per-request only; bind SESSIONS KV to persist session metadata" };
   } finally {
     try { if (context) await context.close(); } catch {}
-    try { await browser.close(); } catch {}
+    // Disconnect this Worker request without terminating the shared remote browser.
+    try { if (browser && typeof browser.disconnect === "function") await browser.disconnect(); else if (browser) await browser.close(); } catch {}
   }
 }
 async function executeSteps({ session_id, steps, approved = false }) {
