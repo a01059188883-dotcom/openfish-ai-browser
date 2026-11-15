@@ -74,8 +74,7 @@ function createMcpServer(token, sessionId) {
   const server = new McpServer({ name: "openfish-ai-browser-http", version: VERSION });
   const call = async (name, args = {}, write = false) => {
     if (write) {
-      const identity = await authenticateApiKey(token, "browser:write");
-      if (!identity || identity.forbidden) throw new Error("This MCP operation requires a valid browser:write API key.");
+      await verifyKey(token, "browser:write");
     }
     return toolResult(await bridgeRequest(`/api/v1/tools/${name}`, { token, sessionId, body: args }));
   };
@@ -109,9 +108,8 @@ const httpServer = http.createServer(async (req, res) => {
   }
   const bearer = /^Bearer (.+)$/i.exec(req.headers.authorization || "");
   if (!bearer) return sendError(res, 401, "Authorization: Bearer API_KEY is required.");
-  const identity = await authenticateApiKey(bearer[1], "browser:read").catch(() => null);
-  if (!identity) return sendError(res, 401, "Invalid, expired, or revoked OpenFish API key.");
-  if (identity.forbidden) return sendError(res, 403, "API key lacks browser:read scope.");
+  try { await verifyKey(bearer[1], "browser:read"); }
+  catch (error) { return sendError(res, error.statusCode || 401, error.message); }
   const sessionId = req.headers["x-openfish-session"] || "default";
   if (sessionId !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) return sendError(res, 400, "Invalid browser session ID.");
   try {
