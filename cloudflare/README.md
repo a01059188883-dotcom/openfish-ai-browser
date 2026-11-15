@@ -35,7 +35,7 @@ The local Worker dashboard is shown at the URL printed by Wrangler. The Browser 
 npx wrangler deploy
 ```
 
-The Worker uses Cloudflare's Browser Run binding. No Cloudflare account ID or Browser Run API token is embedded in source.
+The Worker uses Cloudflare's Browser Run binding. No Cloudflare account ID or Browser Run API token is embedded in source. The first preview deployment still requires a Cloudflare account with Browser Run enabled and a Worker secret configured.
 
 ## Endpoints
 
