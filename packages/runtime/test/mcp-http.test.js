@@ -5,6 +5,8 @@ import { resolve } from "node:path";
 
 test("Streamable HTTP MCP endpoint is authenticated and loopback-bound by default", async () => {
   const source = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
+  const sdk = await import("@modelcontextprotocol/sdk/server/streamableHttp.js");
+  assert.equal(typeof sdk.StreamableHTTPServerTransport, "function");
   assert.ok(source.includes('from "@modelcontextprotocol/sdk/server/streamableHttp.js"'));
   assert.ok(source.includes('new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })'));
   assert.ok(source.includes('transport.handleRequest(req, res, body)'));
