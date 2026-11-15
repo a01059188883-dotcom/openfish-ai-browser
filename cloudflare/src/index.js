@@ -25,7 +25,24 @@ async function saveSession(id, data) {
 async function withBrowser(sessionId, operation, requireSaved = false) {
   const saved = await loadSession(sessionId);
   if (requireSaved && !saved.url) throw new Error("No saved page for this session. First open a URL in the same task, or bind a SESSIONS KV namespace to persist sessions between calls.");
-  const browser = await launch(env.BROWSER);
+  // Browser Run may temporarily reject launches under load. Retry only rate-limit failures,
+  // with bounded exponential backoff and jitter; never create overlapping browser instances.
+  let browser;
+  let lastLaunchError;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { browser = await launch(env.BROWSER); break; }
+    catch (error) {
+      lastLaunchError = error;
+      const message = String(error?.message || error);
+      if (!/429|rate.?limit|too many requests/i.test(message) || attempt === 2) {
+        if (/429|rate.?limit|too many requests/i.test(message)) throw new Error("Cloudflare Browser Run is rate-limiting new browser sessions (429). Wait briefly and retry; saved KV session data is preserved.");
+        throw error;
+      }
+      const delay = 700 * (2 ** attempt) + Math.floor(Math.random() * 300);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  if (!browser) throw lastLaunchError || new Error("Unable to create browser.");
   let context;
   try {
     context = await browser.newContext(saved.storageState ? { storageState: saved.storageState } : {});
