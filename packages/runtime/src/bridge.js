@@ -6,9 +6,10 @@ import { createPlan } from "./ai-planner.js";
 import { executePlan } from "./executor.js";
 import { validateHttpUrl } from "./safety.js";
 import { authenticateApiKey, createApiKey, listApiKeys, revokeApiKey } from "./api-keys.js";
+import { registerClient, listClients, checkClientRateLimit } from "./client-registry.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const VERSION = "1.5.0";
+const VERSION = "1.6.0";
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 const startedAt = Date.now();
 const metrics = { requests: 0, errors: 0, events: [] };
@@ -31,6 +32,7 @@ function send(res, status, data) {
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     ...(origin ? { "access-control-allow-origin": origin, "vary": "Origin" } : {}),
+    ...(res.reqRateHeaders || {}),
     "access-control-allow-methods": "GET,POST,OPTIONS",
     "access-control-allow-headers": "content-type, authorization"
   });
@@ -151,6 +153,7 @@ const server = http.createServer(async (req, res) => {
       const identity = await authenticateApiKey(bearer?.[1], scope);
       if (!identity) return send(res, 401, { error: "Invalid, expired, or revoked API key." });
       if (identity.forbidden) return send(res, 403, { error: `API key lacks ${scope} scope.` });
+      await registerClient(identity, { clientId: body.clientId, platform: body.platform, sessionId: body.sessionId });
       return send(res, 200, { ok: true, identity });
     }
     if (req.method === "GET" && res.reqPath === "/api/browser/sessions") {
@@ -163,6 +166,9 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && res.reqPath.startsWith("/api/browser/sessions/") && res.reqPath.endsWith("/close")) {
       const id = res.reqPath.slice("/api/browser/sessions/".length, -"/close".length);
       return send(res, 200, await closeBrowserSession(id));
+    }
+    if (req.method === "GET" && res.reqPath === "/api/admin/clients") {
+      return send(res, 200, { clients: await listClients(), rateLimitPerMinute: Number(process.env.OPENFISH_RATE_LIMIT_PER_MINUTE || 120) });
     }
     if (req.method === "GET" && res.reqPath === "/api/admin/keys") {
       return send(res, 200, { keys: await listApiKeys() });
@@ -184,6 +190,10 @@ const server = http.createServer(async (req, res) => {
       const identity = await authenticateApiKey(bearer?.[1], requiredScope);
       if (!identity) return send(res, 401, { error: "A valid OpenFish API key is required.", code: "API_KEY_REQUIRED" });
       if (identity.forbidden) return send(res, 403, { error: `API key lacks the ${requiredScope} scope.`, code: "INSUFFICIENT_SCOPE" });
+      await registerClient(identity, { clientId: req.headers["x-openfish-client"], platform: req.headers["x-openfish-platform"], sessionId: requestedSession });
+      const rate = checkClientRateLimit(identity.id, Number(process.env.OPENFISH_RATE_LIMIT_PER_MINUTE || 120));
+      res.reqRateHeaders = { "x-ratelimit-limit": String(rate.limit), "x-ratelimit-remaining": String(rate.remaining), "x-ratelimit-reset": rate.resetAt };
+      if (!rate.allowed) { res.setHeader("retry-after", String(rate.retryAfterSeconds)); return send(res, 429, { error: "API key rate limit exceeded.", code: "RATE_LIMITED", retryAfterSeconds: rate.retryAfterSeconds }); }
       return send(res, 200, { tool: name, result: await invokeTool(name, body) });
     }
     if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, name: "OpenFish AI Browser", version: VERSION });
@@ -194,6 +204,7 @@ const server = http.createServer(async (req, res) => {
         name: "OpenFish AI Browser", version: VERSION, uptime,
         uptimeText: uptime < 60 ? `${uptime}s` : uptime < 3600 ? `${Math.floor(uptime / 60)}m ${uptime % 60}s` : `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
         requests: metrics.requests, errors: metrics.errors,
+        clientCount: (await listClients()).length,
         model: process.env.OPENFISH_MODEL || "qwen2.5:3b",
         browser, port: PORT
       });
