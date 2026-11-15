@@ -110,3 +110,13 @@
 - Added responsive API key management UI with one-time key display and copy action.
 - Fixed dashboard activity chart refresh using the latest event collection.
 - Synchronized package, bridge, MCP, extension, dashboard, README, and test versions to 1.4.0.
+
+
+## 1.5.0 - 2026-11-15
+- Added a separate MCP Streamable HTTP transport at `/mcp`, authenticated with scoped API keys and bound to loopback by default.
+- Kept the existing stdio MCP transport working.
+- Added isolated Playwright BrowserContexts selected by `X-OpenFish-Session`; cookies and local storage are separated between sessions.
+- Added browser session create/list/close APIs and admin console controls with idle expiry and cleanup.
+- Added explicit read/write scope checks to HTTP MCP tool calls while retaining exact-action approval and existing safety policy.
+- Added responsive session management UI and endpoint/version information.
+- Synchronized package, bridge, stdio MCP, HTTP MCP, Chrome extension, dashboard, README, and tests to 1.5.0.
