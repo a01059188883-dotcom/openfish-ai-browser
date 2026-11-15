@@ -110,14 +110,14 @@ const httpServer = http.createServer(async (req, res) => {
   }
   const bearer = /^Bearer (.+)$/i.exec(req.headers.authorization || "");
   if (!bearer) return sendError(res, 401, "Authorization: Bearer API_KEY is required.");
-  try { await verifyKey(bearer[1], "browser:read", { ...clientMeta, sessionId }); }
-  catch (error) { return sendError(res, error.statusCode || 401, error.message); }
   const sessionId = req.headers["x-openfish-session"] || "default";
   const clientMeta = {
     clientId: String(req.headers["x-openfish-client"] || "mcp-http").slice(0, 80),
     platform: String(req.headers["x-openfish-platform"] || "mcp-http").slice(0, 40)
   };
   if (sessionId !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) return sendError(res, 400, "Invalid browser session ID.");
+  try { await verifyKey(bearer[1], "browser:read", { ...clientMeta, sessionId }); }
+  catch (error) { return sendError(res, error.statusCode || 401, error.message); }
   try {
     const body = req.method === "POST" ? await readBody(req) : undefined;
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
