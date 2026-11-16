@@ -9,6 +9,7 @@ const SESSION_TTL_MS = Math.max(60000, Number(process.env.OPENFISH_SESSION_TTL_M
 const MAX_SESSIONS = Math.max(2, Math.min(50, Number(process.env.OPENFISH_MAX_SESSIONS || 20)));
 let browser;
 let browserConnectPromise;
+let pendingSessionCreations = 0;
 
 export function getCurrentBrowserSessionId() {
   return sessionContext.getStore() || "default";
@@ -65,11 +66,22 @@ function validSessionId(id) {
   return typeof id === "string" && /^[a-zA-Z0-9_-]{8,80}$/.test(id) && id !== "default";
 }
 export async function createBrowserSession(name = "New session") {
-  const id = randomUUID();
-  const session = { id, name: String(name || "New session").trim().slice(0, 60) || "New session", context: await createContext(), page: null, createdAt: new Date().toISOString(), lastUsedAt: null, expiresAt: null };
-  sessions.set(id, session);
-  touch(session);
-  return publicSession(session);
+  listBrowserSessions();
+  const activeNamedSessions = [...sessions.keys()].filter(id => id !== "default").length;
+  if (activeNamedSessions + pendingSessionCreations >= MAX_SESSIONS) {
+    throw Object.assign(new Error(`Browser session limit reached (${MAX_SESSIONS}). Close an idle session before creating another.`), { statusCode: 429 });
+  }
+  pendingSessionCreations += 1;
+  try {
+    const id = randomUUID();
+    const context = await createContext();
+    const session = { id, name: String(name || "New session").trim().slice(0, 60) || "New session", context, page: null, createdAt: new Date().toISOString(), lastUsedAt: null, expiresAt: null };
+    sessions.set(id, session);
+    touch(session);
+    return publicSession(session);
+  } finally {
+    pendingSessionCreations -= 1;
+  }
 }
 export function hasBrowserSession(id) {
   listBrowserSessions();
@@ -109,7 +121,8 @@ export function getBrowserStatus() {
     remote: Boolean(process.env.BROWSER_WS_ENDPOINT),
     sessionId: id,
     url: session?.page && !session.page.isClosed() ? session.page.url() : null,
-    sessionCount: sessions.size
+    sessionCount: sessions.size,
+    maxSessions: MAX_SESSIONS
   };
 }
 export async function closeBrowser() {
