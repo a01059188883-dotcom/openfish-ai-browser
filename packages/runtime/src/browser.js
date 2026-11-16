@@ -7,8 +7,12 @@ const sessionContext = new AsyncLocalStorage();
 const sessions = new Map();
 const SESSION_TTL_MS = Math.max(60000, Number(process.env.OPENFISH_SESSION_TTL_MS || 30 * 60 * 1000));
 const MAX_SESSIONS = Math.max(2, Math.min(50, Number(process.env.OPENFISH_MAX_SESSIONS || 20)));
+const BROWSER_MODE = ["auto", "local", "remote"].includes(process.env.OPENFISH_BROWSER_MODE)
+  ? process.env.OPENFISH_BROWSER_MODE : "auto";
 let browser;
 let browserConnectPromise;
+let activeBrowserMode = "disconnected";
+let remoteFallbackReason = null;
 
 export function getCurrentBrowserSessionId() {
   return sessionContext.getStore() || "default";
@@ -20,16 +24,34 @@ function touch(session) {
   session.lastUsedAt = new Date().toISOString();
   session.expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
 }
+async function connectBrowser() {
+  const endpoint = process.env.BROWSER_WS_ENDPOINT;
+  if (BROWSER_MODE === "remote" && !endpoint) {
+    throw new Error("OPENFISH_BROWSER_MODE=remote requires BROWSER_WS_ENDPOINT.");
+  }
+  if (BROWSER_MODE !== "local" && endpoint) {
+    try {
+      const remote = await chromium.connectOverCDP(endpoint, { timeout: 12000 });
+      activeBrowserMode = "remote";
+      remoteFallbackReason = null;
+      return remote;
+    } catch (error) {
+      remoteFallbackReason = String(error?.message || error).slice(0, 300);
+      if (BROWSER_MODE === "remote") throw new Error(`Remote browser unavailable: ${remoteFallbackReason}`);
+      process.stderr.write(`OpenFish: remote browser unavailable; falling back to local Chromium: ${remoteFallbackReason}\n`);
+    }
+  }
+  const local = await chromium.launch({ headless: process.env.HEADLESS !== "false" });
+  activeBrowserMode = endpoint && BROWSER_MODE === "auto" ? "local-fallback" : "local";
+  return local;
+}
 async function getBrowser() {
   if (browser?.isConnected()) return browser;
   if (!browserConnectPromise) {
-    browserConnectPromise = (async () => {
-      const endpoint = process.env.BROWSER_WS_ENDPOINT;
-      browser = endpoint
-        ? await chromium.connectOverCDP(endpoint)
-        : await chromium.launch({ headless: process.env.HEADLESS !== "false" });
-      return browser;
-    })().finally(() => { browserConnectPromise = null; });
+    browserConnectPromise = connectBrowser().then(instance => {
+      browser = instance;
+      return instance;
+    }).finally(() => { browserConnectPromise = null; });
   }
   return browserConnectPromise;
 }
@@ -106,7 +128,10 @@ export function getBrowserStatus() {
   const session = sessions.get(id);
   return {
     connected: Boolean(browser && browser.isConnected()),
-    remote: Boolean(process.env.BROWSER_WS_ENDPOINT),
+    remote: activeBrowserMode === "remote",
+    mode: activeBrowserMode,
+    configuredMode: BROWSER_MODE,
+    fallbackReason: remoteFallbackReason,
     sessionId: id,
     url: session?.page && !session.page.isClosed() ? session.page.url() : null,
     sessionCount: sessions.size
@@ -115,6 +140,7 @@ export function getBrowserStatus() {
 export async function closeBrowser() {
   await Promise.all([...sessions.values()].map(session => session.context.close().catch(() => {})));
   sessions.clear();
-  if (browser && !process.env.BROWSER_WS_ENDPOINT) await browser.close();
+  if (browser && activeBrowserMode !== "remote") await browser.close();
   browser = undefined;
+  activeBrowserMode = "disconnected";
 }
