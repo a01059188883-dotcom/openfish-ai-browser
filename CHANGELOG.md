@@ -140,7 +140,12 @@
 - Cloudflare deployment is not performed by this source release; account secrets and a deployment check are still required.
 
 
-## 1.7.1 - 2026-11-15
+## 1.7.2 - 2026-11-15
 - Added a manually triggered GitHub Actions workflow to deploy the Cloudflare relay and set its Worker secret without exposing secret values in logs.
 - Documented the exact repository Actions secrets and one-click deployment path.
-- Synchronized active application version markers and regression assertions to 1.7.1.
+- Synchronized active application version markers and regression assertions to 1.7.2.
+
+
+## 1.7.2 - 2026-11-16
+- Fix Wrangler entry-point resolution for the config stored under `cloudflare/` by using the config-relative `worker.js` path.
+- Synchronize the Cloudflare Worker, local bridge, MCP servers, Chrome extension, admin dashboard, package metadata, tests, and documentation to v1.7.2.
