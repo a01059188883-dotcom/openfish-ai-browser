@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.0 - 2026-11-16
+- Added automatic remote-to-local Chromium fallback in auto browser mode.
+- Added explicit auto, local, and remote browser modes with runtime status reporting.
+- Added a mobile-viewport KOREA LOTTO production smoke test to CI.
+- Synchronized package, bridge, MCP server, Cloudflare relay, and Chrome extension versions.
+- Kept browser execution self-hosted; Cloudflare relay forwards requests and does not run a paid browser service.
+
+# Changelog
+
 ## 1.0.0 - 2026-11-13
 - Initial OpenFish AI Browser project scaffold.
 - Added Playwright local/remote browser runtime.
