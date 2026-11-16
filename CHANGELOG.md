@@ -149,3 +149,9 @@
 ## 1.7.2 - 2026-11-16
 - Fix Wrangler entry-point resolution for the config stored under `cloudflare/` by using the config-relative `worker.js` path.
 - Synchronize the Cloudflare Worker, local bridge, MCP servers, Chrome extension, admin dashboard, package metadata, tests, and documentation to v1.7.2.
+
+
+## 1.8.0 - 2026-11-16
+- Refined the admin dashboard information hierarchy, responsive navigation, card spacing, form layouts, tables, and narrow-screen controls.
+- Improved the Chrome side panel header, action hierarchy, output panels, touch targets, and responsive spacing.
+- Synchronized application, Worker, MCP, extension, dashboard, documentation, and regression-test version markers to 1.8.0.

@@ -9,7 +9,7 @@ import { authenticateApiKey, createApiKey, listApiKeys, revokeApiKey } from "./a
 import { registerClient, listClients, checkClientRateLimit } from "./client-registry.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const VERSION = "1.7.2";
+const VERSION = "1.8.0";
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 const startedAt = Date.now();
 const metrics = { requests: 0, errors: 0, events: [] };

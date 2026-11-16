@@ -36,3 +36,82 @@ footer{padding:30px 0 8px;line-height:1.6}
 
 .session-create{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:15px;border:1px solid #263b54;border-radius:12px;background:#0b1523}.session-create input{flex:1 1 220px;min-width:0;padding:10px 12px;border:1px solid #2b4059;border-radius:8px;background:#0b1422;color:var(--text);font:inherit;font-size:13px}.session-list{display:grid;gap:9px;margin-top:14px}.session-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 16px;border:1px solid #263b54;border-radius:10px;background:#0d1929}.session-details{display:grid;gap:5px;min-width:0}.session-details b{font-size:13px}.session-details code{overflow-wrap:anywhere;color:#9db5d1;font-size:11px}.session-details small{color:var(--muted);font-size:11px}.session-actions{display:flex;flex-wrap:wrap;gap:8px;flex:0 0 auto}.session-actions button{padding:8px 11px;border:1px solid #304660;border-radius:8px;background:#15263b;color:var(--text);font:inherit;font-size:12px}.session-actions button.danger{border-color:#70414a;background:#2a1820;color:#ffb8c0}.session-actions button:disabled{opacity:.5}
 @media(max-width:560px){.session-row{align-items:flex-start;flex-direction:column}.session-actions{width:100%}.session-actions button{flex:1}}
+
+
+/* v1.8.0 layout refinement */
+:root{--content-gap:clamp(12px,1.4vw,20px)}
+html{scroll-padding-top:104px}
+main{width:100%;max-width:1560px;padding:clamp(18px,2.5vw,38px) clamp(14px,2.6vw,42px) 28px}
+.sidebar{z-index:30}
+nav a{min-height:42px}
+.topbar{align-items:flex-start}
+.topright{flex-wrap:wrap;justify-content:flex-end}
+.stats{grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--content-gap)}
+.stat{min-width:0;min-height:118px;display:flex;flex-direction:column;justify-content:center}
+.stat strong{overflow-wrap:anywhere}
+.grid{grid-template-columns:minmax(0,1.45fr) minmax(290px,.85fr);gap:var(--content-gap);align-items:start}
+.card{min-width:0;padding:clamp(15px,1.6vw,24px)}
+.cardhead{align-items:center}
+.cardhead>div{min-width:0}
+.cardhead p{max-width:72ch}
+textarea{min-height:112px;line-height:1.6}
+.actions{flex-wrap:wrap}
+.actions button{min-height:40px}
+.template-row{grid-template-columns:minmax(150px,1fr) repeat(4,minmax(70px,auto))}
+.template-row button,.template-row select{min-height:40px}
+.plan{min-height:74px}
+.approve{min-height:48px}
+.healthrow{gap:12px}
+.healthrow span{min-width:0}
+.healthrow b{text-align:right;overflow-wrap:anywhere}
+.integration-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.tool-catalog{grid-template-columns:repeat(3,minmax(0,1fr))}
+.systemgrid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.key-create{grid-template-columns:repeat(3,minmax(0,1fr))}
+.key-create label{align-self:end;margin:0}
+.key-create button{grid-column:1/-1;min-height:42px}
+.session-create>*{min-height:40px}
+.session-create input{flex:1 1 260px}
+.session-row,.key-row{min-width:0}
+.session-details,.key-details{overflow-wrap:anywhere}
+@media(max-width:1100px){
+ .sidebar{width:205px}
+ .grid{grid-template-columns:minmax(0,1fr) minmax(260px,.8fr)}
+ .systemgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .tool-catalog{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+ .sidebar{width:100%;height:auto;padding:9px 12px 7px}
+ .brand{padding-bottom:8px}
+ nav{gap:5px}
+ nav a{min-height:36px}
+ main{padding:16px 12px 22px}
+ .topbar{gap:12px}
+ .topright{justify-content:flex-start}
+ .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .grid{grid-template-columns:minmax(0,1fr)}
+ .wide{grid-column:auto}
+ .card{padding:16px}
+ .key-create{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .key-create button{grid-column:1/-1}
+ .systemgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:440px){
+ .topbar h1{font-size:20px}
+ .topright{width:100%}
+ .topright button{flex:1}
+ .stats{gap:8px}
+ .stat{min-height:102px;padding:12px}
+ .stat strong{font-size:21px}
+ .cardhead{align-items:flex-start;flex-direction:column}
+ .cardhead .tag{white-space:normal}
+ .template-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .template-row select{grid-column:1/-1}
+ .integration-grid,.tool-catalog{grid-template-columns:minmax(0,1fr)}
+ .systemgrid{gap:8px}
+ .key-create{grid-template-columns:minmax(0,1fr)}
+ .key-create button{grid-column:auto}
+ .session-create{align-items:stretch}
+ .session-create input,.session-create button{width:100%;flex-basis:100%}
+}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}

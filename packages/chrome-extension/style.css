@@ -24,3 +24,22 @@ button.primary{background:#147d68;border-color:#147d68;color:white;box-shadow:0 
 .hint{margin:0;padding:4px 3px;color:var(--muted);font-size:10px;line-height:1.6}
 @media(min-width:560px){body{padding:16px}.panel{padding:16px}.output{max-height:340px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important}}
+
+
+/* v1.8.0 touch-first side panel refinement */
+header{gap:11px;padding:12px 14px}
+header>div:nth-child(2){min-width:0}
+header h1{letter-spacing:-.2px}
+.status{overflow-wrap:anywhere}
+main{gap:11px}
+.panel{padding:15px}
+.panel h2{display:flex;align-items:center;gap:8px;margin-bottom:13px}
+.panel button{min-height:42px}
+#inspect{background:#1a2b41}
+textarea{min-height:104px;line-height:1.55}
+.output{min-height:56px;max-height:38vh;scrollbar-width:thin}
+#result{min-height:82px}
+#execute{min-height:46px;font-size:13px}
+.hint{padding:3px 4px 8px}
+@media(min-width:560px){body{max-width:560px;margin:0 auto;padding:18px}header{margin:-18px -18px 16px;padding:14px 18px}.panel{padding:18px}}
+@media(max-width:360px){body{padding:10px}header{margin:-10px -10px 12px;padding:11px 10px}.logo{width:32px;height:32px;font-size:21px}.panel{padding:12px}.output{font-size:10px}}
