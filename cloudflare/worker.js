@@ -1,4 +1,4 @@
-const VERSION = "1.7.0";
+const VERSION = "1.7.2";
 const MAX_BODY_BYTES = 512 * 1024;
 const ALLOWED_PATH = path => path === "/mcp" || path === "/health" ||
   path === "/.well-known/openfish-tools.json" ||
