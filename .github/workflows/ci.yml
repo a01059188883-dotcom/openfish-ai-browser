@@ -11,5 +11,10 @@ jobs:
         with:
           node-version: 20
       - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
       - run: npm run check
       - run: npm test
+      - name: KOREA LOTTO live browser smoke test
+        run: npm run test:lotto
+        env:
+          LOTTO_SMOKE_URL: https://korea-lotto-3vx.pages.dev
