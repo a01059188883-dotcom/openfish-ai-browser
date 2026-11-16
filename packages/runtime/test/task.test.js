@@ -21,10 +21,12 @@ test("release version is synchronized across user-facing packages", async () => 
   const mcp = await readFile(resolve("packages/mcp-server/src/index.js"), "utf8");
   const readme = await readFile(resolve("README.md"), "utf8");
   const sidepanel = await readFile(resolve("packages/chrome-extension/sidepanel.html"), "utf8");
+  const worker = await readFile(resolve("cloudflare/worker.js"), "utf8");
   assert.equal(manifest.version, pkg.version);
   assert.match(mcp, new RegExp(`version: "${pkg.version}"`));
   assert.ok(readme.includes(`Version: **${pkg.version}**`));
   assert.ok(sidepanel.includes(`AI Browser · ${pkg.version}`));
+  assert.ok(worker.includes(`const VERSION = "${pkg.version}"`));
 });
 
 test("URL validation permits HTTP(S) and rejects embedded credentials or other protocols", () => {
@@ -35,10 +37,11 @@ test("URL validation permits HTTP(S) and rejects embedded credentials or other p
 
 test("bridge applies strict URL validation to AI planning and uses the configured port for Host checks", async () => {
   const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
   assert.ok(bridge.includes("const ALLOWED_HOSTS = new Set(["));
   assert.ok(bridge.includes("127.0.0.1:${PORT}"));
   assert.ok(bridge.includes("const parsed = validateHttpUrl(body.url)"));
-  assert.ok(bridge.includes('const VERSION = "1.8.0"'));
+  assert.ok(bridge.includes(`const VERSION = "${pkg.version}"`));
 });
 
 test("approved plan executor enforces explicit approval and stops on unsafe targets", async () => {
@@ -90,7 +93,7 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   const html = await readFile(resolve("packages/admin/index.html"), "utf8");
   const app = await readFile(resolve("packages/admin/app.js"), "utf8");
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "1.8.0");
+  assert.equal(pkg.version, "1.9.0");
   assert.ok(bridge.includes('req.url === "/api/admin/status"'));
   assert.ok(bridge.includes('req.url === "/api/admin/events"'));
   assert.ok(bridge.includes('["../../admin/index.html"'));
