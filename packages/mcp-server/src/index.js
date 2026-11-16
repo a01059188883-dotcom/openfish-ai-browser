@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const server = new McpServer({ name: "openfish-ai-browser", version: "1.8.0" });
+const server = new McpServer({ name: "openfish-ai-browser", version: "1.9.0" });
 const result = value => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
 
 async function bridgeRequest(path, options = {}) {
@@ -63,5 +63,8 @@ server.tool("take_screenshot", "Capture the current page in the shared browser a
 server.tool("list_interactive_elements", "List visible links, buttons, inputs, and selects from the shared browser.", {}, async () => result(await bridgeRequest("/api/mcp/list_interactive_elements")));
 
 server.tool("get_accessibility_snapshot", "Return headings and landmarks from the current page in the shared browser.", {}, async () => result(await bridgeRequest("/api/mcp/get_accessibility_snapshot")));
+server.tool("go_back", "Go back one page in the shared browser tab.", {}, async () => result(await bridgeRequest("/api/mcp/go_back", { method: "POST", body: {} })));
+server.tool("go_forward", "Go forward one page in the shared browser tab.", {}, async () => result(await bridgeRequest("/api/mcp/go_forward", { method: "POST", body: {} })));
+server.tool("reload_page", "Reload the current page in the shared browser tab.", {}, async () => result(await bridgeRequest("/api/mcp/reload_page", { method: "POST", body: {} })));
 
 await server.connect(new StdioServerTransport());

@@ -32,6 +32,20 @@ $("run").addEventListener("click", async () => {
   catch(e) { currentPlan = null; $("execute").hidden = true; $("result").textContent = e.message; }
   finally { $("run").disabled = false; }
 });
+async function browserAction(action) {
+  const button = $(action === "go_back" ? "back" : action === "go_forward" ? "forward" : "reload");
+  const label = button.textContent;
+  button.disabled = true;
+  try {
+    const data = await request("/api/mcp/" + action, {});
+    $("page").textContent = `${data.title || ""}\\n${data.url || ""}\\n\\n${data.message || "网页操作完成。"}`;
+  } catch (error) { $("page").textContent = "操作失败：" + error.message; }
+  finally { button.disabled = false; button.textContent = label; }
+}
+$("back").addEventListener("click", () => browserAction("go_back"));
+$("forward").addEventListener("click", () => browserAction("go_forward"));
+$("reload").addEventListener("click", () => browserAction("reload_page"));
+
 health();
 
 $("execute").addEventListener("click", async () => {

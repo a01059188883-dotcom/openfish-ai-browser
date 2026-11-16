@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **1.8.0**.
+Open-source, free-first browser automation starter. Version: **1.9.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -125,3 +125,7 @@ Remote MCP endpoint: `https://YOUR-WORKER.workers.dev/mcp`. Remote clients use `
 - No Cloudflare deployment is claimed by this repository change. Deploy only after setting the Worker secret and verifying the relay health endpoint.
 
 After deployment, check `GET https://YOUR-WORKER.workers.dev/health` with the relay Bearer token. It reports whether a local agent is connected.
+
+
+## Browser navigation controls (v1.9.0)
+The Chrome side panel and MCP interfaces expose `go_back`, `go_forward`, and `reload_page` for the current browser session. Named browser sessions are capped at 20 by default (excluding the default session); expired sessions are cleaned up before a new session is allocated. Configure `OPENFISH_MAX_SESSIONS` (2–50) and `OPENFISH_SESSION_TTL_MS` to adjust these limits.

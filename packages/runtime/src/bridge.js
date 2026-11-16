@@ -9,7 +9,7 @@ import { authenticateApiKey, createApiKey, listApiKeys, revokeApiKey } from "./a
 import { registerClient, listClients, checkClientRateLimit } from "./client-registry.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const VERSION = "1.8.0";
+const VERSION = "1.9.0";
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 const startedAt = Date.now();
 const metrics = { requests: 0, errors: 0, events: [] };
@@ -71,7 +71,7 @@ function readBody(req) {
 }
 
 
-const TOOL_CATALOG = [{"name":"open_page","description":"Navigate the shared browser to a public HTTP(S) URL.","inputSchema":{"type":"object","properties":{"url":{"type":"string","format":"uri"}},"required":["url"],"additionalProperties":false},"approval":"not_required"},{"name":"read_page","description":"Read title, URL, and visible page text.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"plan_task","description":"Create a proposed browser action plan. Does not execute it.","inputSchema":{"type":"object","properties":{"goal":{"type":"string","minLength":1,"maxLength":2000}},"required":["goal"],"additionalProperties":false},"approval":"not_required"},{"name":"execute_plan","description":"Execute a reviewed plan. Requires explicit approval of the exact plan.","inputSchema":{"type":"object","properties":{"plan":{"type":"object"},"approved":{"type":"boolean","const":true}},"required":["plan","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"list_interactive_elements","description":"List visible interactive page elements.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"get_accessibility_snapshot","description":"Read page headings and landmarks.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"click_element","description":"Click a unique visible button-like element; requires explicit approval.","inputSchema":{"type":"object","properties":{"selector":{"type":"string","minLength":1,"maxLength":500},"approved":{"type":"boolean","const":true}},"required":["selector","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"fill_element","description":"Fill a unique ordinary field; requires explicit approval.","inputSchema":{"type":"object","properties":{"selector":{"type":"string","minLength":1,"maxLength":500},"value":{"type":"string","maxLength":10000},"approved":{"type":"boolean","const":true}},"required":["selector","value","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"take_screenshot","description":"Capture the current browser viewport.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"}];
+const TOOL_CATALOG = [{"name":"open_page","description":"Navigate the shared browser to a public HTTP(S) URL.","inputSchema":{"type":"object","properties":{"url":{"type":"string","format":"uri"}},"required":["url"],"additionalProperties":false},"approval":"not_required"},{"name":"read_page","description":"Read title, URL, and visible page text.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"plan_task","description":"Create a proposed browser action plan. Does not execute it.","inputSchema":{"type":"object","properties":{"goal":{"type":"string","minLength":1,"maxLength":2000}},"required":["goal"],"additionalProperties":false},"approval":"not_required"},{"name":"execute_plan","description":"Execute a reviewed plan. Requires explicit approval of the exact plan.","inputSchema":{"type":"object","properties":{"plan":{"type":"object"},"approved":{"type":"boolean","const":true}},"required":["plan","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"list_interactive_elements","description":"List visible interactive page elements.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"get_accessibility_snapshot","description":"Read page headings and landmarks.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"go_back","description":"Go back one page in the current browser tab.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"go_forward","description":"Go forward one page in the current browser tab.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"reload_page","description":"Reload the current browser page.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"click_element","description":"Click a unique visible button-like element; requires explicit approval.","inputSchema":{"type":"object","properties":{"selector":{"type":"string","minLength":1,"maxLength":500},"approved":{"type":"boolean","const":true}},"required":["selector","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"fill_element","description":"Fill a unique ordinary field; requires explicit approval.","inputSchema":{"type":"object","properties":{"selector":{"type":"string","minLength":1,"maxLength":500},"value":{"type":"string","maxLength":10000},"approved":{"type":"boolean","const":true}},"required":["selector","value","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"take_screenshot","description":"Capture the current browser viewport.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"}];
 function adapterTools(kind) {
   if (kind === "openai") return TOOL_CATALOG.map(t => ({ type: "function", function: { name: t.name, description: t.description + (t.approval === "explicit" ? " Explicit user approval is required." : ""), parameters: t.inputSchema, strict: true } }));
   if (kind === "anthropic") return TOOL_CATALOG.map(t => ({ name: t.name, description: t.description + (t.approval === "explicit" ? " Explicit user approval is required." : ""), input_schema: t.inputSchema }));
@@ -108,6 +108,13 @@ async function invokeTool(name, args = {}) {
   if (name === "get_accessibility_snapshot") {
     const page = await getPage();
     return {title:await page.title(),url:page.url(),...(await page.locator("body").evaluate(body=>({headings:[...body.querySelectorAll("h1,h2,h3")].slice(0,60).map(el=>({level:Number(el.tagName.slice(1)),text:(el.innerText||"").trim().slice(0,240)})),landmarks:[...body.querySelectorAll("main,nav,header,footer,form,[role=main],[role=navigation]")].slice(0,30).map(el=>({tag:el.tagName.toLowerCase(),role:el.getAttribute("role"),label:el.getAttribute("aria-label"),text:(el.innerText||"").trim().slice(0,500)}))})))};
+  }
+  if (name === "go_back" || name === "go_forward" || name === "reload_page") {
+    const page = await getPage();
+    if (name === "go_back") await page.goBack({ waitUntil: "domcontentloaded", timeout: 15000 });
+    else if (name === "go_forward") await page.goForward({ waitUntil: "domcontentloaded", timeout: 15000 });
+    else await page.reload({ waitUntil: "domcontentloaded", timeout: 15000 });
+    return { action: name, title: await page.title().catch(() => ""), url: page.url(), message: name === "go_back" ? "Returned to the previous page when history was available." : name === "go_forward" ? "Moved forward when browser history was available." : "Page reloaded." };
   }
   if (name === "take_screenshot") {
     const page = await getPage(); const path = `openfish-${Date.now()}.png`; await page.screenshot({path,fullPage:false}); return {path,url:page.url()};
@@ -184,7 +191,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && res.reqPath.startsWith("/api/v1/tools/")) {
       const name = res.reqPath.slice("/api/v1/tools/".length);
       const body = await readBody(req);
-      const writeTools = new Set(["open_page", "execute_plan", "click_element", "fill_element"]);
+      const writeTools = new Set(["open_page", "execute_plan", "click_element", "fill_element", "go_back", "go_forward", "reload_page"]);
       const requiredScope = writeTools.has(name) ? "browser:write" : "browser:read";
       const bearer = /^Bearer (.+)$/i.exec(req.headers.authorization || "");
       const identity = await authenticateApiKey(bearer?.[1], requiredScope);
@@ -203,7 +210,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, {
         name: "OpenFish AI Browser", version: VERSION, uptime,
         uptimeText: uptime < 60 ? `${uptime}s` : uptime < 3600 ? `${Math.floor(uptime / 60)}m ${uptime % 60}s` : `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
-        requests: metrics.requests, errors: metrics.errors,
+        requests: metrics.requests, errors: metrics.errors, maxBrowserSessions: getBrowserStatus().maxSessions,
         clientCount: (await listClients()).length,
         model: process.env.OPENFISH_MODEL || "qwen2.5:3b",
         browser, port: PORT
@@ -260,6 +267,14 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       if (body.approved !== true) return send(res, 403, { error: "Explicit approval of this exact field and value is required." });
       return send(res, 200, await executePlan({ steps: [{ action: "fill", selector: body.selector, value: body.value }] }, { approved: true }));
+    }
+    if (req.method === "POST" && ["/api/mcp/go_back", "/api/mcp/go_forward", "/api/mcp/reload_page"].includes(req.url)) {
+      const page = await getPage();
+      const action = req.url.split("/").pop();
+      if (action === "go_back") await page.goBack({ waitUntil: "domcontentloaded", timeout: 15000 });
+      else if (action === "go_forward") await page.goForward({ waitUntil: "domcontentloaded", timeout: 15000 });
+      else await page.reload({ waitUntil: "domcontentloaded", timeout: 15000 });
+      return send(res, 200, { action, title: await page.title().catch(() => ""), url: page.url() });
     }
     if (req.method === "POST" && req.url === "/api/mcp/take_screenshot") {
       const page = await getPage();

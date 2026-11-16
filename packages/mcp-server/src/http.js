@@ -6,7 +6,7 @@ import { z } from "zod";
 const PORT = Number(process.env.OPENFISH_MCP_HTTP_PORT || 8788);
 const HOST = process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1";
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const VERSION = "1.8.0";
+const VERSION = "1.9.0";
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -99,6 +99,9 @@ function createMcpServer(token, sessionId, clientMeta) {
   server.tool("take_screenshot", "Capture the current browser viewport.", {}, args => call("take_screenshot", args));
   server.tool("list_interactive_elements", "List visible interactive elements on the current page.", {}, args => call("list_interactive_elements", args));
   server.tool("get_accessibility_snapshot", "Read page headings and landmarks.", {}, args => call("get_accessibility_snapshot", args));
+  server.tool("go_back", "Go back one page in the current isolated browser tab.", {}, args => call("go_back", args, true));
+  server.tool("go_forward", "Go forward one page in the current isolated browser tab.", {}, args => call("go_forward", args, true));
+  server.tool("reload_page", "Reload the current page in the isolated browser tab.", {}, args => call("reload_page", args, true));
   return server;
 }
 
