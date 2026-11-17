@@ -147,7 +147,11 @@ export async function closeBrowserTab(index, approved) {
   const session = await getSession(getCurrentBrowserSessionId()); const pages = session.context.pages();
   if (!Number.isInteger(index) || index < 0 || index >= pages.length) throw Object.assign(new Error("Browser tab index is out of range."), { statusCode: 404 });
   if (pages.length <= 1) throw Object.assign(new Error("The last tab cannot be closed. Open another tab first."), { statusCode: 409 });
-  const closing = pages[index], wasActive = closing === session.page;\n  session.recentlyClosed ||= [];\n  session.recentlyClosed.unshift({ url: closing.url(), title: await closing.title().catch(() => ""), closedAt: new Date().toISOString() });\n  session.recentlyClosed.length = Math.min(session.recentlyClosed.length, 10);\n  await closing.close();
+  const closing = pages[index], wasActive = closing === session.page;
+  session.recentlyClosed ||= [];
+  session.recentlyClosed.unshift({ url: closing.url(), title: await closing.title().catch(() => ""), closedAt: new Date().toISOString() });
+  session.recentlyClosed.length = Math.min(session.recentlyClosed.length, 10);
+  await closing.close();
   const remaining = session.context.pages();
   if (wasActive || !session.page || session.page.isClosed()) { session.page = remaining[Math.min(index, remaining.length - 1)]; await session.page.bringToFront(); }
   return { index, closed: true, activeUrl: session.page.url() };
@@ -189,7 +193,7 @@ export async function reopenClosedBrowserTab(approved) {
   const page = await newTrackedPage(session.context);
   page.setDefaultTimeout(12000);
   try {
-    await page.goto(validateHttpUrl(item.url).href, { waitUntil: "domcontentloaded" });
+    if (item.url !== "about:blank") await page.goto(validateHttpUrl(item.url).href, { waitUntil: "domcontentloaded" });
     session.page = page;
     return { restored: true, tab: { index: session.context.pages().indexOf(page), title: await page.title().catch(() => item.title), url: page.url(), active: true } };
   } catch (error) {
