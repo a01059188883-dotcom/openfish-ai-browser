@@ -43,7 +43,7 @@ async function getBrowser() {
 }
 async function createContext() {
   const instance = await getBrowser();
-  const context = await instance.newContext({ viewport: { width: 1440, height: 900 } });
+  const context = await instance.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
   await context.route("**/*", async route => {
     const requestUrl = route.request().url();
     try {
