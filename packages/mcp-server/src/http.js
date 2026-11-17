@@ -6,7 +6,7 @@ import { z } from "zod";
 const PORT = Number(process.env.OPENFISH_MCP_HTTP_PORT || 8788);
 const HOST = process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1";
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const VERSION = "1.9.0";
+const VERSION = "2.0.0";
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -102,6 +102,10 @@ function createMcpServer(token, sessionId, clientMeta) {
   server.tool("go_back", "Go back one page in the current isolated browser tab.", {}, args => call("go_back", args, true));
   server.tool("go_forward", "Go forward one page in the current isolated browser tab.", {}, args => call("go_forward", args, true));
   server.tool("reload_page", "Reload the current page in the isolated browser tab.", {}, args => call("reload_page", args, true));
+  server.tool("list_tabs", "List tabs in the current isolated browser session.", {}, args => call("list_tabs", args));
+  server.tool("new_tab", "Open a new tab, optionally at a public HTTP(S) URL.", { url: z.string().url().optional() }, args => call("new_tab", args, true));
+  server.tool("switch_tab", "Switch to a tab by its current list index.", { index: z.number().int().min(0) }, args => call("switch_tab", args, true));
+  server.tool("close_tab", "Close a tab by its current list index after explicit approval. The last tab cannot be closed.", { index: z.number().int().min(0), approved: z.literal(true) }, args => call("close_tab", args, true));
   return server;
 }
 

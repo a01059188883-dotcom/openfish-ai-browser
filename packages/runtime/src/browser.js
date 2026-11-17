@@ -113,6 +113,39 @@ export async function getPage() {
   const session = await getSession(id);
   return session.page;
 }
+
+export async function listBrowserTabs() {
+  const session = await getSession(getCurrentBrowserSessionId());
+  let pages = session.context.pages();
+  if (!pages.length) { session.page = await session.context.newPage(); session.page.setDefaultTimeout(12000); }
+  pages = session.context.pages();
+  if (!session.page || session.page.isClosed()) session.page = pages[0];
+  return Promise.all(pages.map(async (page, index) => ({ index, title: await page.title().catch(() => ""), url: page.url(), active: page === session.page })));
+}
+export async function createBrowserTab(url) {
+  const session = await getSession(getCurrentBrowserSessionId());
+  const page = await session.context.newPage(); page.setDefaultTimeout(12000);
+  if (url) await page.goto(validateHttpUrl(url).href, { waitUntil: "domcontentloaded" });
+  session.page = page;
+  return { index: session.context.pages().indexOf(page), title: await page.title().catch(() => ""), url: page.url(), active: true };
+}
+export async function switchBrowserTab(index) {
+  const session = await getSession(getCurrentBrowserSessionId()); const pages = session.context.pages();
+  if (!Number.isInteger(index) || index < 0 || index >= pages.length) throw Object.assign(new Error("Browser tab index is out of range."), { statusCode: 404 });
+  session.page = pages[index]; await session.page.bringToFront();
+  return { index, title: await session.page.title().catch(() => ""), url: session.page.url(), active: true };
+}
+export async function closeBrowserTab(index, approved) {
+  if (approved !== true) throw Object.assign(new Error("Explicit approval is required to close a browser tab."), { statusCode: 403 });
+  const session = await getSession(getCurrentBrowserSessionId()); const pages = session.context.pages();
+  if (!Number.isInteger(index) || index < 0 || index >= pages.length) throw Object.assign(new Error("Browser tab index is out of range."), { statusCode: 404 });
+  if (pages.length <= 1) throw Object.assign(new Error("The last tab cannot be closed. Open another tab first."), { statusCode: 409 });
+  const closing = pages[index], wasActive = closing === session.page; await closing.close();
+  const remaining = session.context.pages();
+  if (wasActive || !session.page || session.page.isClosed()) { session.page = remaining[Math.min(index, remaining.length - 1)]; await session.page.bringToFront(); }
+  return { index, closed: true, activeUrl: session.page.url() };
+}
+
 export function getBrowserStatus() {
   const id = getCurrentBrowserSessionId();
   const session = sessions.get(id);

@@ -157,9 +157,17 @@
 - Synchronized application, Worker, MCP, extension, dashboard, documentation, and regression-test version markers to 1.8.0.
 
 
-## 1.9.0 - 2026-11-16
+## 2.0.0 - 2026-11-16
 - Added browser back, forward, and reload controls to the Chrome side panel.
 - Exposed the same navigation controls as MCP tools and provider-neutral REST tools, sharing the active isolated browser session.
 - Enforced the configured maximum number of named browser sessions and return HTTP 429 when the limit is reached; expired sessions are cleaned before allocation.
 - Exposed the session limit in browser status and documented the configurable limit and session TTL.
-- Synchronized package, bridge, MCP, extension, dashboard, Worker, documentation, and regression-test versions to 1.9.0.
+- Synchronized package, bridge, MCP, extension, dashboard, Worker, documentation, and regression-test versions to 2.0.0.
+
+
+## 2.0.0 - 2026-11-17
+- Added multi-tab listing, creation, active-tab switching, and controlled tab closing to the shared Playwright browser session.
+- Exposed tab management through the local bridge, stdio MCP, Streamable HTTP MCP, and provider-neutral tool catalog.
+- Added a visual tab manager to the Chrome side panel with safe text rendering, refresh, new-tab URL validation, active-tab highlighting, and close confirmation.
+- Required explicit approval for tab closing; prevent closing the last remaining tab and validate tab indices.
+- Synchronized package, runtime, MCP, extension, dashboard, Worker, docs, and regression-test versions to 2.0.0.

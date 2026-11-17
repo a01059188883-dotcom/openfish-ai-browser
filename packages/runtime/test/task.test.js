@@ -38,7 +38,7 @@ test("bridge applies strict URL validation to AI planning and uses the configure
   assert.ok(bridge.includes("const ALLOWED_HOSTS = new Set(["));
   assert.ok(bridge.includes("127.0.0.1:${PORT}"));
   assert.ok(bridge.includes("const parsed = validateHttpUrl(body.url)"));
-  assert.ok(bridge.includes('const VERSION = "1.9.0"'));
+  assert.ok(bridge.includes('const VERSION = "2.0.0"'));
 });
 
 test("approved plan executor enforces explicit approval and stops on unsafe targets", async () => {
@@ -90,7 +90,7 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   const html = await readFile(resolve("packages/admin/index.html"), "utf8");
   const app = await readFile(resolve("packages/admin/app.js"), "utf8");
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "1.9.0");
+  assert.equal(pkg.version, "2.0.0");
   assert.ok(bridge.includes('req.url === "/api/admin/status"'));
   assert.ok(bridge.includes('req.url === "/api/admin/events"'));
   assert.ok(bridge.includes('["../../admin/index.html"'));
@@ -191,4 +191,26 @@ test("named browser sessions enforce the configured capacity", async () => {
   assert.ok(browser.includes("activeNamedSessions + pendingSessionCreations >= MAX_SESSIONS"));
   assert.ok(browser.includes("{ statusCode: 429 }"));
   assert.ok(browser.includes("maxSessions: MAX_SESSIONS"));
+});
+
+
+test("multi-tab management is exposed through runtime, MCP and Chrome side panel", async () => {
+  const browser = await readFile(resolve("packages/runtime/src/browser.js"), "utf8");
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  const stdio = await readFile(resolve("packages/mcp-server/src/index.js"), "utf8");
+  const httpMcp = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
+  const html = await readFile(resolve("packages/chrome-extension/sidepanel.html"), "utf8");
+  const panel = await readFile(resolve("packages/chrome-extension/sidepanel.js"), "utf8");
+  for (const fn of ["listBrowserTabs", "createBrowserTab", "switchBrowserTab", "closeBrowserTab"]) assert.ok(browser.includes("function " + fn));
+  for (const tool of ["list_tabs", "new_tab", "switch_tab", "close_tab"]) {
+    assert.ok(bridge.includes("\"name\":\"" + tool + "\""));
+    assert.ok(bridge.includes("/api/mcp/" + tool));
+    assert.ok(stdio.includes("server.tool(\"" + tool + "\""));
+    assert.ok(httpMcp.includes("server.tool(\"" + tool + "\""));
+  }
+  assert.ok(browser.includes("approved !== true"));
+  assert.ok(browser.includes("pages.length <= 1"));
+  assert.ok(html.includes("id=\"tabsList\""));
+  assert.ok(panel.includes("async function refreshTabs()"));
+  assert.ok(panel.includes("approved:true"));
 });
