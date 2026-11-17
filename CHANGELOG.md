@@ -1,3 +1,9 @@
+## 2.6.0 - 2026-11-17
+- Added an iPhone-friendly remote admin dashboard at the Cloudflare Worker `/admin` route.
+- Added relay-token-authenticated status, event, session, and reviewed task-control routes; only an explicit allowlist is forwarded to the local agent.
+- Dashboard token is kept in sessionStorage for the current tab session; no admin credential is embedded in the static page.
+- Synchronized active release markers to 2.6.0.
+
 # Changelog
 
 ## 1.0.0 - 2026-11-13

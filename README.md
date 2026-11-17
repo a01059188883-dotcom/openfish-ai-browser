@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.5.0**.
+Open-source, free-first browser automation starter. Version: **2.6.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -152,3 +152,7 @@ OpenFish can save the current tab URLs as named local workspaces and restore the
 
 ## Command center and portable browser backups (v2.5.0)
 The Chrome side panel now has a searchable command center (Ctrl/⌘+K), keyboard shortcuts, and in-page text search. Browser-library backups can be exported as JSON and merged back after confirmation. Backups include bookmarks, history, reading-list items, tab organization, and workspace snapshots; they exclude cookies, session credentials, and downloaded files. Imports are limited to 1 MB and validate public HTTP(S) URLs before merging.
+
+
+## Mobile remote admin (v2.6.0)
+Open the Cloudflare Worker URL at `/admin` from iPhone Safari. The mobile dashboard uses the existing relay token as a bearer credential and exposes only bridge status, recent events, isolated browser-session management, and reviewed task planning/execution. The token is stored in `sessionStorage` for the current browser tab session and is cleared when the user disconnects. The Worker serves the static dashboard; all management API requests are authenticated by the relay token and forwarded through the already-connected local relay agent. The local computer must keep the bridge, HTTP MCP server, and relay agent running. This is a single-owner private control panel, not a multi-user SaaS. Do not share the relay token. High-risk browser actions remain blocked by runtime safety rules, and task execution requires explicit confirmation.
