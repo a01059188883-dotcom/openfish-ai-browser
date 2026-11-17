@@ -38,7 +38,7 @@ test("bridge applies strict URL validation to AI planning and uses the configure
   assert.ok(bridge.includes("const ALLOWED_HOSTS = new Set(["));
   assert.ok(bridge.includes("127.0.0.1:${PORT}"));
   assert.ok(bridge.includes("const parsed = validateHttpUrl(body.url)"));
-  assert.ok(bridge.includes('const VERSION = "2.0.0"'));
+  assert.ok(bridge.includes('const VERSION = "2.1.0"'));
 });
 
 test("approved plan executor enforces explicit approval and stops on unsafe targets", async () => {
@@ -90,7 +90,7 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   const html = await readFile(resolve("packages/admin/index.html"), "utf8");
   const app = await readFile(resolve("packages/admin/app.js"), "utf8");
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "2.0.0");
+  assert.equal(pkg.version, "2.1.0");
   assert.ok(bridge.includes('req.url === "/api/admin/status"'));
   assert.ok(bridge.includes('req.url === "/api/admin/events"'));
   assert.ok(bridge.includes('["../../admin/index.html"'));
@@ -213,4 +213,20 @@ test("multi-tab management is exposed through runtime, MCP and Chrome side panel
   assert.ok(html.includes("id=\"tabsList\""));
   assert.ok(panel.includes("async function refreshTabs()"));
   assert.ok(panel.includes("approved:true"));
+});
+
+ 
+test("screenshot preview returns bounded inline JPEG data rather than a temporary path", async () => {
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  const panel = await readFile(resolve("packages/chrome-extension/sidepanel.js"), "utf8");
+  const worker = await readFile(resolve("cloudflare/worker.js"), "utf8");
+  const admin = await readFile(resolve("packages/admin/index.html"), "utf8");
+  const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
+  assert.ok(bridge.includes('type: "jpeg", quality: 55'));
+  assert.ok(bridge.includes("450 * 1024"));
+  assert.ok(bridge.includes("imageDataUrl"));
+  assert.ok(panel.includes("data:image/jpeg;base64,"));
+  assert.ok(panel.includes('$("screenshotImage").src = data.imageDataUrl'));
+  assert.ok(worker.includes('const VERSION = "' + pkg.version + '"'));
+  assert.ok(admin.includes("v" + pkg.version));
 });
