@@ -6,7 +6,7 @@ import { z } from "zod";
 const PORT = Number(process.env.OPENFISH_MCP_HTTP_PORT || 8788);
 const HOST = process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1";
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const VERSION = "2.3.0";
+const VERSION = "2.4.0";
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -124,6 +124,14 @@ function createMcpServer(token, sessionId, clientMeta) {
   server.tool("duplicate_tab", "Duplicate a browser tab by its current list index.", { index: z.number().int().min(0) }, args => call("duplicate_tab", args, true));
   server.tool("reopen_closed_tab", "Restore the most recently closed tab after explicit approval.", { approved: z.literal(true) }, args => call("reopen_closed_tab", args, true));
   server.tool("search_tabs", "Search open tabs by title, URL, or group label.", { query: z.string().min(1).max(200) }, args => call("search_tabs", args));
+  server.tool("save_workspace", "Save the currently open public tabs as a named local workspace.", { name: z.string().min(1).max(60) }, args => call("save_workspace", args, true));
+  server.tool("list_workspaces", "List saved local browser workspaces.", {}, args => call("list_workspaces", args));
+  server.tool("restore_workspace", "Restore a saved workspace by opening its saved URLs after explicit approval.", { id: z.string(), approved: z.literal(true) }, args => call("restore_workspace", args, true));
+  server.tool("remove_workspace", "Delete a saved workspace after explicit approval.", { id: z.string(), approved: z.literal(true) }, args => call("remove_workspace", args, true));
+  server.tool("download_link", "Download a file from one unique visible link in the active page after explicit approval.", { selector: z.string().min(1).max(500), approved: z.literal(true) }, args => call("download_link", args, true));
+  server.tool("list_downloads", "List files downloaded and managed by OpenFish.", {}, args => call("list_downloads", args));
+  server.tool("remove_download", "Delete a managed downloaded file after explicit approval.", { id: z.string(), approved: z.literal(true) }, args => call("remove_download", args, true));
+  server.tool("clear_session_data", "Clear cookies and site storage for the active isolated browser session after explicit approval.", { approved: z.literal(true) }, args => call("clear_session_data", args, true));
   return server;
 }
 
