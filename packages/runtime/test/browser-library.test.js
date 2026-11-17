@@ -55,3 +55,13 @@ test("tab grouping and pin metadata require explicit approval", async () => {
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+
+test("workspace snapshots validate public URLs and require approval for deletion", async () => {
+  const workspace = await library.saveWorkspace({ name: "Research", tabs: [{ url: "https://example.com", title: "Example" }, { url: "https://example.com#section", title: "Duplicate" }] });
+  assert.equal(workspace.tabs.length, 1);
+  assert.equal((await library.listWorkspaces()).length, 1);
+  await assert.rejects(() => library.removeWorkspace(workspace.id, false), error => error.statusCode === 403);
+  await library.removeWorkspace(workspace.id, true);
+  assert.equal((await library.listWorkspaces()).length, 0);
+});
