@@ -72,7 +72,7 @@ test("browser library backup exports portable data and imports only after approv
   assert.equal(backup.schemaVersion, 1);
   assert.ok(Array.isArray(backup.data.bookmarks));
   await assert.rejects(() => library.importBrowserLibrary(backup, false), error => error.statusCode === 403);
-  const result = await library.importBrowserLibrary({ schemaVersion: 1, data: { bookmarks: [{ url: "https://backup.example", title: "Backup" }], history: [], readingList: [], tabOrganization: [], workspaces: [] } }, true);
+  const result = await library.importBrowserLibrary({ schemaVersion: 1, data: { bookmarks: [{ url: "https://backup-test.com", title: "Backup" }], history: [], readingList: [], tabOrganization: [], workspaces: [] } }, true);
   assert.ok(result.imported.bookmarks >= 1);
-  assert.ok((await library.listBookmarks()).some(item => item.url === "https://backup.example/"));
+  assert.ok((await library.listBookmarks()).some(item => item.url === "https://backup-test.com/"));
 });
