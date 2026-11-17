@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const server = new McpServer({ name: "openfish-ai-browser", version: "1.9.0" });
+const server = new McpServer({ name: "openfish-ai-browser", version: "2.0.0" });
 const result = value => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
 
 async function bridgeRequest(path, options = {}) {
@@ -66,5 +66,9 @@ server.tool("get_accessibility_snapshot", "Return headings and landmarks from th
 server.tool("go_back", "Go back one page in the shared browser tab.", {}, async () => result(await bridgeRequest("/api/mcp/go_back", { method: "POST", body: {} })));
 server.tool("go_forward", "Go forward one page in the shared browser tab.", {}, async () => result(await bridgeRequest("/api/mcp/go_forward", { method: "POST", body: {} })));
 server.tool("reload_page", "Reload the current page in the shared browser tab.", {}, async () => result(await bridgeRequest("/api/mcp/reload_page", { method: "POST", body: {} })));
+server.tool("list_tabs", "List tabs in the shared browser session.", {}, async () => result(await bridgeRequest("/api/mcp/list_tabs")));
+server.tool("new_tab", "Open a new tab, optionally at a public HTTP(S) URL.", { url: z.string().url().optional() }, async args => result(await bridgeRequest("/api/mcp/new_tab", { method: "POST", body: args })));
+server.tool("switch_tab", "Switch active tab by its current list index.", { index: z.number().int().min(0) }, async args => result(await bridgeRequest("/api/mcp/switch_tab", { method: "POST", body: args })));
+server.tool("close_tab", "Close a tab only after explicit approval. The last tab cannot be closed.", { index: z.number().int().min(0), approved: z.literal(true) }, async args => result(await bridgeRequest("/api/mcp/close_tab", { method: "POST", body: args })));
 
 await server.connect(new StdioServerTransport());
