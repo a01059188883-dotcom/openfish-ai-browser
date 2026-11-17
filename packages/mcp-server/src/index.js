@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const server = new McpServer({ name: "openfish-ai-browser", version: "2.0.0" });
+const server = new McpServer({ name: "openfish-ai-browser", version: "2.1.0" });
 const result = value => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
 
 async function bridgeRequest(path, options = {}) {
@@ -58,7 +58,7 @@ server.tool("fill_element", "Fill a unique ordinary editable field in the shared
   approved: z.literal(true).describe("Must be true only after the user explicitly approves this exact field and value.")
 }, async ({ selector, value, approved }) => result(await bridgeRequest("/api/mcp/fill_element", { method: "POST", body: { selector, value, approved } })));
 
-server.tool("take_screenshot", "Capture the current page in the shared browser and return the screenshot file path.", {}, async () => result(await bridgeRequest("/api/mcp/take_screenshot", { method: "POST" })));
+server.tool("take_screenshot", "Capture the current browser viewport and return a compressed inline JPEG data URL.", {}, async () => result(await bridgeRequest("/api/mcp/take_screenshot", { method: "POST" })));
 
 server.tool("list_interactive_elements", "List visible links, buttons, inputs, and selects from the shared browser.", {}, async () => result(await bridgeRequest("/api/mcp/list_interactive_elements")));
 
