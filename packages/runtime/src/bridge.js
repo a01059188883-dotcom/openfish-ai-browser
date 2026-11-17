@@ -9,7 +9,7 @@ import { authenticateApiKey, createApiKey, listApiKeys, revokeApiKey } from "./a
 import { registerClient, listClients, checkClientRateLimit } from "./client-registry.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const VERSION = "2.0.0";
+const VERSION = "2.1.0";
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 const startedAt = Date.now();
 const metrics = { requests: 0, errors: 0, events: [] };
@@ -121,7 +121,10 @@ async function invokeTool(name, args = {}) {
     return { action: name, title: await page.title().catch(() => ""), url: page.url(), message: name === "go_back" ? "Returned to the previous page when history was available." : name === "go_forward" ? "Moved forward when browser history was available." : "Page reloaded." };
   }
   if (name === "take_screenshot") {
-    const page = await getPage(); const path = `openfish-${Date.now()}.png`; await page.screenshot({path,fullPage:false}); return {path,url:page.url()};
+    const page = await getPage();
+    const bytes = await page.screenshot({ type: "jpeg", quality: 55, fullPage: false });
+    if (bytes.byteLength > 450 * 1024) throw Object.assign(new Error("Screenshot exceeds the 450 KB response limit. Reduce the browser viewport and try again."), { statusCode: 413 });
+    return { imageDataUrl: "data:image/jpeg;base64," + bytes.toString("base64"), mimeType: "image/jpeg", url: page.url() };
   }
   throw Object.assign(new Error("Unknown OpenFish tool."), { statusCode: 404 });
 }
@@ -286,9 +289,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "POST" && req.url === "/api/mcp/take_screenshot") {
       const page = await getPage();
-      const path = `openfish-${Date.now()}.png`;
-      await page.screenshot({ path, fullPage: false });
-      return send(res, 200, { path, url: page.url() });
+      const bytes = await page.screenshot({ type: "jpeg", quality: 55, fullPage: false });
+      if (bytes.byteLength > 450 * 1024) return send(res, 413, { error: "Screenshot exceeds the 450 KB response limit. Reduce the browser viewport and try again." });
+      return send(res, 200, { imageDataUrl: "data:image/jpeg;base64," + bytes.toString("base64"), mimeType: "image/jpeg", url: page.url() });
     }
     if (req.method === "POST" && req.url === "/api/inspect") {
       const page = await getPage();
