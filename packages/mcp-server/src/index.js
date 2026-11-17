@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const server = new McpServer({ name: "openfish-ai-browser", version: "2.3.0" });
+const server = new McpServer({ name: "openfish-ai-browser", version: "2.4.0" });
 const result = value => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
 
 async function bridgeRequest(path, options = {}) {
@@ -90,5 +90,14 @@ server.tool("list_recently_closed_tabs", "List recently closed tabs available fo
 server.tool("duplicate_tab", "Duplicate a browser tab by its current list index.", { index: z.number().int().min(0) }, async args => result(await bridgeRequest("/api/mcp/duplicate_tab", { method: "POST", body: args })));
 server.tool("reopen_closed_tab", "Restore the most recently closed tab after explicit approval.", { approved: z.literal(true) }, async args => result(await bridgeRequest("/api/mcp/reopen_closed_tab", { method: "POST", body: args })));
 server.tool("search_tabs", "Search open tabs by title, URL, or group label.", { query: z.string().min(1).max(200) }, async args => { const data = await bridgeRequest("/api/mcp/list_tabs", undefined); const q = args.query.toLowerCase(); return result({tabs:(data.tabs || []).filter(tab => (tab.title + " " + tab.url + " " + tab.groupName).toLowerCase().includes(q))}); });
+
+server.tool("save_workspace", "Save the currently open public tabs as a named local workspace.", { name: z.string().min(1).max(60) }, async args => result(await bridgeRequest("/api/mcp/save_workspace", { method: "POST", body: args })));
+server.tool("list_workspaces", "List saved local browser workspaces.", {}, async () => result(await bridgeRequest("/api/mcp/list_workspaces")));
+server.tool("restore_workspace", "Restore a saved workspace by opening its saved URLs after explicit approval.", { id: z.string(), approved: z.literal(true) }, async args => result(await bridgeRequest("/api/mcp/restore_workspace", { method: "POST", body: args })));
+server.tool("remove_workspace", "Delete a saved workspace after explicit approval.", { id: z.string(), approved: z.literal(true) }, async args => result(await bridgeRequest("/api/mcp/remove_workspace", { method: "POST", body: args })));
+server.tool("download_link", "Download a file from one unique visible link in the active page after explicit approval.", { selector: z.string().min(1).max(500), approved: z.literal(true) }, async args => result(await bridgeRequest("/api/mcp/download_link", { method: "POST", body: args })));
+server.tool("list_downloads", "List files downloaded and managed by OpenFish.", {}, async () => result(await bridgeRequest("/api/mcp/list_downloads")));
+server.tool("remove_download", "Delete a managed downloaded file after explicit approval.", { id: z.string(), approved: z.literal(true) }, async args => result(await bridgeRequest("/api/mcp/remove_download", { method: "POST", body: args })));
+server.tool("clear_session_data", "Clear cookies and site storage for the active isolated browser session after explicit approval.", { approved: z.literal(true) }, async args => result(await bridgeRequest("/api/mcp/clear_session_data", { method: "POST", body: args })));
 
 await server.connect(new StdioServerTransport());

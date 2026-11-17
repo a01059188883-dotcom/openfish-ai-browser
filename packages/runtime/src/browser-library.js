@@ -7,10 +7,10 @@ const STORE = resolve(process.env.OPENFISH_DATA_DIR || ".openfish", "browser-lib
 const MAX_HISTORY = 3000;
 let state;
 let writeQueue = Promise.resolve();
-function emptyState() { return { schemaVersion: 1, bookmarks: [], history: [], readingList: [], tabOrganization: [] }; }
+function emptyState() { return { schemaVersion: 1, bookmarks: [], history: [], readingList: [], tabOrganization: [], workspaces: [] }; }
 async function load() {
   if (state) return state;
-  try { const parsed = JSON.parse(await readFile(STORE, "utf8")); state = { ...emptyState(), ...(parsed && typeof parsed === "object" ? parsed : {}) }; for (const key of ["bookmarks", "history", "readingList", "tabOrganization"]) if (!Array.isArray(state[key])) state[key] = []; }
+  try { const parsed = JSON.parse(await readFile(STORE, "utf8")); state = { ...emptyState(), ...(parsed && typeof parsed === "object" ? parsed : {}) }; for (const key of ["bookmarks", "history", "readingList", "tabOrganization", "workspaces"]) if (!Array.isArray(state[key])) state[key] = []; }
   catch (error) { if (error.code !== "ENOENT") throw error; state = emptyState(); }
   return state;
 }
@@ -52,3 +52,38 @@ export async function setTabOrganization({ url, groupName, pinned }, approved) {
 }
 export async function getTabOrganization(url) { try { const normalized = normalizeUrl(url); const item = (await load()).tabOrganization.find(entry => entry.url === normalized); return item ? { ...item } : { groupName: "", pinned: false }; } catch { return { groupName: "", pinned: false }; } }
 export async function getLibraryStats() { const data = await load(); return { bookmarks: data.bookmarks.length, history: data.history.length, readingList: data.readingList.length }; }
+
+export async function saveWorkspace({ name, tabs }) {
+  const cleanName = cleanText(name, "", 60);
+  if (!cleanName) throw Object.assign(new Error("Workspace name is required."), { statusCode: 400 });
+  if (!Array.isArray(tabs) || !tabs.length || tabs.length > 30) throw Object.assign(new Error("A workspace must contain between 1 and 30 tabs."), { statusCode: 400 });
+  const normalizedTabs = [];
+  for (const tab of tabs) {
+    const url = normalizeUrl(tab.url);
+    if (!normalizedTabs.some(item => item.url === url)) normalizedTabs.push({ url, title: cleanText(tab.title, url, 180) });
+  }
+  if (!normalizedTabs.length) throw Object.assign(new Error("No valid public tabs were found to save."), { statusCode: 400 });
+  const data = await load();
+  const now = new Date().toISOString();
+  const workspace = { id: randomUUID(), name: cleanName, tabs: normalizedTabs, createdAt: now, updatedAt: now };
+  data.workspaces.unshift(workspace);
+  await persist();
+  return { ...workspace, tabs: workspace.tabs.map(tab => ({ ...tab })) };
+}
+export async function listWorkspaces() {
+  return (await load()).workspaces.map(item => ({ ...item, tabs: item.tabs.map(tab => ({ ...tab })) }));
+}
+export async function getWorkspace(id) {
+  const item = (await load()).workspaces.find(workspace => workspace.id === id);
+  if (!item) throw Object.assign(new Error("Workspace not found."), { statusCode: 404 });
+  return { ...item, tabs: item.tabs.map(tab => ({ ...tab })) };
+}
+export async function removeWorkspace(id, approved) {
+  if (approved !== true) throw Object.assign(new Error("Explicit approval is required to delete a workspace."), { statusCode: 403 });
+  const data = await load();
+  const index = data.workspaces.findIndex(item => item.id === id);
+  if (index < 0) throw Object.assign(new Error("Workspace not found."), { statusCode: 404 });
+  data.workspaces.splice(index, 1);
+  await persist();
+  return { removed: true, id };
+}

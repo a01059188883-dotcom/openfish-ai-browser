@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { chromium } from "playwright";
 import { validateHttpUrl } from "./safety.js";
-import { recordVisit, getTabOrganization } from "./browser-library.js";
+import { recordVisit, getTabOrganization, saveWorkspace, listWorkspaces, getWorkspace } from "./browser-library.js";
 
 const sessionContext = new AsyncLocalStorage();
 const sessions = new Map();
@@ -43,7 +43,7 @@ async function getBrowser() {
 }
 async function createContext() {
   const instance = await getBrowser();
-  const context = await instance.newContext({ viewport: { width: 1440, height: 900 } });
+  const context = await instance.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true });
   await context.route("**/*", async route => {
     const requestUrl = route.request().url();
     try {
@@ -201,6 +201,44 @@ export async function reopenClosedBrowserTab(approved) {
     await page.close().catch(() => {});
     throw error;
   }
+}
+
+
+export async function saveCurrentWorkspace(name) {
+  const tabs = await listBrowserTabs();
+  const usable = tabs.filter(tab => tab.url.startsWith("http://") || tab.url.startsWith("https://"));
+  return saveWorkspace({ name, tabs: usable.map(tab => ({ url: tab.url, title: tab.title })) });
+}
+export async function getSavedWorkspaces() {
+  return listWorkspaces();
+}
+export async function restoreSavedWorkspace(id, approved) {
+  if (approved !== true) throw Object.assign(new Error("Explicit approval is required to restore a workspace."), { statusCode: 403 });
+  const workspace = await getWorkspace(id);
+  const session = await getSession(getCurrentBrowserSessionId());
+  if (session.context.pages().length + workspace.tabs.length > 40) throw Object.assign(new Error("Restoring this workspace would exceed the 40-tab session limit. Close some tabs first."), { statusCode: 429 });
+  const restored = [];
+  for (const item of workspace.tabs) {
+    const tab = await createBrowserTab(item.url);
+    restored.push(tab);
+  }
+  return { restored: true, workspace: workspace.name, tabs: restored };
+}
+export async function clearSessionData(approved) {
+  if (approved !== true) throw Object.assign(new Error("Explicit approval is required to clear browser session data."), { statusCode: 403 });
+  const session = await getSession(getCurrentBrowserSessionId());
+  await session.context.clearCookies();
+  const pages = session.context.pages();
+  const results = await Promise.all(pages.map(page => page.evaluate(async () => {
+    let cleared = { localStorage: false, sessionStorage: false, caches: 0, serviceWorkers: 0, indexedDB: 0 };
+    try { localStorage.clear(); cleared.localStorage = true; } catch {}
+    try { sessionStorage.clear(); cleared.sessionStorage = true; } catch {}
+    try { const keys = await caches.keys(); await Promise.all(keys.map(key => caches.delete(key))); cleared.caches = keys.length; } catch {}
+    try { const registrations = await navigator.serviceWorker.getRegistrations(); await Promise.all(registrations.map(item => item.unregister())); cleared.serviceWorkers = registrations.length; } catch {}
+    try { const databases = await indexedDB.databases(); await Promise.all(databases.map(db => new Promise(resolve => { if (!db.name) return resolve(); const request = indexedDB.deleteDatabase(db.name); request.onsuccess = request.onerror = request.onblocked = () => resolve(); }))); cleared.indexedDB = databases.length; } catch {}
+    return cleared;
+  }).catch(() => ({ localStorage: false, sessionStorage: false, caches: 0, serviceWorkers: 0, indexedDB: 0 }))));
+  return { cleared: true, cookies: true, pages: results.length, storage: results };
 }
 
 export function getBrowserStatus() {
