@@ -255,7 +255,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && req.url === "/api/admin/events") return send(res, 200, { events: metrics.events });
 
     if (req.method === "GET" && req.url === "/api/mcp/get_page_diagnostics") return send(res, 200, { diagnostics: await getPageDiagnostics() });
-    if (req.method === "POST" && req.url === "/api/mcp/clear_page_diagnostics") { const body = await readBody(req); if (body.approved !== true) return send(res, 403, { error: "Explicit approval is required to clear diagnostics." }); return send(res, 200, await clearPageDiagnostics()); }
+    if (req.method === "POST" && req.url === "/api/mcp/clear_page_diagnostics") return send(res, 200, await clearPageDiagnostics());
     if (req.method === "GET" && req.url === "/api/mcp/list_recently_closed_tabs") return send(res, 200, { tabs: await listRecentlyClosedTabs() });
     if (req.method === "POST" && req.url === "/api/mcp/duplicate_tab") { const body = await readBody(req); return send(res, 200, { tab: await duplicateBrowserTab(body.index), tabs: await listBrowserTabs() }); }
     if (req.method === "POST" && req.url === "/api/mcp/reopen_closed_tab") { const body = await readBody(req); return send(res, 200, { ...(await reopenClosedBrowserTab(body.approved)), tabs: await listBrowserTabs() }); }
