@@ -6,7 +6,7 @@ import { z } from "zod";
 const PORT = Number(process.env.OPENFISH_MCP_HTTP_PORT || 8788);
 const HOST = process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1";
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const VERSION = "2.1.0";
+const VERSION = "2.2.0";
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -106,6 +106,15 @@ function createMcpServer(token, sessionId, clientMeta) {
   server.tool("new_tab", "Open a new tab, optionally at a public HTTP(S) URL.", { url: z.string().url().optional() }, args => call("new_tab", args, true));
   server.tool("switch_tab", "Switch to a tab by its current list index.", { index: z.number().int().min(0) }, args => call("switch_tab", args, true));
   server.tool("close_tab", "Close a tab by its current list index after explicit approval. The last tab cannot be closed.", { index: z.number().int().min(0), approved: z.literal(true) }, args => call("close_tab", args, true));
+  server.tool("list_bookmarks", "List local browser bookmarks.", { query: z.string().max(200).optional() }, args => call("list_bookmarks", args));
+  server.tool("add_bookmark", "Save a public URL as a local bookmark.", { url: z.string().url(), title: z.string().max(180).optional() }, args => call("add_bookmark", args, true));
+  server.tool("remove_bookmark", "Remove a bookmark after explicit approval.", { id: z.string(), approved: z.literal(true) }, args => call("remove_bookmark", args, true));
+  server.tool("list_history", "Search local browsing history.", { query: z.string().max(200).optional(), limit: z.number().int().min(1).max(500).optional() }, args => call("list_history", args));
+  server.tool("clear_history", "Clear local history after explicit approval.", { approved: z.literal(true) }, args => call("clear_history", args, true));
+  server.tool("list_reading_list", "List pages saved for later reading.", {}, args => call("list_reading_list", args));
+  server.tool("add_reading_item", "Save a page for later reading.", { url: z.string().url(), title: z.string().max(180).optional(), note: z.string().max(500).optional() }, args => call("add_reading_item", args, true));
+  server.tool("remove_reading_item", "Remove a reading-list item after explicit approval.", { id: z.string(), approved: z.literal(true) }, args => call("remove_reading_item", args, true));
+  server.tool("organize_tab", "Assign a tab to a group and/or pin it after explicit approval.", { url: z.string().url(), groupName: z.string().max(40).optional(), pinned: z.boolean().optional(), approved: z.literal(true) }, args => call("organize_tab", args, true));
   return server;
 }
 
