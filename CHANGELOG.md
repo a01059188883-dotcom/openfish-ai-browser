@@ -186,3 +186,11 @@
 - Exposed browser-library actions through the shared bridge, MCP stdio/HTTP, REST, and provider-neutral AI tool adapters.
 - Added explicit approval checks for destructive library operations and tab-organization changes.
 - Synchronized package, extension, runtime, Worker, MCP, dashboard, docs, and test release markers to 2.2.0.
+
+
+## 2.3.0 - 2026-11-17
+- Added per-page diagnostics for console warnings/errors, uncaught exceptions, failed requests, and HTTP errors with URL query redaction.
+- Added reader-content extraction, in-page phrase search, and navigation/resource performance summaries.
+- Added tab search, duplicate-tab, and recently closed-tab recovery.
+- Exposed all new operations through the bridge, stdio MCP, Streamable HTTP MCP, and AI tool adapters.
+- Synchronized package, extension, runtime, Worker, MCP, dashboard, docs, and tests to 2.3.0.
