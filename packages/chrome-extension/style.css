@@ -62,3 +62,7 @@ textarea{min-height:104px;line-height:1.55}
 
 /* v2.3.0 diagnostics, reader mode and tab recovery */
 .browser-tools{grid-template-columns:repeat(2,minmax(0,1fr))}.browser-tools button{min-width:0}.tab-actions{max-width:100%;justify-content:flex-end}.tab-actions button{flex:0 1 auto}.tabs-list{max-height:360px;overflow:auto}.tabs-list .tab-row{min-width:0}
+
+
+/* v2.4.0 workspaces and download manager */
+.workspace-create{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:10px 0}.workspace-create input,.downloadSelector{min-width:0;width:100%;padding:9px 10px;border:1px solid #304761;border-radius:9px;background:#0b1524;color:var(--text);font:inherit}.workspace-create button{width:auto}.workspace-list,.downloads-list{display:grid;gap:8px;max-height:300px;overflow:auto}.workspace-row,.download-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;padding:9px;border:1px solid #293d55;border-radius:9px;background:#0d1929}.workspace-info,.download-info{display:grid;gap:4px;min-width:0}.workspace-info strong,.download-info strong{font-size:11px;overflow-wrap:anywhere}.workspace-info span,.download-info span{font-size:10px;color:var(--muted)}.workspace-actions{display:flex;gap:6px}.workspace-actions button,.download-row button{width:auto;min-height:34px;padding:6px 9px;font-size:10px}.danger{border-color:#68434b;background:#38252e;color:#f2c0c0}#clearSessionData{background:#392c1c;border-color:#70562e;color:#f5d9a6}
