@@ -60,7 +60,7 @@ async function browserAction(action) {
   button.disabled = true;
   try {
     const data = await request("/api/mcp/" + action, {});
-    $("page").textContent = `${data.title || ""}\\n${data.url || ""}\\n\\n${data.message || "网页操作完成。"}`;
+    $("page").textContent = `${data.title || ""}\n${data.url || ""}\n\n${data.message || "网页操作完成。"}`;
   } catch (error) { $("page").textContent = "操作失败：" + error.message; }
   finally { button.disabled = false; button.textContent = label; }
 }
@@ -125,7 +125,7 @@ document.querySelectorAll("[data-library-tab]").forEach(button => button.addEven
 $("librarySearch").addEventListener("input", renderLibrary); $("refreshLibrary").addEventListener("click", refreshLibrary);
 $("saveBookmark").addEventListener("click", async () => { try { const page = await getActivePageInfo(); await request("/api/library/bookmarks/add", page); document.querySelector('[data-library-tab="bookmarks"]').click(); } catch(e) { $("libraryList").textContent = e.message; } });
 $("saveReading").addEventListener("click", async () => { try { const page = await getActivePageInfo(); await request("/api/library/reading-list/add", page); document.querySelector('[data-library-tab="reading"]').click(); } catch(e) { $("libraryList").textContent = e.message; } });
-$("readerMode").addEventListener("click", async () => { const button=$("readerMode"); button.disabled=true; try { const data=await request("/api/mcp/extract_reader_content",{}, "GET"); $("page").textContent = data.title + "\\n" + data.url + "\\n" + (data.description ? data.description + "\\n\\n" : "") + data.text; } catch(e) { $("page").textContent="阅读模式失败："+e.message; } finally { button.disabled=false; } });
+$("readerMode").addEventListener("click", async () => { const button=$("readerMode"); button.disabled=true; try { const data=await request("/api/mcp/extract_reader_content",{}, "GET"); $("page").textContent = data.title + "\n" + data.url + "\n" + (data.description ? data.description + "\n\n" : "") + data.text; } catch(e) { $("page").textContent="阅读模式失败："+e.message; } finally { button.disabled=false; } });
 $("pageDiagnostics").addEventListener("click", async () => { const button=$("pageDiagnostics"); button.disabled=true; try { const data=await request("/api/mcp/get_page_diagnostics",{}, "GET"); $("page").textContent = data.diagnostics.length ? JSON.stringify(data.diagnostics,null,2) : "当前页面未发现控制台错误、页面异常或 HTTP 请求错误。"; } catch(e) { $("page").textContent="页面诊断失败："+e.message; } finally { button.disabled=false; } });
 $("pagePerformance").addEventListener("click", async () => { const button=$("pagePerformance"); button.disabled=true; try { const data=await request("/api/mcp/get_page_performance",{}, "GET"); $("page").textContent=JSON.stringify(data,null,2); } catch(e) { $("page").textContent="性能分析失败："+e.message; } finally { button.disabled=false; } });
 health();
