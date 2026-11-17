@@ -73,7 +73,10 @@ async function refreshTabs() {
   try {
     const data = await request("/api/mcp/list_tabs", {}, "GET"); list.replaceChildren();
     if (!data.tabs || !data.tabs.length) { const empty = document.createElement("p"); empty.className = "hint"; empty.textContent = "当前没有标签页"; list.append(empty); return; }
-    const query = ($("tabsSearch")?.value || "").trim().toLowerCase();\n    const visibleTabs = data.tabs.filter(tab => !query || (tab.title + " " + tab.url + " " + tab.groupName).toLowerCase().includes(query));\n    if (!visibleTabs.length) { const empty=document.createElement("p"); empty.className="hint"; empty.textContent="没有匹配的标签页"; list.append(empty); return; }\n    for (const tab of visibleTabs) {
+    const query = ($("tabsSearch")?.value || "").trim().toLowerCase();
+    const visibleTabs = data.tabs.filter(tab => !query || (tab.title + " " + tab.url + " " + tab.groupName).toLowerCase().includes(query));
+    if (!visibleTabs.length) { const empty=document.createElement("p"); empty.className="hint"; empty.textContent="没有匹配的标签页"; list.append(empty); return; }
+    for (const tab of visibleTabs) {
       const row = document.createElement("div"); row.className = "tab-row" + (tab.active ? " active" : "");
       const select = document.createElement("button"); select.type = "button"; select.className = "tab-select";
       const title = document.createElement("strong"); title.textContent = (tab.pinned ? "📌 " : "") + (tab.groupName ? "[" + tab.groupName + "] " : "") + (tab.title || "新标签页");
@@ -82,7 +85,9 @@ async function refreshTabs() {
       select.addEventListener("click", async () => { try { await request("/api/mcp/switch_tab", {index:tab.index}); await refreshTabs(); } catch(e) { list.textContent = e.message; } });
       const close = document.createElement("button"); close.type = "button"; close.className = "tab-close compact"; close.textContent = "关闭"; close.disabled = data.tabs.length <= 1;
       close.addEventListener("click", async () => { if (!window.confirm("确认关闭这个标签页？")) return; try { await request("/api/mcp/close_tab", {index:tab.index,approved:true}); await refreshTabs(); } catch(e) { list.textContent = e.message; } });
-      const duplicate = document.createElement("button"); duplicate.type = "button"; duplicate.className = "compact"; duplicate.textContent = "复制";\n      duplicate.addEventListener("click", async () => { try { await request("/api/mcp/duplicate_tab", {index:tab.index}); await refreshTabs(); } catch(e) { list.textContent = e.message; } });\n      const organize = document.createElement("button"); organize.type = "button"; organize.className = "compact"; organize.textContent = "分组";
+      const duplicate = document.createElement("button"); duplicate.type = "button"; duplicate.className = "compact"; duplicate.textContent = "复制";
+      duplicate.addEventListener("click", async () => { try { await request("/api/mcp/duplicate_tab", {index:tab.index}); await refreshTabs(); } catch(e) { list.textContent = e.message; } });
+      const organize = document.createElement("button"); organize.type = "button"; organize.className = "compact"; organize.textContent = "分组";
       organize.addEventListener("click", async () => { const groupName = window.prompt("输入标签分组名称（留空取消分组）：", tab.groupName || ""); if (groupName === null) return; try { await request("/api/library/tab/organize", {url:tab.url,groupName,pinned:tab.pinned,approved:true}); await refreshTabs(); } catch(e) { list.textContent = e.message; } });
       const pin = document.createElement("button"); pin.type = "button"; pin.className = "compact"; pin.textContent = tab.pinned ? "取消固定" : "固定";
       pin.addEventListener("click", async () => { try { await request("/api/library/tab/organize", {url:tab.url,groupName:tab.groupName || "",pinned:!tab.pinned,approved:true}); await refreshTabs(); } catch(e) { list.textContent = e.message; } });
