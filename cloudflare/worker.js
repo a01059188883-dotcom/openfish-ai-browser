@@ -1,9 +1,14 @@
-const VERSION = "2.5.0";
+import mobileAdminHtml from "./mobile-admin.html";
+
+const VERSION = "2.6.0";
 const MAX_BODY_BYTES = 512 * 1024;
+const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/browser/sessions"]);
 const ALLOWED_PATH = path => path === "/mcp" || path === "/health" ||
   path === "/.well-known/openfish-tools.json" ||
   path === "/api/v1/tools" || path.startsWith("/api/v1/tools/") ||
-  path.startsWith("/api/v1/adapters/") || path === "/api/v1/openapi.json";
+  path.startsWith("/api/v1/adapters/") || path === "/api/v1/openapi.json" ||
+  ADMIN_PATHS.has(path) || /^\/api\/browser\/sessions\/[A-Za-z0-9_-]+\/close$/.test(path) ||
+  path === "/api/plan" || path === "/api/execute";
 
 function bearer(request) {
   return /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") || "")?.[1] || "";
@@ -44,6 +49,13 @@ function safeHeaders(request) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/admin" || url.pathname === "/admin/") {
+      return new Response(mobileAdminHtml, { headers: {
+        "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
+        "x-content-type-options": "nosniff", "referrer-policy": "no-referrer",
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+      }});
+    }
     if (url.pathname === "/agent/connect") {
       if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") return json({ error: "WebSocket upgrade required." }, 426);
       if (!authorized(request, env)) return json({ error: "Unauthorized relay agent." }, 401);
@@ -54,29 +66,23 @@ export default {
       return relayStub(env).fetch("https://relay.internal/status");
     }
     if (!authorized(request, env)) return json({ error: "Unauthorized. Supply the relay Bearer token." }, 401);
-    if (!ALLOWED_PATH(url.pathname)) return json({ error: "Relay path is not allowed." }, 404);
-    if (url.pathname === "/mcp" && !["POST", "GET", "DELETE"].includes(request.method)) {
-      return json({ error: "MCP method not supported." }, 405);
+    const path = url.pathname;
+    if (!ALLOWED_PATH(path)) return json({ error: "Relay path is not allowed." }, 404);
+    if (path === "/mcp" && !["POST", "GET", "DELETE"].includes(request.method)) return json({ error: "MCP method not supported." }, 405);
+    if (path !== "/mcp" && path !== "/health" && !["GET", "POST"].includes(request.method)) return json({ error: "Method not allowed." }, 405);
+    if (path === "/api/admin/status" || path === "/api/admin/events" || path === "/api/browser/sessions") {
+      if (request.method !== "GET") return json({ error: "Method not allowed." }, 405);
     }
-    if (url.pathname !== "/mcp" && url.pathname !== "/health" && request.method !== "GET" && request.method !== "POST") {
-      return json({ error: "Method not allowed." }, 405);
-    }
+    if (path === "/api/browser/sessions" && request.method !== "GET" && request.method !== "POST") return json({ error: "Method not allowed." }, 405);
     let body = "";
     if (request.method !== "GET" && request.method !== "HEAD") {
       const bytes = await request.arrayBuffer();
       if (bytes.byteLength > MAX_BODY_BYTES) return json({ error: "Request body exceeds 512 KB relay limit." }, 413);
       body = bytesToBase64(new Uint8Array(bytes));
     }
-    const payload = {
-      path: url.pathname + url.search,
-      method: request.method,
-      headers: safeHeaders(request),
-      bodyBase64: body
-    };
+    const payload = { path: url.pathname + url.search, method: request.method, headers: safeHeaders(request), bodyBase64: body };
     const response = await relayStub(env).fetch(new Request("https://relay.internal/proxy", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload)
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload)
     }));
     if (!response.ok) return response;
     const result = await response.json();
@@ -90,25 +96,17 @@ export default {
 
 export class OpenFishRelay {
   constructor(ctx, env) {
-    this.ctx = ctx;
-    this.env = env;
-    this.pending = new Map();
-    this.maxPending = 32;
-    this.requestTimeoutMs = 45000;
+    this.ctx = ctx; this.env = env; this.pending = new Map(); this.maxPending = 32; this.requestTimeoutMs = 45000;
   }
-
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname === "/connect") {
       if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") return new Response("WebSocket required", { status: 426 });
       for (const socket of this.ctx.getWebSockets()) {
         const attachment = socket.deserializeAttachment() || {};
-        if (attachment.role === "agent") {
-          try { socket.close(1012, "Agent connection replaced"); } catch {}
-        }
+        if (attachment.role === "agent") { try { socket.close(1012, "Agent connection replaced"); } catch {} }
       }
-      const pair = new WebSocketPair();
-      const [client, server] = Object.values(pair);
+      const pair = new WebSocketPair(); const [client, server] = Object.values(pair);
       this.ctx.acceptWebSocket(server);
       server.serializeAttachment({ role: "agent", connectedAt: Date.now(), protocol: "openfish-relay/1" });
       return new Response(null, { status: 101, webSocket: client });
@@ -123,56 +121,30 @@ export class OpenFishRelay {
     if (!agent || agent.readyState !== WebSocket.OPEN) return json({ error: "Local OpenFish agent is offline. Start the relay agent." }, 503);
     if (this.pending.size >= this.maxPending) return json({ error: "Relay is busy. Retry shortly." }, 429);
     const payload = await request.json();
-    if (typeof payload.path !== "string" || payload.path.length > 2048 || !/^\/(mcp|health|\.well-known\/openfish-tools\.json|api\/v1\/)/.test(payload.path)) {
-      return json({ error: "Invalid relay path." }, 400);
-    }
+    const path = typeof payload.path === "string" ? payload.path.split("?")[0] : "";
+    if (typeof payload.path !== "string" || payload.path.length > 2048 || !ALLOWED_PATH(path)) return json({ error: "Invalid relay path." }, 400);
     const requestId = crypto.randomUUID();
     return new Promise(resolve => {
-      const timer = setTimeout(() => {
-        this.pending.delete(requestId);
-        resolve(json({ error: "Local agent request timed out." }, 504));
-      }, this.requestTimeoutMs);
-      this.pending.set(requestId, result => {
-        clearTimeout(timer);
-        resolve(json(result));
-      });
-      try {
-        agent.send(JSON.stringify({ type: "request", requestId, ...payload }));
-      } catch {
-        clearTimeout(timer);
-        this.pending.delete(requestId);
-        resolve(json({ error: "Could not send request to local agent." }, 502));
-      }
+      const timer = setTimeout(() => { this.pending.delete(requestId); resolve(json({ error: "Local agent request timed out." }, 504)); }, this.requestTimeoutMs);
+      this.pending.set(requestId, result => { clearTimeout(timer); resolve(json(result)); });
+      try { agent.send(JSON.stringify({ type: "request", requestId, ...payload })); }
+      catch { clearTimeout(timer); this.pending.delete(requestId); resolve(json({ error: "Could not send request to local agent." }, 502)); }
     });
   }
-
   async webSocketMessage(socket, message) {
     const attachment = socket.deserializeAttachment() || {};
     if (attachment.role !== "agent" || typeof message !== "string" || message.length > 800000) return;
-    let data;
-    try { data = JSON.parse(message); } catch { return; }
-    if (data.type === "heartbeat") {
-      socket.send(JSON.stringify({ type: "heartbeat_ack", at: Date.now() }));
-      return;
-    }
+    let data; try { data = JSON.parse(message); } catch { return; }
+    if (data.type === "heartbeat") { socket.send(JSON.stringify({ type: "heartbeat_ack", at: Date.now() })); return; }
     if (data.type !== "response" || typeof data.requestId !== "string") return;
-    const complete = this.pending.get(data.requestId);
-    if (!complete) return;
+    const complete = this.pending.get(data.requestId); if (!complete) return;
     this.pending.delete(data.requestId);
     const status = Number.isInteger(data.status) && data.status >= 100 && data.status <= 599 ? data.status : 502;
     const headers = {};
-    for (const name of ["content-type", "mcp-session-id"]) {
-      if (typeof data.headers?.[name] === "string") headers[name] = data.headers[name].slice(0, 2048);
-    }
+    for (const name of ["content-type", "mcp-session-id"]) if (typeof data.headers?.[name] === "string") headers[name] = data.headers[name].slice(0, 2048);
     const bodyBase64 = typeof data.bodyBase64 === "string" && data.bodyBase64.length <= 700000 ? data.bodyBase64 : "";
     complete({ status, headers, bodyBase64 });
   }
-
-  async webSocketClose(socket) {
-    try { socket.close(); } catch {}
-  }
-
-  async webSocketError(socket) {
-    try { socket.close(1011, "Relay socket error"); } catch {}
-  }
+  async webSocketClose(socket) { try { socket.close(); } catch {} }
+  async webSocketError(socket) { try { socket.close(1011, "Relay socket error"); } catch {} }
 }
