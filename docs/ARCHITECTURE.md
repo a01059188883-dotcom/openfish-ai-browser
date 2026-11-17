@@ -22,3 +22,7 @@ The local bridge binds to `127.0.0.1`, not all network interfaces. Before public
 
 ## Browser library (v2.2.0)
 The browser bridge persists bookmarks, top-level navigation history, reading-list entries, and per-URL tab organization metadata under the local OpenFish data directory. It is local-first; history and bookmarks are not uploaded to the Cloudflare relay. Library mutations are available through REST and MCP tools, with explicit approval required for removals, history clearing, and tab organization. Grouping is metadata-based for Playwright tabs and is not native Chromium tab-group UI.
+
+
+## Diagnostics and recovery (v2.3.0)
+Diagnostics are attached to Playwright pages and held in bounded in-memory buffers (100 events per page). They omit URL query strings and fragments. Page content extraction and performance inspection are read-only. Recently closed tabs are retained in the session memory (up to 10); restoring a tab requires explicit approval. Diagnostics and recovery state are not uploaded to the relay or persisted across bridge restarts.
