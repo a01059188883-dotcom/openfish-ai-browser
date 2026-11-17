@@ -6,7 +6,7 @@ import { z } from "zod";
 const PORT = Number(process.env.OPENFISH_MCP_HTTP_PORT || 8788);
 const HOST = process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1";
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const VERSION = "2.2.0";
+const VERSION = "2.3.0";
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -115,6 +115,15 @@ function createMcpServer(token, sessionId, clientMeta) {
   server.tool("add_reading_item", "Save a page for later reading.", { url: z.string().url(), title: z.string().max(180).optional(), note: z.string().max(500).optional() }, args => call("add_reading_item", args, true));
   server.tool("remove_reading_item", "Remove a reading-list item after explicit approval.", { id: z.string(), approved: z.literal(true) }, args => call("remove_reading_item", args, true));
   server.tool("organize_tab", "Assign a tab to a group and/or pin it after explicit approval.", { url: z.string().url(), groupName: z.string().max(40).optional(), pinned: z.boolean().optional(), approved: z.literal(true) }, args => call("organize_tab", args, true));
+  server.tool("get_page_diagnostics", "Read recent console errors, page exceptions, failed requests, and HTTP errors.", { limit: z.number().int().min(1).max(100).optional() }, args => call("get_page_diagnostics", args));
+  server.tool("clear_page_diagnostics", "Clear diagnostics captured for the current page.", {}, args => call("clear_page_diagnostics", args));
+  server.tool("extract_reader_content", "Extract a clean reading view with title, description, headings, and main article text.", {}, args => call("extract_reader_content", args));
+  server.tool("find_in_page", "Find a phrase in the current page and return nearby snippets.", { query: z.string().min(1).max(200) }, args => call("find_in_page", args));
+  server.tool("get_page_performance", "Read navigation timing and resource-transfer summaries.", {}, args => call("get_page_performance", args));
+  server.tool("list_recently_closed_tabs", "List recently closed tabs available for restoration.", {}, args => call("list_recently_closed_tabs", args));
+  server.tool("duplicate_tab", "Duplicate a browser tab by its current list index.", { index: z.number().int().min(0) }, args => call("duplicate_tab", args, true));
+  server.tool("reopen_closed_tab", "Restore the most recently closed tab after explicit approval.", { approved: z.literal(true) }, args => call("reopen_closed_tab", args, true));
+  server.tool("search_tabs", "Search open tabs by title, URL, or group label.", { query: z.string().min(1).max(200) }, args => call("search_tabs", args));
   return server;
 }
 

@@ -60,7 +60,7 @@ async function browserAction(action) {
   button.disabled = true;
   try {
     const data = await request("/api/mcp/" + action, {});
-    $("page").textContent = `${data.title || ""}\\n${data.url || ""}\\n\\n${data.message || "网页操作完成。"}`;
+    $("page").textContent = `${data.title || ""}\n${data.url || ""}\n\n${data.message || "网页操作完成。"}`;
   } catch (error) { $("page").textContent = "操作失败：" + error.message; }
   finally { button.disabled = false; button.textContent = label; }
 }
@@ -73,7 +73,10 @@ async function refreshTabs() {
   try {
     const data = await request("/api/mcp/list_tabs", {}, "GET"); list.replaceChildren();
     if (!data.tabs || !data.tabs.length) { const empty = document.createElement("p"); empty.className = "hint"; empty.textContent = "当前没有标签页"; list.append(empty); return; }
-    for (const tab of data.tabs) {
+    const query = ($("tabsSearch")?.value || "").trim().toLowerCase();
+    const visibleTabs = data.tabs.filter(tab => !query || (tab.title + " " + tab.url + " " + tab.groupName).toLowerCase().includes(query));
+    if (!visibleTabs.length) { const empty=document.createElement("p"); empty.className="hint"; empty.textContent="没有匹配的标签页"; list.append(empty); return; }
+    for (const tab of visibleTabs) {
       const row = document.createElement("div"); row.className = "tab-row" + (tab.active ? " active" : "");
       const select = document.createElement("button"); select.type = "button"; select.className = "tab-select";
       const title = document.createElement("strong"); title.textContent = (tab.pinned ? "📌 " : "") + (tab.groupName ? "[" + tab.groupName + "] " : "") + (tab.title || "新标签页");
@@ -82,15 +85,19 @@ async function refreshTabs() {
       select.addEventListener("click", async () => { try { await request("/api/mcp/switch_tab", {index:tab.index}); await refreshTabs(); } catch(e) { list.textContent = e.message; } });
       const close = document.createElement("button"); close.type = "button"; close.className = "tab-close compact"; close.textContent = "关闭"; close.disabled = data.tabs.length <= 1;
       close.addEventListener("click", async () => { if (!window.confirm("确认关闭这个标签页？")) return; try { await request("/api/mcp/close_tab", {index:tab.index,approved:true}); await refreshTabs(); } catch(e) { list.textContent = e.message; } });
+      const duplicate = document.createElement("button"); duplicate.type = "button"; duplicate.className = "compact"; duplicate.textContent = "复制";
+      duplicate.addEventListener("click", async () => { try { await request("/api/mcp/duplicate_tab", {index:tab.index}); await refreshTabs(); } catch(e) { list.textContent = e.message; } });
       const organize = document.createElement("button"); organize.type = "button"; organize.className = "compact"; organize.textContent = "分组";
       organize.addEventListener("click", async () => { const groupName = window.prompt("输入标签分组名称（留空取消分组）：", tab.groupName || ""); if (groupName === null) return; try { await request("/api/library/tab/organize", {url:tab.url,groupName,pinned:tab.pinned,approved:true}); await refreshTabs(); } catch(e) { list.textContent = e.message; } });
       const pin = document.createElement("button"); pin.type = "button"; pin.className = "compact"; pin.textContent = tab.pinned ? "取消固定" : "固定";
       pin.addEventListener("click", async () => { try { await request("/api/library/tab/organize", {url:tab.url,groupName:tab.groupName || "",pinned:!tab.pinned,approved:true}); await refreshTabs(); } catch(e) { list.textContent = e.message; } });
-      const actions = document.createElement("div"); actions.className = "tab-actions"; actions.append(organize,pin,close); row.append(select, actions); list.append(row);
+      const actions = document.createElement("div"); actions.className = "tab-actions"; actions.append(duplicate,organize,pin,close); row.append(select, actions); list.append(row);
     }
   } catch(error) { list.textContent = "标签页读取失败：" + error.message; }
 }
 $("refreshTabs").addEventListener("click", refreshTabs);
+$("tabsSearch").addEventListener("input", refreshTabs);
+$("restoreClosedTab").addEventListener("click", async () => { if (!window.confirm("恢复最近关闭的标签页？")) return; try { await request("/api/mcp/reopen_closed_tab", {approved:true}); await refreshTabs(); } catch(e) { $("tabsList").textContent = e.message; } });
 $("newTab").addEventListener("click", async () => {
   const button = $("newTab"); button.disabled = true;
   try { const url = $("newTabUrl").value.trim(); await request("/api/mcp/new_tab", url ? {url} : {}); $("newTabUrl").value = ""; await refreshTabs(); }
@@ -120,6 +127,9 @@ document.querySelectorAll("[data-library-tab]").forEach(button => button.addEven
 $("librarySearch").addEventListener("input", renderLibrary); $("refreshLibrary").addEventListener("click", refreshLibrary);
 $("saveBookmark").addEventListener("click", async () => { try { const page = await getActivePageInfo(); await request("/api/library/bookmarks/add", page); document.querySelector('[data-library-tab="bookmarks"]').click(); } catch(e) { $("libraryList").textContent = e.message; } });
 $("saveReading").addEventListener("click", async () => { try { const page = await getActivePageInfo(); await request("/api/library/reading-list/add", page); document.querySelector('[data-library-tab="reading"]').click(); } catch(e) { $("libraryList").textContent = e.message; } });
+$("readerMode").addEventListener("click", async () => { const button=$("readerMode"); button.disabled=true; try { const data=await request("/api/mcp/extract_reader_content",{}, "GET"); $("page").textContent = data.title + "\n" + data.url + "\n" + (data.description ? data.description + "\n\n" : "") + data.text; } catch(e) { $("page").textContent="阅读模式失败："+e.message; } finally { button.disabled=false; } });
+$("pageDiagnostics").addEventListener("click", async () => { const button=$("pageDiagnostics"); button.disabled=true; try { const data=await request("/api/mcp/get_page_diagnostics",{}, "GET"); $("page").textContent = data.diagnostics.length ? JSON.stringify(data.diagnostics,null,2) : "当前页面未发现控制台错误、页面异常或 HTTP 请求错误。"; } catch(e) { $("page").textContent="页面诊断失败："+e.message; } finally { button.disabled=false; } });
+$("pagePerformance").addEventListener("click", async () => { const button=$("pagePerformance"); button.disabled=true; try { const data=await request("/api/mcp/get_page_performance",{}, "GET"); $("page").textContent=JSON.stringify(data,null,2); } catch(e) { $("page").textContent="性能分析失败："+e.message; } finally { button.disabled=false; } });
 health();
 refreshTabs();
 refreshLibrary();

@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.2.0**.
+Open-source, free-first browser automation starter. Version: **2.3.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -140,3 +140,7 @@ The shared browser session supports listing tabs, opening a new tab, switching t
 
 ## Browser productivity library (v2.2.0)
 OpenFish keeps a local browser library in `.openfish/browser-library.json`: bookmarks, top-level browsing history, a read-later list, and per-URL tab organization metadata (group label and pinned state). The Chrome side panel exposes these collections and tab organization. History is deduplicated for rapid reloads and capped at 3,000 entries. Remove and clear operations require explicit approval. The same capabilities are available through stdio MCP, Streamable HTTP MCP, REST, and provider-neutral AI tool adapters. Data stays on the machine running the bridge and is not synced to a cloud account.
+
+
+## Diagnostics, reader mode, and tab recovery (v2.3.0)
+The active page now records a bounded, in-memory diagnostic stream of console warnings/errors, uncaught page exceptions, failed requests, and HTTP responses with status 400 or higher. URLs in diagnostic records omit query strings and fragments to reduce accidental disclosure. The side panel exposes reader extraction, phrase search, navigation timing/resource summaries, tab search, duplicate-tab, and recently-closed-tab restore. Diagnostic data is page-local and resets when the runtime restarts; recently closed tabs are kept in the active session only. These tools are also available through MCP and the provider-neutral tool catalog.

@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const server = new McpServer({ name: "openfish-ai-browser", version: "2.2.0" });
+const server = new McpServer({ name: "openfish-ai-browser", version: "2.3.0" });
 const result = value => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
 
 async function bridgeRequest(path, options = {}) {
@@ -80,5 +80,15 @@ server.tool("list_reading_list", "List pages saved for later reading.", {}, asyn
 server.tool("add_reading_item", "Save a page for later reading.", { url: z.string().url(), title: z.string().max(180).optional(), note: z.string().max(500).optional() }, async args => result(await bridgeRequest("/api/library/reading-list/add", { method: "POST", body: args })));
 server.tool("remove_reading_item", "Remove a reading-list item after explicit approval.", { id: z.string(), approved: z.literal(true) }, async args => result(await bridgeRequest("/api/library/reading-list/remove", { method: "POST", body: args })));
 server.tool("organize_tab", "Assign a tab to a group and/or pin it after explicit approval.", { url: z.string().url(), groupName: z.string().max(40).optional(), pinned: z.boolean().optional(), approved: z.literal(true) }, async args => result(await bridgeRequest("/api/library/tab/organize", { method: "POST", body: args })));
+
+server.tool("get_page_diagnostics", "Read recent console errors, page exceptions, failed requests, and HTTP errors.", { limit: z.number().int().min(1).max(100).optional() }, async args => result(await bridgeRequest("/api/mcp/get_page_diagnostics")));
+server.tool("clear_page_diagnostics", "Clear diagnostics captured for the current page.", {}, async () => result(await bridgeRequest("/api/mcp/clear_page_diagnostics", { method: "POST", body: {} })));
+server.tool("extract_reader_content", "Extract a clean reading view with title, description, headings, and main article text.", {}, async () => result(await bridgeRequest("/api/mcp/extract_reader_content", undefined)));
+server.tool("find_in_page", "Find a phrase in the current page and return nearby snippets.", { query: z.string().min(1).max(200) }, async args => result(await bridgeRequest("/api/mcp/find_in_page", { method: "POST", body: args })));
+server.tool("get_page_performance", "Read navigation timing and resource-transfer summaries.", {}, async () => result(await bridgeRequest("/api/mcp/get_page_performance", undefined)));
+server.tool("list_recently_closed_tabs", "List recently closed tabs available for restoration.", {}, async () => result(await bridgeRequest("/api/mcp/list_recently_closed_tabs", undefined)));
+server.tool("duplicate_tab", "Duplicate a browser tab by its current list index.", { index: z.number().int().min(0) }, async args => result(await bridgeRequest("/api/mcp/duplicate_tab", { method: "POST", body: args })));
+server.tool("reopen_closed_tab", "Restore the most recently closed tab after explicit approval.", { approved: z.literal(true) }, async args => result(await bridgeRequest("/api/mcp/reopen_closed_tab", { method: "POST", body: args })));
+server.tool("search_tabs", "Search open tabs by title, URL, or group label.", { query: z.string().min(1).max(200) }, async args => { const data = await bridgeRequest("/api/mcp/list_tabs", undefined); const q = args.query.toLowerCase(); return result({tabs:(data.tabs || []).filter(tab => (tab.title + " " + tab.url + " " + tab.groupName).toLowerCase().includes(q))}); });
 
 await server.connect(new StdioServerTransport());
