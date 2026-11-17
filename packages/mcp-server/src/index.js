@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const server = new McpServer({ name: "openfish-ai-browser", version: "2.4.0" });
+const server = new McpServer({ name: "openfish-ai-browser", version: "2.5.0" });
 const result = value => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
 
 async function bridgeRequest(path, options = {}) {
@@ -99,5 +99,8 @@ server.tool("download_link", "Download a file from one unique visible link in th
 server.tool("list_downloads", "List files downloaded and managed by OpenFish.", {}, async () => result(await bridgeRequest("/api/mcp/list_downloads")));
 server.tool("remove_download", "Delete a managed downloaded file after explicit approval.", { id: z.string(), approved: z.literal(true) }, async args => result(await bridgeRequest("/api/mcp/remove_download", { method: "POST", body: args })));
 server.tool("clear_session_data", "Clear cookies and site storage for the active isolated browser session after explicit approval.", { approved: z.literal(true) }, async args => result(await bridgeRequest("/api/mcp/clear_session_data", { method: "POST", body: args })));
+
+server.tool("export_browser_library", "Export local bookmarks, history, reading list, tab organization and workspaces as JSON. Excludes cookies and downloaded files.", {}, async () => result(await bridgeRequest("/api/library/export")));
+server.tool("import_browser_library", "Merge a validated browser library backup after explicit approval.", { data: z.record(z.string(), z.unknown()), approved: z.literal(true) }, async args => result(await bridgeRequest("/api/library/import", { method: "POST", body: args })));
 
 await server.connect(new StdioServerTransport());

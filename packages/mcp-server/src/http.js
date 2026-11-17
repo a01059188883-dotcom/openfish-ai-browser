@@ -6,7 +6,7 @@ import { z } from "zod";
 const PORT = Number(process.env.OPENFISH_MCP_HTTP_PORT || 8788);
 const HOST = process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1";
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const VERSION = "2.4.0";
+const VERSION = "2.5.0";
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -132,6 +132,8 @@ function createMcpServer(token, sessionId, clientMeta) {
   server.tool("list_downloads", "List files downloaded and managed by OpenFish.", {}, args => call("list_downloads", args));
   server.tool("remove_download", "Delete a managed downloaded file after explicit approval.", { id: z.string(), approved: z.literal(true) }, args => call("remove_download", args, true));
   server.tool("clear_session_data", "Clear cookies and site storage for the active isolated browser session after explicit approval.", { approved: z.literal(true) }, args => call("clear_session_data", args, true));
+  server.tool("export_browser_library", "Export local bookmarks, history, reading list, tab organization and workspaces as JSON. Excludes cookies and downloaded files.", {}, args => call("export_browser_library", args));
+  server.tool("import_browser_library", "Merge a validated browser library backup after explicit approval.", { data: z.record(z.string(), z.unknown()), approved: z.literal(true) }, args => call("import_browser_library", args, true));
   return server;
 }
 

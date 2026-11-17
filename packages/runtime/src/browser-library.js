@@ -87,3 +87,48 @@ export async function removeWorkspace(id, approved) {
   await persist();
   return { removed: true, id };
 }
+
+export async function exportBrowserLibrary() {
+  const data = await load();
+  return { schemaVersion: 1, exportedAt: new Date().toISOString(), data: JSON.parse(JSON.stringify(data)) };
+}
+export async function importBrowserLibrary(payload, approved) {
+  if (approved !== true) throw Object.assign(new Error("Explicit approval is required to import browser data."), { statusCode: 403 });
+  const serialized = JSON.stringify(payload ?? {});
+  if (Buffer.byteLength(serialized, "utf8") > 1024 * 1024) throw Object.assign(new Error("Browser library backup exceeds the 1 MB import limit."), { statusCode: 413 });
+  const source = payload?.data && typeof payload.data === "object" ? payload.data : payload;
+  if (!source || typeof source !== "object") throw Object.assign(new Error("Invalid browser library backup."), { statusCode: 400 });
+  const data = await load();
+  const safeItems = (items, max) => Array.isArray(items) ? items.slice(0, max) : [];
+  const upsertByUrl = (target, item) => {
+    const index = target.findIndex(existing => existing.url === item.url);
+    if (index >= 0) target[index] = { ...target[index], ...item };
+    else target.unshift(item);
+  };
+  let imported = { bookmarks: 0, history: 0, readingList: 0, tabOrganization: 0, workspaces: 0 };
+  for (const raw of safeItems(source.bookmarks, 5000)) {
+    try { const url = normalizeUrl(raw.url); upsertByUrl(data.bookmarks, { id: randomUUID(), url, title: cleanText(raw.title, url), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }); imported.bookmarks++; } catch {}
+  }
+  const importedHistory = [];
+  for (const raw of safeItems(source.history, MAX_HISTORY)) {
+    try { const url = normalizeUrl(raw.url); importedHistory.push({ id: randomUUID(), url, title: cleanText(raw.title, url), visitedAt: Number.isFinite(Date.parse(raw.visitedAt)) ? new Date(raw.visitedAt).toISOString() : new Date().toISOString() }); } catch {}
+  }
+  data.history = [...data.history, ...importedHistory].sort((a,b) => Date.parse(b.visitedAt) - Date.parse(a.visitedAt)).slice(0, MAX_HISTORY);
+  imported.history = importedHistory.length;
+  for (const raw of safeItems(source.readingList, 5000)) {
+    try { const url = normalizeUrl(raw.url); upsertByUrl(data.readingList, { id: randomUUID(), url, title: cleanText(raw.title, url), note: cleanText(raw.note, "", 500), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), readAt: null }); imported.readingList++; } catch {}
+  }
+  for (const raw of safeItems(source.tabOrganization, 1000)) {
+    try { const url = normalizeUrl(raw.url); const existing = data.tabOrganization.find(item => item.url === url); const item = { url, groupName: cleanText(raw.groupName, "", 40), pinned: Boolean(raw.pinned), updatedAt: new Date().toISOString() }; if (existing) Object.assign(existing, item); else data.tabOrganization.push(item); imported.tabOrganization++; } catch {}
+  }
+  for (const raw of safeItems(source.workspaces, 100)) {
+    try {
+      const tabs = [];
+      for (const tab of safeItems(raw.tabs, 30)) { try { const url = normalizeUrl(tab.url); if (!tabs.some(item => item.url === url)) tabs.push({ url, title: cleanText(tab.title, url) }); } catch {} }
+      const name = cleanText(raw.name, "", 60);
+      if (name && tabs.length) { data.workspaces.unshift({ id: randomUUID(), name, tabs, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }); imported.workspaces++; }
+    } catch {}
+  }
+  await persist();
+  return { imported, totals: await getLibraryStats(), workspaces: (await listWorkspaces()).length };
+}
