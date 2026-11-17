@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.0.0**.
+Open-source, free-first browser automation starter. Version: **2.1.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -130,6 +130,9 @@ After deployment, check `GET https://YOUR-WORKER.workers.dev/health` with the re
 ## Browser navigation controls (v2.0.0)
 The Chrome side panel and MCP interfaces expose `go_back`, `go_forward`, and `reload_page` for the current browser session. Named browser sessions are capped at 20 by default (excluding the default session); expired sessions are cleaned up before a new session is allocated. Configure `OPENFISH_MAX_SESSIONS` (2–50) and `OPENFISH_SESSION_TTL_MS` to adjust these limits.
 
+
+## Screenshot preview (v2.1.0)
+The Chrome side panel can capture and preview the active browser viewport as a compressed JPEG. The same screenshot tool is available through stdio MCP, Streamable HTTP MCP, and provider-neutral tool adapters. Screenshot bytes are returned inline rather than writing a temporary file to an unspecified working directory.
 
 ## Multi-tab browser management (v2.0.0)
 The shared browser session supports listing tabs, opening a new tab, switching the active tab, and closing a tab through the Chrome side panel and MCP interfaces. Tab indices are current-list indices and can change after tabs are closed. Closing requires `approved: true` and the last remaining tab cannot be closed. Each isolated browser session retains its own tabs and cookies.
