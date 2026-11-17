@@ -325,7 +325,7 @@ test("portable backup and command center are exposed with bounded import", async
   assert.ok(html.includes('id="exportLibrary"'));
   assert.ok(html.includes('id="importLibraryFile"'));
   assert.ok(panel.includes("function renderCommandResults()"));
-  assert.ok(panel.includes("Shift + T"));
-  assert.ok(panelJs.includes('event.shiftKey&&key==="t"'));
-  assert.ok(panel.includes("/api/library/import"));
+  assert.ok(html.includes("Shift + T"));
+  assert.ok(panel.includes('event.shiftKey&&key==="t"'));
+  assert.ok(bridge.includes("/api/library/import"));
 });
