@@ -26,3 +26,7 @@ The browser bridge persists bookmarks, top-level navigation history, reading-lis
 
 ## Diagnostics and recovery (v2.3.0)
 Diagnostics are attached to Playwright pages and held in bounded in-memory buffers (100 events per page). They omit URL query strings and fragments. Page content extraction and performance inspection are read-only. Recently closed tabs are retained in the session memory (up to 10); restoring a tab requires explicit approval. Diagnostics and recovery state are not uploaded to the relay or persisted across bridge restarts.
+
+
+## Workspaces, downloads, and privacy (v2.4.0)
+Workspace snapshots persist only public tab URLs and titles; restore creates new tabs and does not attempt to restore cookies, form values, or in-memory page state. Managed downloads are written beneath `.openfish/downloads`, use sanitized generated filenames, require an explicitly approved unique visible link, and are capped at 25 MB per file and 500 MB total managed files. Deleting a managed download checks that its stored path remains inside the managed directory. Session privacy clearing requires approval and clears cookies plus per-page web storage/cache/service-worker/IndexedDB data in the selected isolated browser context. It does not clear the separate OpenFish browser library.
