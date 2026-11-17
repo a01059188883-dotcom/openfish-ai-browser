@@ -38,7 +38,7 @@ test("bridge applies strict URL validation to AI planning and uses the configure
   assert.ok(bridge.includes("const ALLOWED_HOSTS = new Set(["));
   assert.ok(bridge.includes("127.0.0.1:${PORT}"));
   assert.ok(bridge.includes("const parsed = validateHttpUrl(body.url)"));
-  assert.ok(bridge.includes('const VERSION = "2.2.0"'));
+  assert.ok(bridge.includes('const VERSION = "2.3.0"'));
 });
 
 test("approved plan executor enforces explicit approval and stops on unsafe targets", async () => {
@@ -90,7 +90,7 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   const html = await readFile(resolve("packages/admin/index.html"), "utf8");
   const app = await readFile(resolve("packages/admin/app.js"), "utf8");
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "2.2.0");
+  assert.equal(pkg.version, "2.3.0");
   assert.ok(bridge.includes('req.url === "/api/admin/status"'));
   assert.ok(bridge.includes('req.url === "/api/admin/events"'));
   assert.ok(bridge.includes('["../../admin/index.html"'));
@@ -253,4 +253,25 @@ test("browser productivity library is exposed through runtime, MCP, and side pan
   assert.ok(panel.includes('data-library-tab="history"'));
   assert.ok(panelJs.includes("async function refreshLibrary()"));
   assert.ok(panelJs.includes("/api/library/tab/organize"));
+});
+
+
+test("diagnostics, reader extraction, performance inspection, and tab recovery are exposed safely", async () => {
+  const browser = await readFile(resolve("packages/runtime/src/browser.js"), "utf8");
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  const stdio = await readFile(resolve("packages/mcp-server/src/index.js"), "utf8");
+  const httpMcp = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
+  const panel = await readFile(resolve("packages/chrome-extension/sidepanel.html"), "utf8");
+  const panelJs = await readFile(resolve("packages/chrome-extension/sidepanel.js"), "utf8");
+  for (const fn of ["getPageDiagnostics", "clearPageDiagnostics", "listRecentlyClosedTabs", "duplicateBrowserTab", "reopenClosedBrowserTab"]) assert.ok(browser.includes("function " + fn));
+  for (const tool of ["get_page_diagnostics", "clear_page_diagnostics", "extract_reader_content", "find_in_page", "get_page_performance", "list_recently_closed_tabs", "duplicate_tab", "reopen_closed_tab", "search_tabs"]) {
+    assert.ok(bridge.includes('"name":"' + tool + '"'));
+    assert.ok(stdio.includes('server.tool("' + tool + '"'));
+    assert.ok(httpMcp.includes('server.tool("' + tool + '"'));
+  }
+  assert.ok(browser.includes('rows.length = Math.min(rows.length, 100)'));
+  assert.ok(browser.includes('session.recentlyClosed.length = Math.min(session.recentlyClosed.length, 10)'));
+  assert.ok(browser.includes('approved !== true'));
+  for (const id of ["readerMode", "pageDiagnostics", "pagePerformance", "tabsSearch", "restoreClosedTab"]) assert.ok(panel.includes('id="' + id + '"'));
+  for (const control of ["readerMode", "pageDiagnostics", "pagePerformance", "restoreClosedTab"]) assert.ok(panelJs.includes('$("' + control + '")'));
 });
