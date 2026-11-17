@@ -11,6 +11,26 @@ async function health() {
   try { const r = await fetch(API + "/health"); if (!r.ok) throw new Error(); $("status").textContent = "本地服务已连接"; }
   catch { $("status").textContent = "本地服务未启动"; }
 }
+
+$("captureScreenshot").addEventListener("click", async () => {
+  const button = $("captureScreenshot");
+  const preview = $("screenshotPreview");
+  button.disabled = true;
+  button.textContent = "截图生成中…";
+  try {
+    const data = await request("/api/mcp/take_screenshot", {});
+    if (!data.imageDataUrl || !data.imageDataUrl.startsWith("data:image/jpeg;base64,")) throw new Error("截图数据格式无效。");
+    $("screenshotImage").src = data.imageDataUrl;
+    $("screenshotCaption").textContent = data.url || "当前网页";
+    preview.hidden = false;
+  } catch (error) {
+    preview.hidden = true;
+    $("page").textContent = "截图失败：" + error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = "网页截图";
+  }
+});
 $("inspect").addEventListener("click", async () => {
   $("page").textContent = "读取中…";
   try { const [tab] = await chrome.tabs.query({active:true,currentWindow:true}); if (tab?.url?.startsWith("http")) await request("/navigate",{url:tab.url}); const data = await request("/api/inspect"); $("page").textContent = `${data.title}\n${data.url}\n\n${data.text}`; }
