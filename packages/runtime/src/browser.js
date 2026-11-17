@@ -13,7 +13,7 @@ let browserConnectPromise;
 let pendingSessionCreations = 0;
 const trackedPages = new WeakSet();
 function trackPage(page) { if (trackedPages.has(page)) return page; trackedPages.add(page); page.on("load", () => { const url = page.url(); page.title().then(title => recordVisit({ url, title })).catch(() => {}); }); return page; }
-function newTrackedPage(context) { return trackPage(context.newPage()); }
+async function newTrackedPage(context) { return trackPage(await context.newPage()); }
 
 export function getCurrentBrowserSessionId() {
   return sessionContext.getStore() || "default";
