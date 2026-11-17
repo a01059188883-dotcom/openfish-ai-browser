@@ -194,3 +194,11 @@
 - Added tab search, duplicate-tab, and recently closed-tab recovery.
 - Exposed all new operations through the bridge, stdio MCP, Streamable HTTP MCP, and AI tool adapters.
 - Synchronized package, extension, runtime, Worker, MCP, dashboard, docs, and tests to 2.3.0.
+
+
+## 2.4.0 - 2026-11-17
+- Added named local workspaces that save the current public tab URLs and restore them as new tabs without closing existing tabs.
+- Added an approval-gated download manager for unique visible page links, with sanitized filenames, managed local storage, 25 MB per-file and 500 MB total limits, and explicit deletion.
+- Added an approval-gated session privacy action to clear cookies, local/session storage, caches, service workers, and IndexedDB for the active isolated browser session.
+- Exposed new operations through the bridge, MCP stdio/HTTP, REST, and AI tool adapters; added side-panel management UI.
+- Synchronized package, extension, runtime, Worker, MCP, dashboard, docs, and tests to 2.4.0.
