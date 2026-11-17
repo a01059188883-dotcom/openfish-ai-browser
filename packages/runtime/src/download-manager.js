@@ -36,7 +36,10 @@ function publicRecord(item) {
   return { id: item.id, filename: item.filename, url: item.url, size: item.size, createdAt: item.createdAt, path: item.path };
 }
 function safeFilename(value) {
-  const name = basename(String(value || "download")).replace(/[\\u0000-\\u001f\\u007f]/g, "").replace(/[\\\\/:*?"<>|]/g, "_").replace(/^\\.+/, "").trim().slice(0, 120);
+  const name = basename(String(value || "download"))
+    .replace(/[\x00-\x1f\x7f]/g, "")
+    .replaceAll("\\", "_").replaceAll("/", "_")
+    .replace(/[<>:"|?*]/g, "_").replace(/^\.+/, "").trim().slice(0, 120);
   return name || "download";
 }
 function insideDownloadDirectory(path) {
