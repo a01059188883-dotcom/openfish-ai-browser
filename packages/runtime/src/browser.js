@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { chromium } from "playwright";
 import { validateHttpUrl } from "./safety.js";
+import { recordVisit, getTabOrganization } from "./browser-library.js";
 
 const sessionContext = new AsyncLocalStorage();
 const sessions = new Map();
@@ -10,6 +11,9 @@ const MAX_SESSIONS = Math.max(2, Math.min(50, Number(process.env.OPENFISH_MAX_SE
 let browser;
 let browserConnectPromise;
 let pendingSessionCreations = 0;
+const trackedPages = new WeakSet();
+function trackPage(page) { if (trackedPages.has(page)) return page; trackedPages.add(page); page.on("load", () => { const url = page.url(); page.title().then(title => recordVisit({ url, title })).catch(() => {}); }); return page; }
+function newTrackedPage(context) { return trackPage(context.newPage()); }
 
 export function getCurrentBrowserSessionId() {
   return sessionContext.getStore() || "default";
@@ -57,7 +61,7 @@ async function getSession(sessionId) {
   }
   touch(session);
   if (!session.page || session.page.isClosed()) {
-    session.page = await session.context.newPage();
+    session.page = await newTrackedPage(session.context);
     session.page.setDefaultTimeout(12000);
   }
   return session;
@@ -117,14 +121,14 @@ export async function getPage() {
 export async function listBrowserTabs() {
   const session = await getSession(getCurrentBrowserSessionId());
   let pages = session.context.pages();
-  if (!pages.length) { session.page = await session.context.newPage(); session.page.setDefaultTimeout(12000); }
+  if (!pages.length) { session.page = await newTrackedPage(session.context); session.page.setDefaultTimeout(12000); }
   pages = session.context.pages();
   if (!session.page || session.page.isClosed()) session.page = pages[0];
-  return Promise.all(pages.map(async (page, index) => ({ index, title: await page.title().catch(() => ""), url: page.url(), active: page === session.page })));
+  return Promise.all(pages.map(async (page, index) => { trackPage(page); const organization = await getTabOrganization(page.url()); return { index, title: await page.title().catch(() => ""), url: page.url(), active: page === session.page, groupName: organization.groupName, pinned: organization.pinned }; }));
 }
 export async function createBrowserTab(url) {
   const session = await getSession(getCurrentBrowserSessionId());
-  const page = await session.context.newPage(); page.setDefaultTimeout(12000);
+  const page = await newTrackedPage(session.context); page.setDefaultTimeout(12000);
   if (url) await page.goto(validateHttpUrl(url).href, { waitUntil: "domcontentloaded" });
   session.page = page;
   return { index: session.context.pages().indexOf(page), title: await page.title().catch(() => ""), url: page.url(), active: true };
