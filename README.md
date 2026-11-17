@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.1.0**.
+Open-source, free-first browser automation starter. Version: **2.2.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -136,3 +136,7 @@ The Chrome side panel can capture and preview the active browser viewport as a c
 
 ## Multi-tab browser management (v2.0.0)
 The shared browser session supports listing tabs, opening a new tab, switching the active tab, and closing a tab through the Chrome side panel and MCP interfaces. Tab indices are current-list indices and can change after tabs are closed. Closing requires `approved: true` and the last remaining tab cannot be closed. Each isolated browser session retains its own tabs and cookies.
+
+
+## Browser productivity library (v2.2.0)
+OpenFish keeps a local browser library in `.openfish/browser-library.json`: bookmarks, top-level browsing history, a read-later list, and per-URL tab organization metadata (group label and pinned state). The Chrome side panel exposes these collections and tab organization. History is deduplicated for rapid reloads and capped at 3,000 entries. Remove and clear operations require explicit approval. The same capabilities are available through stdio MCP, Streamable HTTP MCP, REST, and provider-neutral AI tool adapters. Data stays on the machine running the bridge and is not synced to a cloud account.

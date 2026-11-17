@@ -38,7 +38,7 @@ test("bridge applies strict URL validation to AI planning and uses the configure
   assert.ok(bridge.includes("const ALLOWED_HOSTS = new Set(["));
   assert.ok(bridge.includes("127.0.0.1:${PORT}"));
   assert.ok(bridge.includes("const parsed = validateHttpUrl(body.url)"));
-  assert.ok(bridge.includes('const VERSION = "2.1.0"'));
+  assert.ok(bridge.includes('const VERSION = "2.2.0"'));
 });
 
 test("approved plan executor enforces explicit approval and stops on unsafe targets", async () => {
@@ -90,7 +90,7 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   const html = await readFile(resolve("packages/admin/index.html"), "utf8");
   const app = await readFile(resolve("packages/admin/app.js"), "utf8");
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "2.1.0");
+  assert.equal(pkg.version, "2.2.0");
   assert.ok(bridge.includes('req.url === "/api/admin/status"'));
   assert.ok(bridge.includes('req.url === "/api/admin/events"'));
   assert.ok(bridge.includes('["../../admin/index.html"'));
@@ -229,4 +229,28 @@ test("screenshot preview returns bounded inline JPEG data rather than a temporar
   assert.ok(panel.includes('$("screenshotImage").src = data.imageDataUrl'));
   assert.ok(worker.includes('const VERSION = "' + pkg.version + '"'));
   assert.ok(admin.includes("v" + pkg.version));
+});
+
+ 
+test("browser productivity library is exposed through runtime, MCP, and side panel", async () => {
+  const library = await readFile(resolve("packages/runtime/src/browser-library.js"), "utf8");
+  const browser = await readFile(resolve("packages/runtime/src/browser.js"), "utf8");
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  const stdio = await readFile(resolve("packages/mcp-server/src/index.js"), "utf8");
+  const httpMcp = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
+  const panel = await readFile(resolve("packages/chrome-extension/sidepanel.html"), "utf8");
+  const panelJs = await readFile(resolve("packages/chrome-extension/sidepanel.js"), "utf8");
+  for (const fn of ["addBookmark", "listBookmarks", "removeBookmark", "recordVisit", "listHistory", "clearHistory", "addReadingItem", "listReadingItems", "removeReadingItem", "setTabOrganization"]) assert.ok(library.includes("export async function " + fn));
+  assert.ok(library.includes("MAX_HISTORY = 3000"));
+  assert.ok(library.includes("approved !== true"));
+  assert.ok(browser.includes("recordVisit({ url, title })"));
+  for (const tool of ["list_bookmarks", "add_bookmark", "remove_bookmark", "list_history", "clear_history", "list_reading_list", "add_reading_item", "remove_reading_item", "organize_tab"]) {
+    assert.ok(bridge.includes('"name":"' + tool + '"'));
+    assert.ok(stdio.includes('server.tool("' + tool + '"'));
+    assert.ok(httpMcp.includes('server.tool("' + tool + '"'));
+  }
+  assert.ok(panel.includes('id="libraryPanel"'));
+  assert.ok(panel.includes('data-library-tab="history"'));
+  assert.ok(panelJs.includes("async function refreshLibrary()"));
+  assert.ok(panelJs.includes("/api/library/tab/organize"));
 });

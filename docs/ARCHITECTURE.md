@@ -18,3 +18,7 @@ Chrome Side Panel ── localhost HTTP bridge ───────────
 
 ## Security boundaries
 The local bridge binds to `127.0.0.1`, not all network interfaces. Before public deployment, add authentication, origin allowlists, CSRF protection, per-user browser contexts, quotas, audit logs, and secret management. Do not expose an unauthenticated Playwright endpoint to the public internet.
+
+
+## Browser library (v2.2.0)
+The browser bridge persists bookmarks, top-level navigation history, reading-list entries, and per-URL tab organization metadata under the local OpenFish data directory. It is local-first; history and bookmarks are not uploaded to the Cloudflare relay. Library mutations are available through REST and MCP tools, with explicit approval required for removals, history clearing, and tab organization. Grouping is metadata-based for Playwright tabs and is not native Chromium tab-group UI.
