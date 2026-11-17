@@ -11,7 +11,7 @@ const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/bro
 const ALLOWED_PATH = path => path === "/mcp" || path === "/health" ||
   path === "/.well-known/openfish-tools.json" || path === "/api/v1/tools" ||
   path.startsWith("/api/v1/tools/") || path.startsWith("/api/v1/adapters/") || path === "/api/v1/openapi.json" ||
-  ADMIN_PATHS.has(path) || /^\\/api\\/browser\\/sessions\\/[A-Za-z0-9_-]+\\/close$/.test(path) ||
+  ADMIN_PATHS.has(path) || /^\/api\/browser\/sessions\/[A-Za-z0-9_-]+\/close$/.test(path) ||
   path === "/api/plan" || path === "/api/execute";
 
 function validateConfig() {
