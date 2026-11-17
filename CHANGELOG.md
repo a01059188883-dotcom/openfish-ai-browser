@@ -171,3 +171,10 @@
 - Added a visual tab manager to the Chrome side panel with safe text rendering, refresh, new-tab URL validation, active-tab highlighting, and close confirmation.
 - Required explicit approval for tab closing; prevent closing the last remaining tab and validate tab indices.
 - Synchronized package, runtime, MCP, extension, dashboard, Worker, docs, and regression-test versions to 2.0.0.
+
+
+## 2.1.0 - 2026-11-17
+- Added an inline compressed JPEG screenshot preview in the Chrome side panel.
+- Changed screenshot results from temporary filesystem paths to self-contained image data, avoiding ambiguous file locations for MCP clients.
+- Kept screenshot capture available through the shared bridge, stdio MCP, Streamable HTTP MCP, and provider-neutral adapters.
+- Synchronized package, runtime, Worker, MCP, extension, dashboard, README, changelog, and regression-test version markers to 2.1.0.
