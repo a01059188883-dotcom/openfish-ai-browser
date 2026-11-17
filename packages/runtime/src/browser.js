@@ -12,7 +12,10 @@ let browser;
 let browserConnectPromise;
 let pendingSessionCreations = 0;
 const trackedPages = new WeakSet();
-function trackPage(page) { if (trackedPages.has(page)) return page; trackedPages.add(page); page.on("load", () => { const url = page.url(); page.title().then(title => recordVisit({ url, title })).catch(() => {}); }); return page; }
+const diagnosticsByPage = new WeakMap();
+function safeDiagnosticUrl(value) { try { const url = new URL(value); return url.origin + url.pathname; } catch { return ""; } }
+function recordDiagnostic(page, type, message, url = page.url()) { let rows = diagnosticsByPage.get(page); if (!rows) { rows = []; diagnosticsByPage.set(page, rows); } rows.unshift({ time: new Date().toISOString(), type, message: String(message || "").slice(0, 1000), url: safeDiagnosticUrl(url) }); rows.length = Math.min(rows.length, 100); }
+function trackPage(page) { if (trackedPages.has(page)) return page; trackedPages.add(page); page.on("load", () => { const url = page.url(); page.title().then(title => recordVisit({ url, title })).catch(() => {}); }); page.on("console", message => { if (["error", "warning"].includes(message.type())) recordDiagnostic(page, "console-" + message.type(), message.text(), message.location().url || page.url()); }); page.on("pageerror", error => recordDiagnostic(page, "page-error", error.message)); page.on("requestfailed", request => recordDiagnostic(page, "request-failed", request.failure()?.errorText || "Request failed", request.url())); page.on("response", response => { if (response.status() >= 400) recordDiagnostic(page, "http-" + response.status(), response.statusText(), response.url()); }); return page; }
 async function newTrackedPage(context) { return trackPage(await context.newPage()); }
 
 export function getCurrentBrowserSessionId() {
@@ -56,7 +59,7 @@ async function createContext() {
 async function getSession(sessionId) {
   let session = sessions.get(sessionId);
   if (!session) {
-    session = { id: sessionId, context: await createContext(), page: null, createdAt: new Date().toISOString(), lastUsedAt: null, expiresAt: null };
+    session = { id: sessionId, context: await createContext(), page: null, recentlyClosed: [], createdAt: new Date().toISOString(), lastUsedAt: null, expiresAt: null };
     sessions.set(sessionId, session);
   }
   touch(session);
@@ -79,7 +82,7 @@ export async function createBrowserSession(name = "New session") {
   try {
     const id = randomUUID();
     const context = await createContext();
-    const session = { id, name: String(name || "New session").trim().slice(0, 60) || "New session", context, page: null, createdAt: new Date().toISOString(), lastUsedAt: null, expiresAt: null };
+    const session = { id, name: String(name || "New session").trim().slice(0, 60) || "New session", context, page: null, recentlyClosed: [], createdAt: new Date().toISOString(), lastUsedAt: null, expiresAt: null };
     sessions.set(id, session);
     touch(session);
     return publicSession(session);
@@ -144,10 +147,56 @@ export async function closeBrowserTab(index, approved) {
   const session = await getSession(getCurrentBrowserSessionId()); const pages = session.context.pages();
   if (!Number.isInteger(index) || index < 0 || index >= pages.length) throw Object.assign(new Error("Browser tab index is out of range."), { statusCode: 404 });
   if (pages.length <= 1) throw Object.assign(new Error("The last tab cannot be closed. Open another tab first."), { statusCode: 409 });
-  const closing = pages[index], wasActive = closing === session.page; await closing.close();
+  const closing = pages[index], wasActive = closing === session.page;\n  session.recentlyClosed ||= [];\n  session.recentlyClosed.unshift({ url: closing.url(), title: await closing.title().catch(() => ""), closedAt: new Date().toISOString() });\n  session.recentlyClosed.length = Math.min(session.recentlyClosed.length, 10);\n  await closing.close();
   const remaining = session.context.pages();
   if (wasActive || !session.page || session.page.isClosed()) { session.page = remaining[Math.min(index, remaining.length - 1)]; await session.page.bringToFront(); }
   return { index, closed: true, activeUrl: session.page.url() };
+}
+
+
+export async function getPageDiagnostics(limit = 100) {
+  const page = await getPage();
+  return (diagnosticsByPage.get(page) || []).slice(0, Math.max(1, Math.min(100, Number(limit) || 100)));
+}
+export async function clearPageDiagnostics() {
+  const page = await getPage();
+  const rows = diagnosticsByPage.get(page) || [];
+  const cleared = rows.length;
+  diagnosticsByPage.set(page, []);
+  return { cleared };
+}
+export async function listRecentlyClosedTabs() {
+  const session = await getSession(getCurrentBrowserSessionId());
+  return (session.recentlyClosed || []).map(item => ({ ...item }));
+}
+export async function duplicateBrowserTab(index) {
+  const session = await getSession(getCurrentBrowserSessionId());
+  const pages = session.context.pages();
+  if (!Number.isInteger(index) || index < 0 || index >= pages.length) throw Object.assign(new Error("Browser tab index is out of range."), { statusCode: 404 });
+  const source = pages[index];
+  const url = source.url();
+  const page = await newTrackedPage(session.context);
+  page.setDefaultTimeout(12000);
+  if (url.startsWith("http://") || url.startsWith("https://")) await page.goto(validateHttpUrl(url).href, { waitUntil: "domcontentloaded" });
+  session.page = page;
+  return { index: session.context.pages().indexOf(page), title: await page.title().catch(() => ""), url: page.url(), active: true };
+}
+export async function reopenClosedBrowserTab(approved) {
+  if (approved !== true) throw Object.assign(new Error("Explicit approval is required to reopen a closed tab."), { statusCode: 403 });
+  const session = await getSession(getCurrentBrowserSessionId());
+  const item = (session.recentlyClosed || []).shift();
+  if (!item) throw Object.assign(new Error("There are no recently closed tabs to restore."), { statusCode: 404 });
+  const page = await newTrackedPage(session.context);
+  page.setDefaultTimeout(12000);
+  try {
+    await page.goto(validateHttpUrl(item.url).href, { waitUntil: "domcontentloaded" });
+    session.page = page;
+    return { restored: true, tab: { index: session.context.pages().indexOf(page), title: await page.title().catch(() => item.title), url: page.url(), active: true } };
+  } catch (error) {
+    session.recentlyClosed.unshift(item);
+    await page.close().catch(() => {});
+    throw error;
+  }
 }
 
 export function getBrowserStatus() {
