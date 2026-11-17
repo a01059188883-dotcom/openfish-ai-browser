@@ -30,3 +30,7 @@ Diagnostics are attached to Playwright pages and held in bounded in-memory buffe
 
 ## Workspaces, downloads, and privacy (v2.4.0)
 Workspace snapshots persist only public tab URLs and titles; restore creates new tabs and does not attempt to restore cookies, form values, or in-memory page state. Managed downloads are written beneath `.openfish/downloads`, use sanitized generated filenames, require an explicitly approved unique visible link, and are capped at 25 MB per file and 500 MB total managed files. Deleting a managed download checks that its stored path remains inside the managed directory. Session privacy clearing requires approval and clears cookies plus per-page web storage/cache/service-worker/IndexedDB data in the selected isolated browser context. It does not clear the separate OpenFish browser library.
+
+
+## Command center and portable backups (v2.5.0)
+The side-panel command palette is a local UI feature. Browser-library export includes only local library records and workspace metadata; it excludes cookies, browser session credentials, and downloaded file contents/paths. Import is a merge operation, capped at 1 MB, with every URL revalidated through the shared public HTTP(S) URL validator. The import endpoint requires explicit approval.
