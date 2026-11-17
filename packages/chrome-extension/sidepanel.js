@@ -95,7 +95,9 @@ async function refreshTabs() {
     }
   } catch(error) { list.textContent = "标签页读取失败：" + error.message; }
 }
-$("refreshTabs").addEventListener("click", refreshTabs);\n$("tabsSearch").addEventListener("input", refreshTabs);\n$("restoreClosedTab").addEventListener("click", async () => { if (!window.confirm("恢复最近关闭的标签页？")) return; try { await request("/api/mcp/reopen_closed_tab", {approved:true}); await refreshTabs(); } catch(e) { $("tabsList").textContent = e.message; } });
+$("refreshTabs").addEventListener("click", refreshTabs);
+$("tabsSearch").addEventListener("input", refreshTabs);
+$("restoreClosedTab").addEventListener("click", async () => { if (!window.confirm("恢复最近关闭的标签页？")) return; try { await request("/api/mcp/reopen_closed_tab", {approved:true}); await refreshTabs(); } catch(e) { $("tabsList").textContent = e.message; } });
 $("newTab").addEventListener("click", async () => {
   const button = $("newTab"); button.disabled = true;
   try { const url = $("newTabUrl").value.trim(); await request("/api/mcp/new_tab", url ? {url} : {}); $("newTabUrl").value = ""; await refreshTabs(); }
