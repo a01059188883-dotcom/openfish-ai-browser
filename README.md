@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.4.0**.
+Open-source, free-first browser automation starter. Version: **2.5.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -148,3 +148,7 @@ The active page now records a bounded, in-memory diagnostic stream of console wa
 
 ## Workspaces, downloads, and privacy controls (v2.4.0)
 OpenFish can save the current tab URLs as named local workspaces and restore them into new tabs without closing the current session. The download manager can save a file only from one unique visible link after explicit approval, stores files in `.openfish/downloads`, enforces a 25 MB per-file and 500 MB total managed-storage limit by default, and supports explicit file deletion. A session privacy action clears cookies and site storage for the active isolated browser context; it does not erase bookmarks, history, reading-list items, or managed downloads. These capabilities are exposed through MCP and provider-neutral AI tool adapters.
+
+
+## Command center and portable browser backups (v2.5.0)
+The Chrome side panel now has a searchable command center (Ctrl/⌘+K), keyboard shortcuts, and in-page text search. Browser-library backups can be exported as JSON and merged back after confirmation. Backups include bookmarks, history, reading-list items, tab organization, and workspace snapshots; they exclude cookies, session credentials, and downloaded files. Imports are limited to 1 MB and validate public HTTP(S) URLs before merging.
