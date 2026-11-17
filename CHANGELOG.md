@@ -178,3 +178,11 @@
 - Changed screenshot results from temporary filesystem paths to self-contained image data, avoiding ambiguous file locations for MCP clients.
 - Kept screenshot capture available through the shared bridge, stdio MCP, Streamable HTTP MCP, and provider-neutral adapters.
 - Synchronized package, runtime, Worker, MCP, extension, dashboard, README, changelog, and regression-test version markers to 2.1.0.
+
+
+## 2.2.0 - 2026-11-17
+- Added a private local browser library for bookmarks, browsing history, and a read-later list with bounded history retention and atomic persistence.
+- Added per-URL tab grouping labels and pinned-state organization in the Chrome side panel.
+- Exposed browser-library actions through the shared bridge, MCP stdio/HTTP, REST, and provider-neutral AI tool adapters.
+- Added explicit approval checks for destructive library operations and tab-organization changes.
+- Synchronized package, extension, runtime, Worker, MCP, dashboard, docs, and test release markers to 2.2.0.
