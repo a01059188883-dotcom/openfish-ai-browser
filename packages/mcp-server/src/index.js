@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const server = new McpServer({ name: "openfish-ai-browser", version: "2.1.0" });
+const server = new McpServer({ name: "openfish-ai-browser", version: "2.2.0" });
 const result = value => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
 
 async function bridgeRequest(path, options = {}) {
@@ -70,5 +70,15 @@ server.tool("list_tabs", "List tabs in the shared browser session.", {}, async (
 server.tool("new_tab", "Open a new tab, optionally at a public HTTP(S) URL.", { url: z.string().url().optional() }, async args => result(await bridgeRequest("/api/mcp/new_tab", { method: "POST", body: args })));
 server.tool("switch_tab", "Switch active tab by its current list index.", { index: z.number().int().min(0) }, async args => result(await bridgeRequest("/api/mcp/switch_tab", { method: "POST", body: args })));
 server.tool("close_tab", "Close a tab only after explicit approval. The last tab cannot be closed.", { index: z.number().int().min(0), approved: z.literal(true) }, async args => result(await bridgeRequest("/api/mcp/close_tab", { method: "POST", body: args })));
+
+server.tool("list_bookmarks", "List local browser bookmarks.", { query: z.string().max(200).optional() }, async args => result(await bridgeRequest("/api/library/bookmarks" + (args.query ? "?q=" + encodeURIComponent(args.query) : ""), undefined, "GET")));
+server.tool("add_bookmark", "Save a public URL as a local bookmark.", { url: z.string().url(), title: z.string().max(180).optional() }, async args => result(await bridgeRequest("/api/library/bookmarks/add", { method: "POST", body: args })));
+server.tool("remove_bookmark", "Remove a bookmark after explicit approval.", { id: z.string(), approved: z.literal(true) }, async args => result(await bridgeRequest("/api/library/bookmarks/remove", { method: "POST", body: args })));
+server.tool("list_history", "Search local browsing history.", { query: z.string().max(200).optional(), limit: z.number().int().min(1).max(500).optional() }, async args => result(await bridgeRequest("/api/library/history?limit=" + (args.limit || 100) + (args.query ? "&q=" + encodeURIComponent(args.query) : ""), undefined, "GET")));
+server.tool("clear_history", "Clear local history after explicit approval.", { approved: z.literal(true) }, async args => result(await bridgeRequest("/api/library/history/clear", { method: "POST", body: args })));
+server.tool("list_reading_list", "List pages saved for later reading.", {}, async () => result(await bridgeRequest("/api/library/reading-list", undefined, "GET")));
+server.tool("add_reading_item", "Save a page for later reading.", { url: z.string().url(), title: z.string().max(180).optional(), note: z.string().max(500).optional() }, async args => result(await bridgeRequest("/api/library/reading-list/add", { method: "POST", body: args })));
+server.tool("remove_reading_item", "Remove a reading-list item after explicit approval.", { id: z.string(), approved: z.literal(true) }, async args => result(await bridgeRequest("/api/library/reading-list/remove", { method: "POST", body: args })));
+server.tool("organize_tab", "Assign a tab to a group and/or pin it after explicit approval.", { url: z.string().url(), groupName: z.string().max(40).optional(), pinned: z.boolean().optional(), approved: z.literal(true) }, async args => result(await bridgeRequest("/api/library/tab/organize", { method: "POST", body: args })));
 
 await server.connect(new StdioServerTransport());
