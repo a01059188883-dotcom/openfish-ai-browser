@@ -202,3 +202,11 @@
 - Added an approval-gated session privacy action to clear cookies, local/session storage, caches, service workers, and IndexedDB for the active isolated browser session.
 - Exposed new operations through the bridge, MCP stdio/HTTP, REST, and AI tool adapters; added side-panel management UI.
 - Synchronized package, extension, runtime, Worker, MCP, dashboard, docs, and tests to 2.4.0.
+
+
+## 2.5.0 - 2026-11-17
+- Added a searchable command palette and keyboard shortcuts for common browser actions.
+- Added in-page text search controls to the Chrome side panel.
+- Added portable JSON export/import for bookmarks, history, reading list, tab organization, and workspaces; imports merge data, validate public URLs, and require explicit approval.
+- Backups exclude cookies, credentials, and downloaded files and enforce a 1 MB import limit.
+- Exposed backup operations through REST and MCP; synchronized all release markers to 2.5.0.
