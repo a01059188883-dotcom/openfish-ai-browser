@@ -8,6 +8,7 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   const config = await readFile(resolve("cloudflare/wrangler.toml"), "utf8");
   const html = await readFile(resolve("public/index.html"), "utf8");
   const app = await readFile(resolve("public/app.js"), "utf8");
+  const admin = await readFile(resolve("cloudflare/mobile-admin.html"), "utf8");
   assert.ok(config.includes('[browser]'));
   assert.ok(config.includes('binding = "BROWSER"'));
   assert.ok(config.includes('[assets]'));
@@ -23,4 +24,8 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(app.includes("data:image/jpeg;base64,"));
   assert.ok(app.includes("/api/cloud-browser/navigate"));
   assert.ok(app.includes("/api/cloud-browser/action"));
+  assert.ok(admin.includes('id="cloudStatus"'));
+  assert.ok(admin.includes('id="cloudClose"'));
+  assert.ok(admin.includes('sessionStorage.setItem("openfish.relay.token"'));
+  assert.ok(admin.includes('api("/api/cloud-browser/status")'));
 });
