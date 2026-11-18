@@ -63,9 +63,9 @@ export default {
     }
     if (url.pathname.startsWith("/api/cloud-browser/")) {
       if (!authorized(request, env)) return json({ error: "Unauthorized. Supply the relay Bearer token." }, 401);
-      const allowed = new Set(["/api/cloud-browser/status", "/api/cloud-browser/navigate", "/api/cloud-browser/action", "/api/cloud-browser/close"]);
+      const allowed = new Set(["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/navigate", "/api/cloud-browser/action", "/api/cloud-browser/close"]);
       if (!allowed.has(url.pathname)) return json({ error: "Cloud browser route not found." }, 404);
-      if (url.pathname.endsWith("/status") && request.method !== "GET") return json({ error: "Method not allowed." }, 405);
+      if ((url.pathname.endsWith("/status") || url.pathname.endsWith("/view")) && request.method !== "GET") return json({ error: "Method not allowed." }, 405);
       if (!url.pathname.endsWith("/status") && request.method !== "POST") return json({ error: "Method not allowed." }, 405);
       const body = request.method === "POST" ? await request.text() : "";
       if (body.length > 16000) return json({ error: "Request too large." }, 413);
@@ -199,6 +199,14 @@ export class OpenFishRelay {
       const shot = await page.screenshot({ type: "jpeg", quality: 62, fullPage: false });
       return { ...details, screenshot: bytesToBase64(new Uint8Array(shot)), screenshotType: "image/jpeg" };
     };
+    if (url.pathname === "/cloud/view") {
+      let browser;
+      try {
+        const connected = await getBrowser(); browser = connected.browser;
+        return jsonResponse({ ok: true, ...(await snapshot(connected.page)) });
+      } catch (error) { return jsonResponse({ error: String(error?.message || error).slice(0, 500) }, 502); }
+      finally { if (browser) { try { await browser.disconnect(); } catch {} } }
+    }
     if (url.pathname === "/cloud/status") {
       const id = await this.ctx.storage.get("cloudBrowserSessionId");
       if (!id) return jsonResponse({ ok: true, connected: false, provider: "Cloudflare Browser Run", version: VERSION, freeAllowance: "10 minutes/day on Workers Free" });
