@@ -1,7 +1,7 @@
 import mobileAdminHtml from "./mobile-admin.html";
 import { acquire, connect } from "@cloudflare/playwright";
 
-const VERSION = "2.9.0";
+const VERSION = "2.10.0";
 const MAX_BODY_BYTES = 512 * 1024;
 const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/browser/sessions"]);
 const ALLOWED_PATH = path => path === "/mcp" || path === "/health" ||
@@ -193,6 +193,28 @@ export class OpenFishRelay {
   async handleCloudBrowser(request) {
     const url = new URL(request.url);
     const jsonResponse = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+    // Optional self-hosted Playwright engine takes priority when both secrets are configured.
+    // Cloudflare Browser Run remains the fallback, preserving existing deployments.
+    if (this.env.BROWSER_ENGINE_URL && this.env.BROWSER_ENGINE_TOKEN) {
+      const endpoint = new URL(url.pathname.slice("/cloud".length), this.env.BROWSER_ENGINE_URL.endsWith("/") ? this.env.BROWSER_ENGINE_URL : this.env.BROWSER_ENGINE_URL + "/");
+      const method = url.pathname === "/cloud/status" || url.pathname === "/cloud/view" ? "GET" : "POST";
+      const body = method === "POST" ? await request.text() : undefined;
+      if (body && body.length > 16000) return jsonResponse({ error: "Request too large." }, 413);
+      try {
+        const upstream = await fetch(endpoint, {
+          method,
+          headers: { "authorization": "Bearer " + this.env.BROWSER_ENGINE_TOKEN, ...(body ? { "content-type": "application/json" } : {}) },
+          body,
+          signal: AbortSignal.timeout(35000)
+        });
+        const headers = new Headers(upstream.headers);
+        headers.set("cache-control", "no-store");
+        headers.set("x-openfish-version", VERSION);
+        return new Response(upstream.body, { status: upstream.status, headers });
+      } catch (error) {
+        return jsonResponse({ error: "Self-hosted browser engine unavailable: " + String(error?.message || error).slice(0, 250), code: "ENGINE_UNAVAILABLE" }, 502);
+      }
+    }
     const validateTarget = raw => {
       let target;
       try { target = new URL(raw); } catch { throw new Error("请输入有效的网址"); }
