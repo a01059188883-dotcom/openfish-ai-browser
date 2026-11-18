@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { once } from "node:events";
+import { fileURLToPath } from "node:url";
 
 test("self-hosted engine requires a long private token and exposes authenticated health", async t => {
   const port = 19000 + Math.floor(Math.random() * 1000);
@@ -9,16 +9,16 @@ test("self-hosted engine requires a long private token and exposes authenticated
   const child = spawn(process.execPath, ["server.js"], {
     cwd: new URL(".", import.meta.url).pathname.replace(/\/test\/$/, ""),
     env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", OPENFISH_ENGINE_TOKEN: token },
-    stdio: "ignore"
+    stdio: ["ignore", "pipe", "pipe"]
   });
-  t.after(() => child.kill("SIGTERM"));
+  let childError = "";\n  child.stderr.setEncoding("utf8");\n  child.stderr.on("data", chunk => { childError += chunk; });\n  t.after(() => child.kill("SIGTERM"));
   const base = `http://127.0.0.1:${port}`;
   let ready = false;
   for (let i = 0; i < 40; i++) {
     try { const r = await fetch(base + "/health"); if (r.ok) { ready = true; break; } } catch {}
     await new Promise(resolve => setTimeout(resolve, 100));
   }
-  assert.equal(ready, true, "engine should start");
+  assert.equal(ready, true, "engine should start: " + childError);
   const denied = await fetch(base + "/status");
   assert.equal(denied.status, 401);
   const allowed = await fetch(base + "/health", { headers: { authorization: "Bearer " + token } });
