@@ -1,7 +1,7 @@
 import mobileAdminHtml from "./mobile-admin.html";
-import puppeteer from "@cloudflare/puppeteer";
+import { acquire, connect } from "@cloudflare/playwright";
 
-const VERSION = "2.8.0";
+const VERSION = "2.9.0";
 const MAX_BODY_BYTES = 512 * 1024;
 const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/browser/sessions"]);
 const ALLOWED_PATH = path => path === "/mcp" || path === "/health" ||
@@ -212,17 +212,21 @@ export class OpenFishRelay {
       let browser = null;
       const stored = await this.ctx.storage.get("cloudBrowserSessionId");
       if (stored) {
-        try { browser = await puppeteer.connect(this.env.BROWSER, stored); }
+        try { browser = await connect(this.env.BROWSER, stored); }
         catch { await this.ctx.storage.delete("cloudBrowserSessionId"); }
       }
       if (!browser) {
-        browser = await puppeteer.launch(this.env.BROWSER, { keep_alive: 1200000 });
-        await this.ctx.storage.put("cloudBrowserSessionId", browser.sessionId());
+        const acquired = await acquire(this.env.BROWSER);
+        browser = await connect(this.env.BROWSER, acquired.sessionId);
+        await this.ctx.storage.put("cloudBrowserSessionId", acquired.sessionId);
       }
-      let pages = await browser.pages();
+      const pages = browser.contexts().flatMap(context => context.pages());
       let page = pages[0];
-      if (!page) page = await browser.newPage();
-      await page.setViewport({ width: 1280, height: 820 });
+      if (!page) {
+        const context = browser.contexts()[0] || await browser.newContext();
+        page = await context.newPage();
+      }
+      await page.setViewportSize({ width: 1280, height: 820 });
       return { browser, page };
     };
     const snapshot = async page => {
@@ -242,14 +246,14 @@ export class OpenFishRelay {
         const connected = await getBrowser(); browser = connected.browser;
         return jsonResponse({ ok: true, ...(await snapshot(connected.page)) });
       } catch (error) { return jsonResponse({ error: String(error?.message || error).slice(0, 500) }, 502); }
-      finally { if (browser) { try { await browser.disconnect(); } catch {} } }
+      finally { if (browser) { try { await browser.close(); } catch {} } }
     }
     if (url.pathname === "/cloud/status") {
       const id = await this.ctx.storage.get("cloudBrowserSessionId");
       if (!id) return jsonResponse({ ok: true, connected: false, provider: "Cloudflare Browser Run", version: VERSION, freeAllowance: "10 minutes/day on Workers Free" });
       try {
-        const browser = await puppeteer.connect(this.env.BROWSER, id);
-        const pages = await browser.pages();
+        const browser = await connect(this.env.BROWSER, id);
+        const pages = browser.contexts().flatMap(context => context.pages());
         const current = pages[0] ? await pages[0].url() : "";
         await browser.disconnect();
         return jsonResponse({ ok: true, connected: true, currentUrl: current, provider: "Cloudflare Browser Run", version: VERSION, freeAllowance: "10 minutes/day on Workers Free" });
@@ -260,7 +264,7 @@ export class OpenFishRelay {
     }
     if (url.pathname === "/cloud/close") {
       const id = await this.ctx.storage.get("cloudBrowserSessionId");
-      if (id) { try { const browser = await puppeteer.connect(this.env.BROWSER, id); await browser.close(); } catch {} }
+      if (id) { try { const browser = await connect(this.env.BROWSER, id); await browser.close(); } catch {} }
       await this.ctx.storage.delete("cloudBrowserSessionId");
       return jsonResponse({ ok: true, closed: true });
     }
