@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.7.0**.
+Open-source, free-first browser automation starter. Version: **2.8.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -156,3 +156,17 @@ The Chrome side panel now has a searchable command center (Ctrl/⌘+K), keyboard
 
 ## Mobile remote admin (v2.6.0)
 Open the Cloudflare Worker URL at `/admin` from iPhone Safari. The mobile dashboard uses the existing relay token as a bearer credential and exposes only bridge status, recent events, isolated browser-session management, and reviewed task planning/execution. The token is stored in `sessionStorage` for the current browser tab session and is cleared when the user disconnects. The Worker serves the static dashboard; all management API requests are authenticated by the relay token and forwarded through the already-connected local relay agent. The local computer must keep the bridge, HTTP MCP server, and relay agent running. This is a single-owner private control panel, not a multi-user SaaS. Do not share the relay token. High-risk browser actions remain blocked by runtime safety rules, and task execution requires explicit confirmation.
+
+
+## First-party plugin browser API (v2.8.0)
+
+The cloud browser can now be called directly by first-party plugins without routing through the mobile UI. The Worker exposes a versioned REST API and an OpenAPI 3.1 discovery document:
+
+- `GET /api/v1/openapi.json` — API schema (public read-only discovery).
+- `GET /api/v1/browser/status` — session status.
+- `GET /api/v1/browser/view` — current URL, page title, visible text, links, and screenshot.
+- `POST /api/v1/browser/navigate` — navigate to a public HTTP(S) URL; JSON body: `{"url":"https://example.com"}`.
+- `POST /api/v1/browser/action` — back/forward/reload/click/type/press/scroll/clickLink actions.
+- `POST /api/v1/browser/close` — close the current cloud browser session.
+
+Send `Authorization: Bearer YOUR_OPENFISH_RELAY_TOKEN` with every browser API request. The token is a private single-owner credential; do not embed it in public client-side code or distribute it to third parties. Browser API CORS is enabled for first-party browser extensions, but CORS is not an authentication boundary. The API is intended for your own trusted plugins. Navigation blocks localhost, private IP literals, and common metadata/local hostnames. Cloudflare Browser Run free usage is limited and may be exhausted; the API does not create unlimited free compute.
