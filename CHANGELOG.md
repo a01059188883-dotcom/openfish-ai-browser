@@ -1,3 +1,10 @@
+## 2.9.0 - 2026-11-18
+- Adopted Cloudflare's Workers-compatible open-source Playwright package as the browser-control adapter for the existing Chromium Browser Run binding.
+- Replaced Puppeteer-specific page/session operations with Playwright browser contexts, pages, and viewport APIs while preserving the existing REST/MCP surface.
+- Enabled nodejs_compat as required by the Cloudflare Playwright runtime.
+- Documented third-party project/license review and excluded incompatible/paid-service dependencies.
+- Synchronized package version and regression tests to 2.9.0.
+
 ## 2.8.0 - 2026-11-18
 - Added a versioned REST API for first-party plugins to control the Cloudflare cloud browser independently of the mobile UI.
 - Added an OpenAPI 3.1 discovery document and CORS preflight support for browser-extension/plugin callers.
