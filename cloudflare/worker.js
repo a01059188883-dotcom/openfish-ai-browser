@@ -66,7 +66,7 @@ export default {
       const allowed = new Set(["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/navigate", "/api/cloud-browser/action", "/api/cloud-browser/close"]);
       if (!allowed.has(url.pathname)) return json({ error: "Cloud browser route not found." }, 404);
       if ((url.pathname.endsWith("/status") || url.pathname.endsWith("/view")) && request.method !== "GET") return json({ error: "Method not allowed." }, 405);
-      if (!url.pathname.endsWith("/status") && request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+      if (!url.pathname.endsWith("/status") && !url.pathname.endsWith("/view") && request.method !== "POST") return json({ error: "Method not allowed." }, 405);
       const body = request.method === "POST" ? await request.text() : "";
       if (body.length > 16000) return json({ error: "Request too large." }, 413);
       return relayStub(env).fetch(new Request("https://relay.internal/cloud" + url.pathname.slice("/api/cloud-browser".length), { method: request.method, headers: { "content-type": "application/json" }, body: body || undefined }));
