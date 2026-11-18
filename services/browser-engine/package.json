@@ -1,0 +1,10 @@
+{
+  "name": "openfish-self-hosted-browser-engine",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-hosted Playwright Chromium engine for OpenFish AI Browser",
+  "scripts": { "start": "node server.js", "test": "node --test test/*.test.js" },
+  "dependencies": { "playwright": "1.58.2" },
+  "engines": { "node": ">=20" }
+}
