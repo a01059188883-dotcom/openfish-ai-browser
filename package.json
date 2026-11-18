@@ -1,6 +1,6 @@
 {
   "name": "openfish-ai-browser",
-  "version": "2.6.1",
+  "version": "2.7.0",
   "private": true,
   "type": "module",
   "description": "Free-first open-source AI browser automation with MCP and Chrome extension",
@@ -15,6 +15,7 @@
     "deploy:relay": "npx wrangler deploy --config cloudflare/wrangler.toml"
   },
   "dependencies": {
+    "@cloudflare/puppeteer": "^2.0.1",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "playwright": "^1.48.0",
     "zod": "^3.23.8",
