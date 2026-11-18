@@ -71,6 +71,7 @@ export default {
       if (body.length > 16000) return json({ error: "Request too large." }, 413);
       return relayStub(env).fetch(new Request("https://relay.internal/cloud" + url.pathname.slice("/api/cloud-browser".length), { method: request.method, headers: { "content-type": "application/json" }, body: body || undefined }));
     }
+    if (env.ASSETS && ["/app.css", "/app.js", "/favicon.ico", "/manifest.webmanifest"].includes(url.pathname)) return env.ASSETS.fetch(request);
     if (url.pathname === "/agent/connect") {
       if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") return json({ error: "WebSocket upgrade required." }, 426);
       if (!authorized(request, env)) return json({ error: "Unauthorized relay agent." }, 401);
