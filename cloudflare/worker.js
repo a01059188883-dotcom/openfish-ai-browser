@@ -1,13 +1,13 @@
 import mobileAdminHtml from "./mobile-admin.html";
 import puppeteer from "@cloudflare/puppeteer";
 
-const VERSION = "2.7.0";
+const VERSION = "2.8.0";
 const MAX_BODY_BYTES = 512 * 1024;
 const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/browser/sessions"]);
 const ALLOWED_PATH = path => path === "/mcp" || path === "/health" ||
   path === "/.well-known/openfish-tools.json" ||
   path === "/api/v1/tools" || path.startsWith("/api/v1/tools/") ||
-  path.startsWith("/api/v1/adapters/") || path === "/api/v1/openapi.json" ||
+  path.startsWith("/api/v1/adapters/") || path === "/api/v1/openapi.json" || path.startsWith("/api/v1/browser/") ||
   ADMIN_PATHS.has(path) || /^\/api\/browser\/sessions\/[A-Za-z0-9_-]+\/close$/.test(path) ||
   path === "/api/plan" || path === "/api/execute";
 
@@ -60,6 +60,43 @@ export default {
         "x-content-type-options": "nosniff", "referrer-policy": "no-referrer",
         "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
       }});
+    }
+    // Public plugin discovery document; all browser operations remain bearer-authenticated.
+    if (url.pathname === "/api/v1/openapi.json" && request.method === "GET") {
+      return new Response(JSON.stringify({
+        openapi: "3.1.0",
+        info: { title: "OpenFish Browser Plugin API", version: VERSION, description: "Private browser API for first-party plugins. Authenticate with the OpenFish relay Bearer token." },
+        servers: [{ url: url.origin }],
+        security: [{ BearerAuth: [] }],
+        components: { securitySchemes: { BearerAuth: { type: "http", scheme: "bearer", bearerFormat: "OpenFish Relay Token" } } },
+        paths: {
+          "/api/v1/browser/status": { get: { summary: "Browser session status", responses: { "200": { description: "Current cloud browser status" } } } },
+          "/api/v1/browser/view": { get: { summary: "Read current page and screenshot", responses: { "200": { description: "Current page snapshot" } } } },
+          "/api/v1/browser/navigate": { post: { summary: "Navigate to a public HTTP(S) URL", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["url"], properties: { url: { type: "string", format: "uri" } } } } } }, responses: { "200": { description: "Navigation result" } } } },
+          "/api/v1/browser/action": { post: { summary: "Interact with the active page", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["action"], properties: { action: { type: "string", enum: ["back", "forward", "reload", "click", "type", "press", "scroll", "clickLink"] }, x: { type: "number" }, y: { type: "number" }, text: { type: "string" }, key: { type: "string" }, deltaY: { type: "number" }, url: { type: "string", format: "uri" } } } } } }, responses: { "200": { description: "Action result" } } } },
+          "/api/v1/browser/close": { post: { summary: "Close the active browser session", responses: { "200": { description: "Session closed" } } } }
+        }
+      }), { headers: { "content-type": "application/vnd.oai.openapi+json;version=3.1", "cache-control": "public, max-age=300", "x-openfish-version": VERSION } });
+    }
+    if (url.pathname.startsWith("/api/v1/browser/")) {
+      const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type", "access-control-max-age": "86400", "cache-control": "no-store" };
+      if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+      if (!authorized(request, env)) return json({ error: "Unauthorized. Supply the OpenFish relay Bearer token." }, 401);
+      const routes = { "/api/v1/browser/status": ["/cloud/status", "GET"], "/api/v1/browser/view": ["/cloud/view", "GET"], "/api/v1/browser/navigate": ["/cloud/navigate", "POST"], "/api/v1/browser/action": ["/cloud/action", "POST"], "/api/v1/browser/close": ["/cloud/close", "POST"] };
+      const route = routes[url.pathname];
+      if (!route) return json({ error: "Browser API route not found." }, 404);
+      if (request.method !== route[1]) return json({ error: "Method not allowed." }, 405);
+      let body;
+      if (request.method === "POST") {
+        const raw = await request.text();
+        if (raw.length > 16000) return json({ error: "Request too large." }, 413);
+        body = raw || "{}";
+      }
+      const response = await relayStub(env).fetch(new Request("https://relay.internal" + route[0], { method: request.method, headers: { "content-type": "application/json" }, body }));
+      const headers = new Headers(response.headers);
+      for (const [key, value] of Object.entries(cors)) headers.set(key, value);
+      headers.set("x-openfish-version", VERSION);
+      return new Response(response.body, { status: response.status, headers });
     }
     if (url.pathname.startsWith("/api/cloud-browser/")) {
       if (!authorized(request, env)) return json({ error: "Unauthorized. Supply the relay Bearer token." }, 401);
