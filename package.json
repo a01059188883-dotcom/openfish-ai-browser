@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Free-first open-source AI browser automation with MCP and Chrome extension",
   "scripts": {
-    "start:bridge": "node packages/runtime/src/bridge.js",
+    "start:bridge": "node --env-file=.env packages/runtime/src/bridge.js",
     "start:mcp": "node packages/mcp-server/src/index.js",
     "check": "node --check packages/runtime/src/bridge.js && node --check packages/runtime/src/browser.js && node --check packages/runtime/src/browser-library.js && node --check packages/runtime/src/download-manager.js && node --check packages/runtime/src/ai-planner.js && node --check packages/runtime/src/safety.js && node --check packages/runtime/src/api-keys.js && node --check packages/runtime/src/client-registry.js && node --check packages/runtime/src/relay-agent.js && node --check cloudflare/worker.js && node --check packages/runtime/src/executor.js && node --check packages/mcp-server/src/index.js && node --check packages/mcp-server/src/http.js && node --check packages/chrome-extension/sidepanel.js && node --check packages/admin/app.js",
     "test": "node --test packages/runtime/test/*.test.js",
