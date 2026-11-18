@@ -1,8 +1,8 @@
 import mobileAdminHtml from "./mobile-admin.html";
 
-const VERSION = "2.6.0";
+const VERSION = "2.6.1";
 const MAX_BODY_BYTES = 512 * 1024;
-const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/browser/sessions"]);
+const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/browser/sessions"]);
 const ALLOWED_PATH = path => path === "/mcp" || path === "/health" ||
   path === "/.well-known/openfish-tools.json" ||
   path === "/api/v1/tools" || path.startsWith("/api/v1/tools/") ||
@@ -67,6 +67,10 @@ export default {
     }
     if (!authorized(request, env)) return json({ error: "Unauthorized. Supply the relay Bearer token." }, 401);
     const path = url.pathname;
+    if (path === "/api/admin/relay-status") {
+      if (request.method !== "GET") return json({ error: "Method not allowed." }, 405);
+      return relayStub(env).fetch("https://relay.internal/status");
+    }
     if (!ALLOWED_PATH(path)) return json({ error: "Relay path is not allowed." }, 404);
     if (path === "/mcp" && !["POST", "GET", "DELETE"].includes(request.method)) return json({ error: "MCP method not supported." }, 405);
     if (path !== "/mcp" && path !== "/health" && !["GET", "POST"].includes(request.method)) return json({ error: "Method not allowed." }, 405);
