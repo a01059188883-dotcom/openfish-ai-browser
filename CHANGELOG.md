@@ -1,3 +1,10 @@
+## 2.8.0 - 2026-11-18
+- Added a versioned REST API for first-party plugins to control the Cloudflare cloud browser independently of the mobile UI.
+- Added an OpenAPI 3.1 discovery document and CORS preflight support for browser-extension/plugin callers.
+- Kept all browser operations behind the private relay Bearer token and retained public-network URL validation.
+- Fixed mobile screenshot coordinate mapping for page clicks.
+- Synchronized package, Worker, mobile frontend, README, changelog, and regression tests to 2.8.0.
+
 ## 2.6.0 - 2026-11-17
 - Added an iPhone-friendly remote admin dashboard at the Cloudflare Worker `/admin` route.
 - Added relay-token-authenticated status, event, session, and reviewed task-control routes; only an explicit allowlist is forwarded to the local agent.
