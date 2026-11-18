@@ -18,7 +18,7 @@ test("self-hosted engine requires a long private token and exposes authenticated
   const base = `http://127.0.0.1:${port}`;
   let ready = false;
   for (let i = 0; i < 40; i++) {
-    try { const r = await fetch(base + "/health"); if (r.ok) { ready = true; break; } } catch {}
+    try { const r = await fetch(base + "/health", { headers: { authorization: "Bearer " + token } }); if (r.ok) { ready = true; break; } } catch {}
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   assert.equal(ready, true, "engine should start: " + childError);
