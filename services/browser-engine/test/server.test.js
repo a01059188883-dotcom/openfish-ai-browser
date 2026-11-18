@@ -7,11 +7,14 @@ test("self-hosted engine requires a long private token and exposes authenticated
   const port = 19000 + Math.floor(Math.random() * 1000);
   const token = "test-only-token-" + "x".repeat(40);
   const child = spawn(process.execPath, ["server.js"], {
-    cwd: new URL(".", import.meta.url).pathname.replace(/\/test\/$/, ""),
+    cwd: fileURLToPath(new URL("../", import.meta.url)),
     env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", OPENFISH_ENGINE_TOKEN: token },
     stdio: ["ignore", "pipe", "pipe"]
   });
-  let childError = "";\n  child.stderr.setEncoding("utf8");\n  child.stderr.on("data", chunk => { childError += chunk; });\n  t.after(() => child.kill("SIGTERM"));
+  let childError = "";
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", chunk => { childError += chunk; });
+  t.after(() => child.kill("SIGTERM"));
   const base = `http://127.0.0.1:${port}`;
   let ready = false;
   for (let i = 0; i < 40; i++) {
