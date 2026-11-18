@@ -12,8 +12,3 @@ new_sqlite_classes = ["OpenFishRelay"]
 
 [vars]
 OPENFISH_RELAY_PROTOCOL = "openfish-relay/1"
-
-[[rules]]
-type = "Text"
-globs = ["mobile-admin.html"]
-fallthrough = false
