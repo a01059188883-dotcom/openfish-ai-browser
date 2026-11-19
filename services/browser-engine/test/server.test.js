@@ -39,7 +39,7 @@ test("self-hosted engine requires a long private token and exposes authenticated
   assert.equal(allowed.status, 200);
   const health = await allowed.json();
   assert.equal(health.engine, "OpenFish Self-hosted Playwright");
-  assert.equal(health.version, "1.3.2");
+  assert.equal(health.version, "1.3.3");
 });
 
 test("self-hosted engine exposes real multi-tab management actions", async () => {
