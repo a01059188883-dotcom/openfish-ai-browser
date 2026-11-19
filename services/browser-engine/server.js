@@ -6,6 +6,7 @@ import { pipeline } from "node:stream/promises";
 import { basename, join } from "node:path";
 import { chromium } from "playwright";
 import { validateTarget } from "./network-policy.js";
+import { deleteCompletedDownload, validateDownloadStorage } from "./download-storage.js";
 
 const PORT = Number(process.env.PORT || 8788);
 const TOKEN = process.env.OPENFISH_ENGINE_TOKEN || "";
@@ -67,31 +68,6 @@ async function createSession(id) {
   const session = { id, context, page, downloads: new Map(), busy: false, lastUsedAt: Date.now(), createdAt: Date.now() };
   sessions.set(id, session);
   return session;
-}
-async function validateDownloadStorage() {
-  if (!DOWNLOADS_DIR) {
-    if (REQUIRE_DOWNLOADS_TMPFS) throw new Error("Required bounded download storage path is not configured.");
-    return { mode: "playwright-default" };
-  }
-  await mkdir(DOWNLOADS_DIR, { recursive: true });
-  const fsInfo = await statfs(DOWNLOADS_DIR);
-  const capacityBytes = fsInfo.bsize * fsInfo.blocks;
-  if (REQUIRE_DOWNLOADS_TMPFS && fsInfo.type !== 0x01021994) {
-    throw new Error("Required download storage is not a Linux tmpfs volume.");
-  }
-  const probe = join(DOWNLOADS_DIR, ".openfish-write-check-" + randomUUID());
-  await writeFile(probe, "ok", { flag: "wx" });
-  await unlink(probe);
-  if (REQUIRE_DOWNLOADS_TMPFS && capacityBytes > 64 * 1024 * 1024 + fsInfo.bsize) {
-    throw new Error("Download tmpfs capacity exceeds the configured 64 MiB safety ceiling.");
-  }
-  return { mode: REQUIRE_DOWNLOADS_TMPFS ? "required-tmpfs" : "configured", capacityBytes };
-}
-async function deleteCompletedDownload(download, path) {
-  // download.path() resolves only after completion; cancel() cannot remove a completed file.
-  await download.delete().catch(async () => {
-    await unlink(path).catch(error => { if (error.code !== "ENOENT") throw error; });
-  });
 }
 async function reapExpired() {
   const now = Date.now();
@@ -282,7 +258,7 @@ if (TOKEN.length < 32) {
 }
 const server = http.createServer((req, res) => { handle(req, res).catch(error => { if (res.headersSent || res.destroyed) { if (!res.destroyed) res.destroy(error); } else send(res, 500, { error: String(error?.message || error) }); }); });
 try {
-  downloadStorage = await validateDownloadStorage();
+  downloadStorage = await validateDownloadStorage({ directory: DOWNLOADS_DIR, required: REQUIRE_DOWNLOADS_TMPFS });
   server.listen(PORT, HOST, () => console.log(`OpenFish self-hosted browser engine listening on ${HOST}:${PORT}`));
 } catch (error) {
   console.error("Download storage preflight failed:", error);
