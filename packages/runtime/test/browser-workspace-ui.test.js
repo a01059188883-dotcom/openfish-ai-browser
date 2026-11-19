@@ -7,7 +7,7 @@ const app = await readFile(new URL("../../../public/app.js", import.meta.url), "
 const css = await readFile(new URL("../../../public/app.css", import.meta.url), "utf8");
 
 test("mobile browser workspace exposes the core navigation and library controls", () => {
-  for (const id of ["url", "searchEngine", "back", "forward", "reload", "reader", "screenshot", "bookmark", "copyText", "bookmarks", "history", "clearHistory"]) {
+  for (const id of ["url", "searchEngine", "back", "forward", "reload", "reader", "screenshot", "bookmark", "copyText", "bookmarks", "history", "clearHistory", "tabs", "addTab"]) {
     assert.match(html, new RegExp('id="' + id + '"'));
   }
 });
@@ -17,6 +17,10 @@ test("mobile browser workspace preserves legacy bookmarks and stores local histo
   assert.match(app, /HISTORY_KEY="openfish\.history\.v1"/);
   assert.match(app, /recordHistory\(/);
   assert.match(app, /searchEngineSetting/);
+  assert.match(app, /function renderTabs/);
+  assert.match(app, /action:"newTab"/);
+  assert.match(app, /action:"switchTab"/);
+  assert.match(app, /action:"closeTab"/);
 });
 
 test("mobile browser workspace has responsive library and reader layouts", () => {
