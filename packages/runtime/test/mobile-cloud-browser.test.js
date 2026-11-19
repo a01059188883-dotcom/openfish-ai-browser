@@ -19,7 +19,7 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(worker.includes('/api/v1/browser/action'));
   assert.ok(worker.includes('/api/v1/openapi.json'));
   assert.ok(worker.includes('access-control-allow-origin'));
-  assert.ok(worker.includes('const VERSION = "2.10.1"'));
+  assert.ok(worker.includes('const VERSION = "2.11.0"'));
   assert.ok(worker.includes('if (!authorized(request, env))'));
   assert.ok(worker.includes('acquire(this.env.BROWSER)'));
   assert.ok(worker.includes('connect(this.env.BROWSER, acquired.sessionId)'));
