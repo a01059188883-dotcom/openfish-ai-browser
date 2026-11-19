@@ -150,9 +150,9 @@ async function handle(req, res) {
       const path = await download.path();
       if (!path) throw Object.assign(new Error("The browser did not provide a completed download file."), { statusCode: 502 });
       const info = await stat(path);
-      if (info.size > MAX_DOWNLOAD_BYTES) throw Object.assign(new Error("Download exceeds the 15 MB per-file limit."), { statusCode: 413 });
+      if (info.size > MAX_DOWNLOAD_BYTES) { await download.cancel().catch(() => {}); throw Object.assign(new Error("Download exceeds the 15 MB per-file limit."), { statusCode: 413 }); }
       const used = [...session.downloads.values()].reduce((sum, item) => sum + item.size, 0);
-      if (used + info.size > MAX_SESSION_DOWNLOAD_BYTES) throw Object.assign(new Error("Session download storage is full (50 MB). Remove older downloads first."), { statusCode: 507 });
+      if (used + info.size > MAX_SESSION_DOWNLOAD_BYTES) { await download.cancel().catch(() => {}); throw Object.assign(new Error("Session download storage is full (50 MB). Remove older downloads first."), { statusCode: 507 }); }
       const data = await readFile(path);
       const id = randomUUID();
       const filename = basename(String(download.suggestedFilename() || "download")).replace(/[\\x00-\\x1f\\x7f<>:"|?*]/g, "_").slice(0, 120) || "download";
