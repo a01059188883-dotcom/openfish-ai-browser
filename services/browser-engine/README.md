@@ -45,7 +45,7 @@ Browserless's self-hosted Docker image is another option, but its repository use
 - Do not use this engine to bypass CAPTCHAs, authentication, paywalls, or site restrictions.
 - Session contexts are isolated from one another in memory, but the shared bearer token is a service credential, not end-user identity. Do not expose it to untrusted clients or treat this as a complete multi-tenant identity system.
 
-## Network request policy and tab lifecycle (engine 1.3.1)
+## Network request policy and tab lifecycle (engine 1.3.2)
 
 The engine validates the initial navigation URL and installs a browser-context request guard. The guard revalidates HTTP(S) destinations for page requests, subresources, and redirect hops; service workers are disabled so they cannot bypass the context route. Browser WebSocket connections are blocked. Private, loopback, link-local, metadata, multicast, and special-purpose IPv4/IPv6 ranges are rejected.
 
