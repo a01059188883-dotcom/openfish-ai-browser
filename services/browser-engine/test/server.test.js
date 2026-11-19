@@ -69,7 +69,9 @@ test("cloud download API is approval-gated and bounded per session", async () =>
   assert.match(server, /MAX_DOWNLOAD_BYTES = 15 \* 1024 \* 1024/);
   assert.match(server, /MAX_SESSION_DOWNLOAD_BYTES = 50 \* 1024 \* 1024/);
   assert.match(server, /session\.downloads\.set\(id, record\)/);
-  assert.match(server, /url\.pathname === "\/downloads\/remove"/);\n  assert.match(server, /url\.pathname === "\/downloads\/file"/);\n  assert.match(server, /Explicit approval is required to retrieve a download/);
+  assert.match(server, /url\.pathname === "\/downloads\/remove"/);
+  assert.match(server, /url\.pathname === "\/downloads\/file"/);
+  assert.match(server, /Explicit approval is required to retrieve a download/);
 });
 
 test("mobile downloads remain resumable and require an explicit save tap", async () => {
