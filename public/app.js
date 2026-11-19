@@ -1,7 +1,8 @@
 (()=>{
 "use strict";
-const $=id=>document.getElementById(id), TOKEN_KEY="openfish.relay.token", BOOKMARK_KEY="openfish.bookmarks", HISTORY_KEY="openfish.history.v1", READING_KEY="openfish.readingList.v1", SEARCH_KEY="openfish.searchEngine";
-let token=sessionStorage.getItem(TOKEN_KEY)||"",currentUrl="",lastView=null,busy=false,readerMode=false;
+const $=id=>document.getElementById(id), TOKEN_KEY="openfish.relay.token", BOOKMARK_KEY="openfish.bookmarks", HISTORY_KEY="openfish.history.v1", READING_KEY="openfish.readingList.v1", SEARCH_KEY="openfish.searchEngine", SESSION_KEY="openfish.browser.session";
+let token=sessionStorage.getItem(TOKEN_KEY)||"",sessionId=sessionStorage.getItem(SESSION_KEY)||"",currentUrl="",lastView=null,busy=false,readerMode=false;
+if(!/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)){sessionId=crypto.randomUUID();sessionStorage.setItem(SESSION_KEY,sessionId)}
 const readStore=(key,fallback)=>{try{const v=JSON.parse(localStorage.getItem(key)||"null");return Array.isArray(v)?v:fallback}catch{return fallback}};
 let bookmarks=readStore(BOOKMARK_KEY,[]),historyItems=readStore(HISTORY_KEY,[]),readingItems=readStore(READING_KEY,[]);
 const toast=message=>{const el=$("toast");el.textContent=String(message);el.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>el.classList.remove("show"),2600)};
@@ -9,7 +10,7 @@ const setState=(message,provider)=>{$("state").textContent=message;if(provider)$
 const save=(key,value)=>localStorage.setItem(key,JSON.stringify(value));
 async function api(path,body){
  if(!token){token=prompt("请输入 Cloudflare Relay Token（与管理后台使用的 Token 相同）")||"";if(!token)throw Error("需要 Relay Token 才能使用云端浏览器");sessionStorage.setItem(TOKEN_KEY,token)}
- const response=await fetch(path,{method:body===undefined?"GET":"POST",headers:{"Authorization":"Bearer "+token,...(body===undefined?{}:{"Content-Type":"application/json"})},body:body===undefined?undefined:JSON.stringify(body),cache:"no-store"});
+ const response=await fetch(path,{method:body===undefined?"GET":"POST",headers:{"Authorization":"Bearer "+token,"X-OpenFish-Session":sessionId,...(body===undefined?{}:{"Content-Type":"application/json"})},body:body===undefined?undefined:JSON.stringify(body),cache:"no-store"});
  const data=await response.json().catch(()=>({}));
  if(!response.ok){if(response.status===401){sessionStorage.removeItem(TOKEN_KEY);token=""}throw Error(data.error||("HTTP "+response.status))}
  return data;
