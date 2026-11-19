@@ -270,6 +270,7 @@ async function handle(req, res) {
     }
     return send(res, 200, { ...(await snapshot(session.page)), tabs: await listTabs(session), activeIndex: session.context.pages().indexOf(session.page), sessionId: id });
   } catch (error) {
+    if (res.headersSent || res.destroyed) { if (!res.destroyed) res.destroy(error); return; }
     return send(res, error.statusCode || 502, { error: String(error?.message || error).slice(0, 500), code: /429|limit|quota/i.test(String(error)) ? "BROWSER_LIMIT" : "BROWSER_ERROR" });
   } finally {
     if (session) { session.busy = false; session.lastUsedAt = Date.now(); }
@@ -279,7 +280,7 @@ if (TOKEN.length < 32) {
   console.error("OPENFISH_ENGINE_TOKEN must be set to a random secret of at least 32 characters.");
   process.exit(1);
 }
-const server = http.createServer((req, res) => { handle(req, res).catch(error => send(res, 500, { error: String(error?.message || error) })); });
+const server = http.createServer((req, res) => { handle(req, res).catch(error => { if (res.headersSent || res.destroyed) { if (!res.destroyed) res.destroy(error); } else send(res, 500, { error: String(error?.message || error) }); }); });
 try {
   downloadStorage = await validateDownloadStorage();
   server.listen(PORT, HOST, () => console.log(`OpenFish self-hosted browser engine listening on ${HOST}:${PORT}`));
