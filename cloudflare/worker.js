@@ -1,7 +1,7 @@
 import mobileAdminHtml from "./mobile-admin.html";
 import { acquire, connect } from "@cloudflare/playwright";
 
-const VERSION = "2.10.0";
+const VERSION = "2.10.1";
 const MAX_BODY_BYTES = 512 * 1024;
 const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/browser/sessions"]);
 const ALLOWED_PATH = path => path === "/mcp" || path === "/health" ||
