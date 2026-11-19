@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 test("Docker image includes the extracted network policy module", async () => {
   const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
-  assert.ok(dockerfile.includes("COPY server.js network-policy.js ./"));
+  assert.ok(dockerfile.includes("COPY server.js network-policy.js download-storage.js ./"));
 });
 
 test("self-hosted engine requires a long private token and exposes authenticated health", async t => {
@@ -150,8 +150,8 @@ test("mobile download refresh revokes stale object URLs", async () => {
 
 test("completed downloads rejected by either storage limit are deleted", async () => {
   const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
-  assert.match(server, /async function deleteCompletedDownload\(download, path\)/);
-  assert.match(server, /await download\.delete\(\)\.catch\(async \(\) =>/);
+  assert.match(server, /import \{ deleteCompletedDownload, validateDownloadStorage \} from "\.\/download-storage\.js"/);
+  assert.match(server, /await deleteCompletedDownload\(download, path\)/);
   assert.match(server, /if \(info\.size > MAX_DOWNLOAD_BYTES\) \{ await deleteCompletedDownload\(download, path\);/);
   assert.match(server, /if \(used \+ info\.size > MAX_SESSION_DOWNLOAD_BYTES\) \{ await deleteCompletedDownload\(download, path\);/);
   assert.doesNotMatch(server, /await download\.cancel\(\)/);
@@ -161,9 +161,9 @@ test("production download storage is bounded tmpfs and fails closed when unavail
   const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
   const workflow = await readFile(new URL("../../../.github/workflows/deploy-relay.yml", import.meta.url), "utf8");
   assert.match(server, /OPENFISH_REQUIRE_DOWNLOADS_TMPFS/);
-  assert.match(server, /fsInfo\.type !== 0x01021994/);
-  assert.match(server, /capacityBytes > 64 \* 1024 \* 1024/);
-  assert.match(server, /writeFile\(probe, "ok", \{ flag: "wx" \}\)/);
+  assert.match(await readFile(new URL("../download-storage.js", import.meta.url), "utf8"), /fsInfo\.type !== 0x01021994/);
+  assert.match(await readFile(new URL("../download-storage.js", import.meta.url), "utf8"), /capacityBytes > maxBytes \+ fsInfo\.bsize/);
+  assert.match(await readFile(new URL("../download-storage.js", import.meta.url), "utf8"), /writeFile\(probe, "ok", \{ flag: "wx" \}\)/);
   assert.match(server, /downloadsPath: DOWNLOADS_DIR/);
   assert.match(workflow, /--add-volume mount-path=\/downloads,type=in-memory,size-limit=64Mi/);
   assert.match(workflow, /OPENFISH_DOWNLOADS_DIR=\/downloads,OPENFISH_REQUIRE_DOWNLOADS_TMPFS=true/);
