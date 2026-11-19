@@ -184,3 +184,9 @@ References:
 - https://github.com/browser-use/browser-use
 - https://github.com/browserless/browserless
 - https://github.com/lightpanda-io/browser
+
+## Browser network egress hardening (v2.11.0)
+
+The self-hosted Playwright engine now validates browser-context HTTP(S) requests, not only the initial navigation URL. Subresources and redirect hops are checked; service workers are disabled; page WebSocket connections are blocked. IPv4 and IPv6 private, loopback, link-local, metadata, multicast, documentation, benchmarking, and other special-purpose ranges are rejected. The Cloudflare Browser Run fallback applies the same URL checks to browser-context requests when the platform exposes the routing APIs, and viewing a page disconnects the Worker from the session without closing the session itself.
+
+**Important limitation:** hostname validation and the browser's later DNS resolution are separate operations. DNS rebinding cannot be fully prevented by application checks alone. A public deployment must also enforce outbound network rules that block private, loopback, link-local, metadata, and reserved destinations. This release does not claim a complete SSRF-proof network sandbox.
