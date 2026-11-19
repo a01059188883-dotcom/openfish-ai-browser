@@ -105,7 +105,8 @@ test("GitHub Actions relay deployment requires all Cloudflare secrets and instal
   assert.ok(workflow.includes("status.traffic[?tag=preflight].url"));
   assert.ok(workflow.includes("gcloud run services update-traffic openfish-browser-engine"));
   assert.ok(workflow.includes("--to-latest --remove-tags=preflight"));
-  assert.ok(workflow.includes("  push:"));\n  assert.ok(workflow.includes("branches: [main]"));
+  assert.ok(workflow.includes("  push:"));
+  assert.ok(workflow.includes("branches: [main]"));
   assert.ok(workflow.includes("group: openfish-production-deploy"));
   assert.ok(workflow.includes("cancel-in-progress: false"));
   assert.ok(workflow.indexOf('h.version!=="1.3.5"') < workflow.indexOf("gcloud run services update-traffic"));
