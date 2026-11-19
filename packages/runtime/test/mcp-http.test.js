@@ -108,8 +108,8 @@ test("GitHub Actions relay deployment requires all Cloudflare secrets and instal
   assert.ok(!workflow.includes("  push:"));
   assert.ok(workflow.includes("group: openfish-production-deploy"));
   assert.ok(workflow.includes("cancel-in-progress: false"));
-  assert.ok(workflow.indexOf('h.version!=="1.3.3"') < workflow.indexOf("gcloud run services update-traffic"));
-  assert.ok(workflow.includes("h.version!==\"1.3.3\""));
+  assert.ok(workflow.indexOf('h.version!=="1.3.4"') < workflow.indexOf("gcloud run services update-traffic"));
+  assert.ok(workflow.includes("h.version!==\"1.3.4\""));
   assert.ok(workflow.includes("secrets.BROWSER_ENGINE_TOKEN"));
   assert.ok(workflow.includes("wrangler@4 secret put BROWSER_ENGINE_URL"));
   assert.ok(workflow.includes("wrangler@4 secret put BROWSER_ENGINE_TOKEN"));
