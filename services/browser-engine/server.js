@@ -1,6 +1,6 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, unlink } from "node:fs/promises";
 import { basename } from "node:path";
 import { chromium } from "playwright";
 import { validateTarget } from "./network-policy.js";
@@ -126,11 +126,14 @@ async function handle(req, res) {
     session.busy = true;
     if (url.pathname === "/status") return send(res, 200, { ok: true, connected: Boolean(session.context && !session.page.isClosed()), provider: "Self-hosted Playwright + Chromium", currentUrl: session.page.url(), sessionId: id });
     if (url.pathname === "/tabs") return send(res, 200, { ok: true, tabs: await listTabs(session), activeIndex: session.context.pages().indexOf(session.page) });
-    if (url.pathname === "/downloads") return send(res, 200, { ok: true, downloads: [...session.downloads.values()].map(({ data, ...item }) => item) });
+    if (url.pathname === "/downloads") return send(res, 200, { ok: true, downloads: [...session.downloads.values()].map(({ data, path, ...item }) => item) });
     const payload = req.method === "POST" ? await readBody(req) : {};
     if (url.pathname === "/downloads/remove") {
       if (payload.approved !== true) throw Object.assign(new Error("Explicit approval is required to remove a download."), { statusCode: 403 });
-      if (!session.downloads.delete(String(payload.id || ""))) throw Object.assign(new Error("Download not found."), { statusCode: 404 });
+      const item = session.downloads.get(String(payload.id || ""));
+      if (!item) throw Object.assign(new Error("Download not found."), { statusCode: 404 });
+      session.downloads.delete(item.id);
+      if (item.path) await unlink(item.path).catch(error => { if (error.code !== "ENOENT") throw error; });
       return send(res, 200, { ok: true, removed: true, id: payload.id });
     }
     if (url.pathname === "/download") {
@@ -155,8 +158,8 @@ async function handle(req, res) {
       if (used + info.size > MAX_SESSION_DOWNLOAD_BYTES) { await download.cancel().catch(() => {}); throw Object.assign(new Error("Session download storage is full (50 MB). Remove older downloads first."), { statusCode: 507 }); }
       const data = await readFile(path);
       const id = randomUUID();
-      const filename = basename(String(download.suggestedFilename() || "download")).replace(/[\u0000-\u001f\u007f<>:"|?*]/g, "_").replaceAll("\\", "_").slice(0, 120) || "download";
-      const record = { id, filename, size: info.size, url: target, createdAt: new Date().toISOString(), data };
+      const filename = basename(String(download.suggestedFilename() || "download")).replace(/[\u0000-\u001f\u007f<>:"|?*]/g, "_").replaceAll("\\", "_").replace(/^\\.+/, "").trim().slice(0, 120) || "download";
+      const record = { id, filename, size: info.size, url: target, createdAt: new Date().toISOString(), data, path };
       session.downloads.set(id, record);
       return send(res, 200, { ok: true, download: { id, filename, size: info.size, url: target, createdAt: record.createdAt, dataBase64: data.toString("base64") } });
     }
