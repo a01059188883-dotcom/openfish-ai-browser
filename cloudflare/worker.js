@@ -222,12 +222,14 @@ export class OpenFishRelay {
       const method = url.pathname === "/cloud/status" || url.pathname === "/cloud/view" || url.pathname === "/cloud/tabs" || url.pathname === "/cloud/downloads" ? "GET" : "POST";
       const body = method === "POST" ? await request.text() : undefined;
       if (body && body.length > 16000) return jsonResponse({ error: "Request too large." }, 413);
+      // File transfer may legitimately take longer; keep ordinary browser RPCs bounded.
+      const upstreamTimeoutMs = url.pathname.startsWith("/cloud/download") ? 120000 : 45000;
       try {
         const upstream = await fetch(endpoint, {
           method,
           headers: { "authorization": "Bearer " + this.env.BROWSER_ENGINE_TOKEN, "x-openfish-session": sessionId, ...(body ? { "content-type": "application/json" } : {}) },
           body,
-          signal: AbortSignal.timeout(120000)
+          signal: AbortSignal.timeout(upstreamTimeoutMs)
         });
         const headers = new Headers(upstream.headers);
         headers.set("cache-control", "no-store");
