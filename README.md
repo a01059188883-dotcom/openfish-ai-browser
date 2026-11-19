@@ -195,3 +195,17 @@ The self-hosted Playwright engine now validates browser-context HTTP(S) requests
 ## Browser workspace refresh (v2.12.0)
 
 The mobile browser workspace now has selectable Google, Bing and DuckDuckGo search, local browsing history, searchable bookmarks, page-text copy and a simplified reading view. Local history and bookmarks stay in the current device's browser storage; they are not synced to the cloud browser session. The cloud browser service remains a single-page session until server-side multi-tab endpoints are implemented and tested. This release does not add paid browser providers.
+
+## Browser ecosystem review and integrated module map (v2.12.0)
+
+The public-source review used these projects as architecture references, not as wholesale code imports:
+
+- [Playwright](https://github.com/microsoft/playwright) — cross-browser automation, browser contexts, navigation, downloads and test primitives; already the core automation layer in OpenFish.
+- [Browser Use](https://github.com/browser-use/browser-use) — MIT-licensed agent patterns for accessibility-first actions, persistent browser work and local-model integration. OpenFish keeps its own approval gate and does not depend on the paid Browser Use Cloud.
+- [Steel Browser](https://github.com/steel-dev/steel-browser) — Apache-2.0 reference for session lifecycle, browser APIs, observability and cleanup. Its standalone server is not bundled as a second competing engine.
+- [Blanc](https://github.com/bnfy/blanc) — MIT-licensed desktop-browser reference for tab organization, favorites/history/downloads, permissions, privacy and compact browser chrome. Its Electron desktop implementation is not copied into this mobile/cloud product.
+- Browserless was reviewed but not selected as a required dependency: its published open-source licensing is SSPL-1.0 OR a commercial license, which is not a safe default for a free-first deployment.
+
+OpenFish's existing runtime module set includes Chromium/Playwright navigation, isolated sessions, local tab management, bookmarks, browsing history, reading list, downloads, tab organization, page diagnostics, accessibility snapshots, reader-content extraction, screenshots, AI task planning, explicit action approval, MCP/REST tool discovery and provider adapters. The v2.12.0 mobile workspace adds searchable local history and favorites, selectable search engines, page-text copy and a simplified reading view while preserving the existing legacy bookmark storage key.
+
+**Not represented as completed in this release:** multi-tab control in the remote cloud browser API, private-profile isolation in the mobile cloud UI, built-in network ad blocking, extension installation management, browser sync, and a full native desktop browser shell. These require separate backend, permission and security work; the UI does not expose fake controls for them.
