@@ -33,8 +33,40 @@ function render(d){
  const links=$("links");links.replaceChildren();(d.links||[]).slice(0,30).forEach(link=>{const row=document.createElement("div");row.className="bookmark-row";const a=document.createElement("a");a.href="#";a.textContent=(link.text||"网页链接")+" · "+link.href;a.addEventListener("click",event=>{event.preventDefault();navigate(link.href)});const download=document.createElement("button");download.className="link-download";download.type="button";download.textContent="下载";download.title="尝试将此链接作为文件下载";download.addEventListener("click",()=>downloadLink(link.href));row.append(a,download);links.append(row)});
  renderTabs(d.tabs||[]);setState("浏览器在线",d.provider||"云端浏览器已连接");
 }
-async function downloadLink(url){if(!confirm("确认下载此链接的文件？单个文件上限 15 MB。"))return;try{const result=await api("/api/cloud-browser/download",{url,approved:true});const binary=atob(result.download.dataBase64),bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);const blob=new Blob([bytes],{type:"application/octet-stream"}),objectUrl=URL.createObjectURL(blob),anchor=document.createElement("a");anchor.href=objectUrl;anchor.download=result.download.filename;anchor.click();setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);await loadDownloads();toast("文件下载已交付到手机")}catch(error){toast("下载失败："+error.message)}}
-async function loadDownloads(){const result=await api("/api/cloud-browser/downloads");const host=$("downloads");host.replaceChildren();if(!result.downloads?.length){host.textContent="当前会话没有下载记录";return}result.downloads.forEach(item=>{const row=document.createElement("div");row.className="bookmark-row";const label=document.createElement("span");label.textContent=item.filename+" · "+(item.size/1024).toFixed(1)+" KB";const remove=document.createElement("button");remove.type="button";remove.textContent="移除";remove.addEventListener("click",async()=>{if(!confirm("从当前云端会话移除此下载记录？"))return;try{await api("/api/cloud-browser/downloads/remove",{id:item.id,approved:true});await loadDownloads()}catch(error){toast(error.message)}});row.append(label,remove);host.append(row)})}
+function decodeDownload(data){const binary=atob(data.dataBase64),bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return new Blob([bytes],{type:"application/octet-stream"})}
+function addDownloadSaveLink(item,data){
+ const host=$("downloads"),old=downloadObjectUrls.get(item.id);if(old)URL.revokeObjectURL(old);
+ const objectUrl=URL.createObjectURL(decodeDownload(data));downloadObjectUrls.set(item.id,objectUrl);
+ const row=document.createElement("div");row.className="bookmark-row";
+ const label=document.createElement("span");label.textContent=item.filename+" · "+(item.size/1024).toFixed(1)+" KB";
+ const link=document.createElement("a");link.href=objectUrl;link.download=item.filename;link.textContent="点按保存到手机";link.className="download-save-link";
+ row.append(label,link);host.prepend(row);toast("文件已准备好，请点按“保存到手机”完成接收");
+}
+async function downloadLink(url){
+ if(!confirm("确认下载此链接的文件？单个文件上限 15 MB。"))return;
+ try{const result=await api("/api/cloud-browser/download",{url,approved:true});addDownloadSaveLink(result.download,result.download);await loadDownloads(false)}
+ catch(error){toast("下载失败："+error.message)}
+}
+async function loadDownloads(showEmpty=true){
+ const result=await api("/api/cloud-browser/downloads"),host=$("downloads");host.replaceChildren();
+ if(!result.downloads?.length){host.textContent=showEmpty?"当前会话没有下载记录":"下载已准备，请点按保存链接";return}
+ result.downloads.forEach(item=>{
+  const row=document.createElement("div");row.className="bookmark-row";
+  const label=document.createElement("span");label.textContent=item.filename+" · "+(item.size/1024).toFixed(1)+" KB";
+  const save=document.createElement("button");save.type="button";save.textContent="准备保存";save.addEventListener("click",async()=>{
+   save.disabled=true;save.textContent="正在准备…";
+   try{const result=await api("/api/cloud-browser/downloads/file",{id:item.id,approved:true});addDownloadSaveLink(item,result.download)}
+   catch(error){toast("文件读取失败："+error.message);save.disabled=false;save.textContent="重试保存"}
+  });
+  const remove=document.createElement("button");remove.type="button";remove.textContent="移除";remove.addEventListener("click",async()=>{
+   if(!confirm("从当前云端会话移除此下载记录？"))return;
+   try{await api("/api/cloud-browser/downloads/remove",{id:item.id,approved:true});const objectUrl=downloadObjectUrls.get(item.id);if(objectUrl)URL.revokeObjectURL(objectUrl);downloadObjectUrls.delete(item.id);await loadDownloads()}
+   catch(error){toast(error.message)}
+  });
+  row.append(label,save,remove);host.append(row)
+ })
+}
+window.addEventListener("pagehide",()=>{for(const url of downloadObjectUrls.values())URL.revokeObjectURL(url);downloadObjectUrls.clear()});
 async function run(path,body){if(busy)return;busy=true;setState("正在处理…");try{const data=await api(path,body);if(data.screenshot)render(data);else if(path.endsWith("/status"))setState(data.connected?"会话已连接":"浏览器待机",data.provider||"云端浏览器");else toast("操作完成");return data}catch(error){toast(error.message);setState("等待操作");throw error}finally{busy=false}}
 function searchUrl(value){const engine=$("searchEngine").value;const q=encodeURIComponent(value);return engine==="bing"?"https://www.bing.com/search?q="+q:engine==="duckduckgo"?"https://duckduckgo.com/?q="+q:"https://www.google.com/search?q="+q}
 async function navigate(raw){let value=String(raw||"").trim();if(!value)return;if(!/^https?:\/\//i.test(value)){if(value.includes(".")&&!value.includes(" "))value="https://"+value;else value=searchUrl(value)}$("url").value=value;try{const data=await run("/api/cloud-browser/navigate",{url:value});if(data){recordHistory({url:data.url||value,title:data.title||value});renderHistory()}}catch{}}
