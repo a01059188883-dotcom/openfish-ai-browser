@@ -18,9 +18,9 @@ test("mobile browser workspace preserves legacy bookmarks and stores local histo
   assert.match(app, /recordHistory\(/);
   assert.match(app, /searchEngineSetting/);
   assert.match(app, /function renderTabs/);
-  assert.match(app, /action:"newTab"/);
-  assert.match(app, /action:"switchTab"/);
-  assert.match(app, /action:"closeTab"/);
+  assert.match(app, /act\("newTab"\)/);
+  assert.match(app, /act\("switchTab"/);
+  assert.match(app, /act\("closeTab"/);
 });
 
 test("mobile browser workspace has responsive library and reader layouts", () => {
