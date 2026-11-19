@@ -17,6 +17,8 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(worker.includes('url.pathname.startsWith("/api/cloud-browser/")'));
   assert.ok(worker.includes('/api/v1/browser/navigate'));
   assert.ok(worker.includes('/api/v1/browser/action'));
+  assert.ok(worker.includes('/api/v1/browser/tabs'));
+  assert.ok(worker.includes('url.pathname === "/cloud/tabs"'));
   assert.ok(worker.includes('/api/v1/openapi.json'));
   assert.ok(worker.includes('access-control-allow-origin'));
   assert.ok(worker.includes('const VERSION = "2.12.0"'));
@@ -33,12 +35,16 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(worker.includes('context.routeWebSocket'));
   assert.ok(worker.includes('browser.disconnect()'));
   assert.ok(worker.includes('guardedBrowserContexts'));
-  for (const id of ["url", "back", "forward", "reload", "go", "viewport", "sendText", "bookmark", "bookmarks"]) assert.ok(html.includes('id="' + id + '"'));
-  for (const route of ["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/navigate", "/api/cloud-browser/action", "/api/cloud-browser/close"]) assert.ok(worker.includes(route));
+  for (const id of ["url", "back", "forward", "reload", "go", "viewport", "sendText", "bookmark", "bookmarks", "tabs", "addTab"]) assert.ok(html.includes('id="' + id + '"'));
+  for (const route of ["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/tabs", "/api/cloud-browser/navigate", "/api/cloud-browser/action", "/api/cloud-browser/close"]) assert.ok(worker.includes(route));
   assert.ok(app.includes("data:image/jpeg;base64,"));
   assert.ok(app.includes("(e.clientY-r.top)/r.height*820"));
   assert.ok(app.includes("/api/cloud-browser/navigate"));
   assert.ok(app.includes("/api/cloud-browser/action"));
+  assert.ok(app.includes('action:"newTab"'));
+  assert.ok(app.includes('action:"switchTab"'));
+  assert.ok(app.includes('action:"closeTab"'));
+  assert.ok(app.includes("function renderTabs"));
   assert.ok(admin.includes('id="cloudStatus"'));
   assert.ok(admin.includes('id="cloudClose"'));
   assert.ok(admin.includes('sessionStorage.setItem("openfish.relay.token"'));
