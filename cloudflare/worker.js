@@ -83,7 +83,7 @@ export default {
       const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type", "access-control-max-age": "86400", "cache-control": "no-store" };
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
       if (!authorized(request, env)) return json({ error: "Unauthorized. Supply the OpenFish relay Bearer token." }, 401);
-      const routes = { "/api/v1/browser/status": ["/cloud/status", "GET"], "/api/v1/browser/view": ["/cloud/view", "GET"], "/api/v1/browser/navigate": ["/cloud/navigate", "POST"], "/api/v1/browser/action": ["/cloud/action", "POST"], "/api/v1/browser/close": ["/cloud/close", "POST"] };
+      const routes = { "/api/v1/browser/status": ["/cloud/status", "GET"], "/api/v1/browser/view": ["/cloud/view", "GET"], "/api/v1/browser/tabs": ["/cloud/tabs", "GET"], "/api/v1/browser/navigate": ["/cloud/navigate", "POST"], "/api/v1/browser/action": ["/cloud/action", "POST"], "/api/v1/browser/close": ["/cloud/close", "POST"] };
       const route = routes[url.pathname];
       if (!route) return json({ error: "Browser API route not found." }, 404);
       if (request.method !== route[1]) return json({ error: "Method not allowed." }, 405);
@@ -101,7 +101,7 @@ export default {
     }
     if (url.pathname.startsWith("/api/cloud-browser/")) {
       if (!authorized(request, env)) return json({ error: "Unauthorized. Supply the relay Bearer token." }, 401);
-      const allowed = new Set(["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/navigate", "/api/cloud-browser/action", "/api/cloud-browser/close"]);
+      const allowed = new Set(["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/tabs", "/api/cloud-browser/navigate", "/api/cloud-browser/action", "/api/cloud-browser/close"]);
       if (!allowed.has(url.pathname)) return json({ error: "Cloud browser route not found." }, 404);
       if ((url.pathname.endsWith("/status") || url.pathname.endsWith("/view")) && request.method !== "GET") return json({ error: "Method not allowed." }, 405);
       if (!url.pathname.endsWith("/status") && !url.pathname.endsWith("/view") && request.method !== "POST") return json({ error: "Method not allowed." }, 405);
@@ -198,7 +198,7 @@ export class OpenFishRelay {
     // Cloudflare Browser Run remains the fallback, preserving existing deployments.
     if (this.env.BROWSER_ENGINE_URL && this.env.BROWSER_ENGINE_TOKEN) {
       const endpoint = new URL(url.pathname.slice("/cloud".length), this.env.BROWSER_ENGINE_URL.endsWith("/") ? this.env.BROWSER_ENGINE_URL : this.env.BROWSER_ENGINE_URL + "/");
-      const method = url.pathname === "/cloud/status" || url.pathname === "/cloud/view" ? "GET" : "POST";
+      const method = url.pathname === "/cloud/status" || url.pathname === "/cloud/view" || url.pathname === "/cloud/tabs" ? "GET" : "POST";
       const body = method === "POST" ? await request.text() : undefined;
       if (body && body.length > 16000) return jsonResponse({ error: "Request too large." }, 413);
       try {
@@ -244,10 +244,11 @@ export class OpenFishRelay {
         await this.ctx.storage.put("cloudBrowserSessionId", acquired.sessionId);
       }
       const pages = browser.contexts().flatMap(context => context.pages());
-      let page = pages[0];
+      let page = pages[Number(await this.ctx.storage.get("cloudBrowserActiveTabIndex")) || 0] || pages[0];
       if (!page) {
         const context = browser.contexts()[0] || await browser.newContext();
         page = await context.newPage();
+        await this.ctx.storage.put("cloudBrowserActiveTabIndex", 0);
       }
       await page.setViewportSize({ width: 1280, height: 820 });
       const context = page.context();
@@ -274,6 +275,17 @@ export class OpenFishRelay {
       const shot = await page.screenshot({ type: "jpeg", quality: 62, fullPage: false });
       return { ...details, screenshot: bytesToBase64(new Uint8Array(shot)), screenshotType: "image/jpeg" };
     };
+    if (url.pathname === "/cloud/tabs") {
+      let browser;
+      try {
+        const connected = await getBrowser(); browser = connected.browser;
+        const pages = browser.contexts().flatMap(context => context.pages());
+        const activeIndex = pages.indexOf(connected.page);
+        const tabs = await Promise.all(pages.map(async (tab, index) => ({ index, active: index === activeIndex, title: await tab.title().catch(() => ""), url: tab.url() })));
+        return jsonResponse({ ok: true, tabs, activeIndex });
+      } catch (error) { return jsonResponse({ error: String(error?.message || error).slice(0, 500) }, 502); }
+      finally { if (browser) { try { await browser.disconnect(); } catch {} } }
+    }
     if (url.pathname === "/cloud/view") {
       let browser;
       try {
@@ -284,11 +296,12 @@ export class OpenFishRelay {
     }
     if (url.pathname === "/cloud/status") {
       const id = await this.ctx.storage.get("cloudBrowserSessionId");
-      if (!id) return jsonResponse({ ok: true, connected: false, provider: "Cloudflare Browser Run", version: VERSION, freeAllowance: "10 minutes/day on Workers Free" });
+      if (!id) return jsonResponse({ ok: true, connected: false, provider: "Cloudflare Browser Run", version: VERSION });
       try {
         const browser = await connect(this.env.BROWSER, id);
         const pages = browser.contexts().flatMap(context => context.pages());
-        const current = pages[0] ? await pages[0].url() : "";
+        const active = pages[Number(await this.ctx.storage.get("cloudBrowserActiveTabIndex")) || 0] || pages[0];
+        const current = active ? await active.url() : "";
         await browser.disconnect();
         return jsonResponse({ ok: true, connected: true, currentUrl: current, provider: "Cloudflare Browser Run", version: VERSION, freeAllowance: "10 minutes/day on Workers Free" });
       } catch {
@@ -300,6 +313,7 @@ export class OpenFishRelay {
       const id = await this.ctx.storage.get("cloudBrowserSessionId");
       if (id) { try { const browser = await connect(this.env.BROWSER, id); await browser.close(); } catch {} }
       await this.ctx.storage.delete("cloudBrowserSessionId");
+      await this.ctx.storage.delete("cloudBrowserActiveTabIndex");
       return jsonResponse({ ok: true, closed: true });
     }
     let payload = {};
@@ -314,7 +328,27 @@ export class OpenFishRelay {
         await page.goto(target, { waitUntil: "domcontentloaded", timeout: 25000 });
       } else if (url.pathname === "/cloud/action") {
         const action = payload.action;
-        if (action === "back") await page.goBack({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => null);
+        if (action === "newTab") {
+          const context = page.context();
+          page = await context.newPage();
+          await page.setViewportSize({ width: 1280, height: 820 });
+          await this.ctx.storage.put("cloudBrowserActiveTabIndex", context.pages().indexOf(page));
+        } else if (action === "switchTab") {
+          const pages = browser.contexts().flatMap(context => context.pages());
+          const index = Number(payload.index);
+          if (!Number.isInteger(index) || index < 0 || index >= pages.length) throw new Error("标签页编号无效");
+          page = pages[index];
+          await this.ctx.storage.put("cloudBrowserActiveTabIndex", index);
+        } else if (action === "closeTab") {
+          const pages = browser.contexts().flatMap(context => context.pages());
+          const index = payload.index === undefined ? pages.indexOf(page) : Number(payload.index);
+          if (!Number.isInteger(index) || index < 0 || index >= pages.length) throw new Error("标签页编号无效");
+          await pages[index].close();
+          const remaining = browser.contexts().flatMap(context => context.pages());
+          page = remaining[Math.min(index, remaining.length - 1)] || await (browser.contexts()[0] || await browser.newContext()).newPage();
+          await page.setViewportSize({ width: 1280, height: 820 });
+          await this.ctx.storage.put("cloudBrowserActiveTabIndex", Math.max(0, remaining.indexOf(page)));
+        } else if (action === "back") await page.goBack({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => null);
         else if (action === "forward") await page.goForward({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => null);
         else if (action === "reload") await page.reload({ waitUntil: "domcontentloaded", timeout: 20000 });
         else if (action === "click") {
@@ -339,7 +373,8 @@ export class OpenFishRelay {
         } else throw new Error("不支持的浏览器操作");
       }
       const result = await snapshot(page);
-      return jsonResponse({ ok: true, ...result });
+      const tabs = await Promise.all(browser.contexts().flatMap(context => context.pages()).map(async (tab, index) => ({ index, active: tab === page, title: await tab.title().catch(() => ""), url: tab.url() })));
+      return jsonResponse({ ok: true, ...result, tabs, activeIndex: tabs.findIndex(tab => tab.active) });
     } catch (error) {
       return jsonResponse({ error: String(error?.message || error).slice(0, 500), code: /429|limit|quota/i.test(String(error)) ? "BROWSER_LIMIT" : "BROWSER_ERROR" }, 502);
     } finally {
