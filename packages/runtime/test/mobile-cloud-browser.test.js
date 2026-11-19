@@ -15,6 +15,9 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(config.includes('[assets]'));
   assert.ok(worker.includes('import { acquire, connect } from "@cloudflare/playwright"'));
   assert.ok(worker.includes('url.pathname.startsWith("/api/cloud-browser/")'));
+  for (const route of ["/api/cloud-browser/download", "/api/cloud-browser/downloads", "/api/cloud-browser/downloads/remove"]) assert.ok(worker.includes(route));
+  assert.ok(worker.includes('"/cloud/downloads"'));
+  assert.ok(worker.includes('"/cloud/download"'));
   assert.ok(worker.includes('const storageKey = key => "cloudBrowser:" + sessionId + ":" + key'));
   assert.ok(worker.includes('withCloudSessionLock'));
   assert.ok(worker.includes('cloudBrowserLastUsedAt'));
