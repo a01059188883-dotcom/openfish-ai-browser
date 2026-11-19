@@ -158,7 +158,7 @@ async function handle(req, res) {
       if (used + info.size > MAX_SESSION_DOWNLOAD_BYTES) { await download.cancel().catch(() => {}); throw Object.assign(new Error("Session download storage is full (50 MB). Remove older downloads first."), { statusCode: 507 }); }
       const data = await readFile(path);
       const id = randomUUID();
-      const filename = basename(String(download.suggestedFilename() || "download")).replace(/[\u0000-\u001f\u007f<>:"|?*]/g, "_").replaceAll("\\", "_").replace(/^\\.+/, "").trim().slice(0, 120) || "download";
+      const filename = basename(String(download.suggestedFilename() || "download")).replace(/[\u0000-\u001f\u007f<>:"|?*]/g, "_").replaceAll("\\", "_").replace(/^\.+/, "").trim().slice(0, 120) || "download";
       const record = { id, filename, size: info.size, url: target, createdAt: new Date().toISOString(), data, path };
       session.downloads.set(id, record);
       return send(res, 200, { ok: true, download: { id, filename, size: info.size, url: target, createdAt: record.createdAt, dataBase64: data.toString("base64") } });
