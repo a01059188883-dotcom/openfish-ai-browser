@@ -25,6 +25,13 @@
 
 # Changelog
 
+## 2.13.1 - 2026-11-19
+- Make cloud downloads resumable within the active browser session.
+- Replace automatic post-fetch download triggering with an explicit user-tapped save link for improved iPhone Safari compatibility.
+- Retain prepared object URLs until page exit or explicit removal, with retry and expiry messaging.
+- Synchronize OpenFish release metadata to 2.13.1 and self-hosted engine metadata to 1.3.1.
+
+
 ## 1.0.0 - 2026-11-13
 - Initial OpenFish AI Browser project scaffold.
 - Added Playwright local/remote browser runtime.
