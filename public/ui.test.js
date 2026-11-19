@@ -32,3 +32,9 @@ test("application package version is synchronized", async () => {
   const pkg = JSON.parse(await read("../package.json"));
   assert.equal(pkg.version, "2.13.5");
 });
+
+test("Cloud Run deployment refuses traffic shift without bounded tmpfs health", async () => {
+  const workflow = await read("../.github/workflows/deploy-relay.yml");
+  assert.match(workflow, /downloadStorage\?\.mode!==\"required-tmpfs\"/);
+  assert.match(workflow, /downloadStorage\.capacityBytes>64\*1024\*1024/);
+});
