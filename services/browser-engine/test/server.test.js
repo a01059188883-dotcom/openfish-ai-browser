@@ -71,3 +71,12 @@ test("cloud download API is approval-gated and bounded per session", async () =>
   assert.match(server, /session\.downloads\.set\(id, record\)/);
   assert.match(server, /url\.pathname === "\/downloads\/remove"/);\n  assert.match(server, /url\.pathname === "\/downloads\/file"/);\n  assert.match(server, /Explicit approval is required to retrieve a download/);
 });
+
+test("mobile downloads remain resumable and require an explicit save tap", async () => {
+  const app = await readFile(new URL("../../../public/app.js", import.meta.url), "utf8");
+  const worker = await readFile(new URL("../../../cloudflare/worker.js", import.meta.url), "utf8");
+  assert.match(app, /downloads\/file/);
+  assert.match(app, /点按保存到手机/);
+  assert.match(app, /downloadObjectUrls/);
+  assert.match(worker, /api\/cloud-browser\/downloads\/file/);
+});
