@@ -1,6 +1,6 @@
 (()=>{
 "use strict";
-const $=id=>document.getElementById(id), TOKEN_KEY="openfish.relay.token", BOOKMARK_KEY="openfish.bookmarks", HISTORY_KEY="openfish.history.v1", READING_KEY="openfish.readingList.v1", SEARCH_KEY="openfish.searchEngine", SESSION_KEY="openfish.browser.session";
+const $=id=>document.getElementById(id), downloadObjectUrls=new Map(), TOKEN_KEY="openfish.relay.token", BOOKMARK_KEY="openfish.bookmarks", HISTORY_KEY="openfish.history.v1", READING_KEY="openfish.readingList.v1", SEARCH_KEY="openfish.searchEngine", SESSION_KEY="openfish.browser.session";
 let token=sessionStorage.getItem(TOKEN_KEY)||"",sessionId=sessionStorage.getItem(SESSION_KEY)||"",currentUrl="",lastView=null,busy=false,readerMode=false;
 if(!/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)){sessionId=crypto.randomUUID();sessionStorage.setItem(SESSION_KEY,sessionId)}
 const readStore=(key,fallback)=>{try{const v=JSON.parse(localStorage.getItem(key)||"null");return Array.isArray(v)?v:fallback}catch{return fallback}};
