@@ -44,7 +44,7 @@ function addDownloadSaveLink(item,data){
 }
 async function downloadLink(url){
  if(!confirm("确认下载此链接的文件？单个文件上限 15 MB。"))return;
- try{const result=await api("/api/cloud-browser/download",{url,approved:true});addDownloadSaveLink(result.download,result.download);await loadDownloads(false)}
+ try{const result=await api("/api/cloud-browser/download",{url,approved:true});await loadDownloads(false);addDownloadSaveLink(result.download,result.download)}
  catch(error){toast("下载失败："+error.message)}
 }
 async function loadDownloads(showEmpty=true){
