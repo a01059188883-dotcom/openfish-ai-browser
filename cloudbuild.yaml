@@ -29,7 +29,7 @@ images:
   - ${_IMAGE_URI}:latest
 
 substitutions:
-  _IMAGE_URI: asia-northeast3-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/openfish-browser-engine
+  _IMAGE_URI: asia-northeast3-docker.pkg.dev/openfish-ai-browser/cloud-run-source-deploy/openfish-browser-engine
 
 options:
   logging: CLOUD_LOGGING_ONLY
