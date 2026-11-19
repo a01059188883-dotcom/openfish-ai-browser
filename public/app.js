@@ -14,13 +14,23 @@ async function api(path,body){
  if(!response.ok){if(response.status===401){sessionStorage.removeItem(TOKEN_KEY);token=""}throw Error(data.error||("HTTP "+response.status))}
  return data;
 }
+function renderTabs(tabs=[]){
+ const host=$("tabs");host.replaceChildren();
+ if(!tabs.length){const empty=document.createElement("span");empty.className="muted";empty.textContent="尚无标签页";host.append(empty);return}
+ tabs.forEach(tab=>{
+  const item=document.createElement("div");item.className="tab-item"+(tab.active?" active":"");
+  const select=document.createElement("button");select.className="tab-select";select.textContent=(tab.title||tab.url||"新标签页").slice(0,28);select.title=tab.url||tab.title||"新标签页";select.addEventListener("click",()=>act("switchTab",{index:tab.index}));
+  const close=document.createElement("button");close.className="tab-close";close.type="button";close.textContent="×";close.setAttribute("aria-label","关闭标签页");close.addEventListener("click",event=>{event.stopPropagation();act("closeTab",{index:tab.index})});
+  item.append(select,close);host.append(item);
+ });
+}
 function render(d){
  lastView=d;currentUrl=d.url||currentUrl;$("url").value=currentUrl;$("pageTitle").textContent=d.title||"网页";$("pageUrl").textContent=currentUrl;$("pageText").textContent=d.text||"网页未返回可见文本";
  const viewport=$("viewport");viewport.replaceChildren();
  if(readerMode){const article=document.createElement("article");article.className="reader-content";const h=document.createElement("h2");h.textContent=d.title||"网页阅读";const p=document.createElement("p");p.textContent=d.text||"当前页面没有可提取的文字。";article.append(h,p);viewport.append(article)}
  else if(d.screenshot){const img=document.createElement("img");img.alt="当前网页截图；点击网页位置可交互";img.src="data:image/jpeg;base64,"+d.screenshot;img.addEventListener("click",event=>{const rect=img.getBoundingClientRect();const x=Math.round((event.clientX-rect.left)/rect.width*1280),y=Math.round((event.clientY-rect.top)/rect.height*820);$("coords").textContent="位置 "+x+", "+y;act("click",{x,y})});viewport.append(img)}
  const links=$("links");links.replaceChildren();(d.links||[]).slice(0,30).forEach(link=>{const a=document.createElement("a");a.href="#";a.textContent=(link.text||"网页链接")+" · "+link.href;a.addEventListener("click",event=>{event.preventDefault();navigate(link.href)});links.append(a)});
- setState("浏览器在线",d.provider||"云端浏览器已连接");
+ renderTabs(d.tabs||[]);setState("浏览器在线",d.provider||"云端浏览器已连接");
 }
 async function run(path,body){if(busy)return;busy=true;setState("正在处理…");try{const data=await api(path,body);if(data.screenshot)render(data);else if(path.endsWith("/status"))setState(data.connected?"会话已连接":"浏览器待机",data.provider||"云端浏览器");else toast("操作完成");return data}catch(error){toast(error.message);setState("等待操作");throw error}finally{busy=false}}
 function searchUrl(value){const engine=$("searchEngine").value;const q=encodeURIComponent(value);return engine==="bing"?"https://www.bing.com/search?q="+q:engine==="duckduckgo"?"https://duckduckgo.com/?q="+q:"https://www.google.com/search?q="+q}
@@ -32,7 +42,7 @@ function renderCollection(hostId,items,query,kind){const host=$(hostId);host.rep
 function renderBookmarks(){renderCollection("bookmarks",bookmarks,$("bookmarkSearch").value,"bookmark");$("bookmarkCount").textContent=String(bookmarks.length)}
 function renderHistory(){renderCollection("history",historyItems,$("historySearch").value,"history")}
 $("go").addEventListener("click",()=>navigate($("url").value));$("url").addEventListener("keydown",e=>{if(e.key==="Enter")navigate($("url").value)});
-$("back").addEventListener("click",()=>act("back"));$("forward").addEventListener("click",()=>act("forward"));$("reload").addEventListener("click",()=>act("reload"));$("start").addEventListener("click",()=>navigate("https://example.com"));$("newTab").addEventListener("click",()=>{readerMode=false;navigate("https://example.com")});
+$("back").addEventListener("click",()=>act("back"));$("forward").addEventListener("click",()=>act("forward"));$("reload").addEventListener("click",()=>act("reload"));$("start").addEventListener("click",()=>navigate("https://example.com"));$("newTab").addEventListener("click",()=>{readerMode=false;navigate("https://example.com")});$("addTab").addEventListener("click",()=>act("newTab"));
 $("closeBrowser").addEventListener("click",async()=>{if(!confirm("结束云端浏览器会话？当前网页会关闭。"))return;try{await api("/api/cloud-browser/close",{});$("viewport").innerHTML='<div class="empty"><div class="orb">◉</div><h2>会话已结束</h2><p>再次输入网址即可启动新的浏览器会话</p></div>';currentUrl="";lastView=null;setState("已结束","浏览器待机")}catch(error){toast(error.message)}});
 $("bookmark").addEventListener("click",()=>{if(!currentUrl)return toast("请先打开网页");if(bookmarks.some(x=>x.url===currentUrl))return toast("该网页已收藏");bookmarks.unshift({url:currentUrl,title:$("pageTitle").textContent,createdAt:new Date().toISOString()});bookmarks=bookmarks.slice(0,200);save(BOOKMARK_KEY,bookmarks);renderBookmarks();toast("已收藏到本机")});
 $("screenshot").addEventListener("click",()=>{if(!lastView?.screenshot)return toast("当前没有网页截图");const a=document.createElement("a");a.href="data:image/jpeg;base64,"+lastView.screenshot;a.download="openfish-screenshot.jpg";a.click()});
