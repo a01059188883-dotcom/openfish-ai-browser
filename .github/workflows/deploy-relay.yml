@@ -3,6 +3,10 @@ name: Deploy OpenFish Relay
 on:
   workflow_dispatch:
 
+concurrency:
+  group: openfish-production-deploy
+  cancel-in-progress: false
+
 permissions:
   contents: read
   id-token: write
