@@ -65,6 +65,12 @@ async function createSession(id) {
   sessions.set(id, session);
   return session;
 }
+async function deleteCompletedDownload(download, path) {
+  // download.path() resolves only after completion; cancel() cannot remove a completed file.
+  await download.delete().catch(async () => {
+    await unlink(path).catch(error => { if (error.code !== "ENOENT") throw error; });
+  });
+}
 async function reapExpired() {
   const now = Date.now();
   for (const [id, session] of sessions) {
@@ -187,9 +193,9 @@ async function handle(req, res) {
       const path = await download.path();
       if (!path) throw Object.assign(new Error("The browser did not provide a completed download file."), { statusCode: 502 });
       const info = await stat(path);
-      if (info.size > MAX_DOWNLOAD_BYTES) { await download.cancel().catch(() => {}); throw Object.assign(new Error("Download exceeds the 15 MB per-file limit."), { statusCode: 413 }); }
+      if (info.size > MAX_DOWNLOAD_BYTES) { await deleteCompletedDownload(download, path); throw Object.assign(new Error("Download exceeds the 15 MB per-file limit."), { statusCode: 413 }); }
       const used = [...session.downloads.values()].reduce((sum, item) => sum + item.size, 0);
-      if (used + info.size > MAX_SESSION_DOWNLOAD_BYTES) { await download.cancel().catch(() => {}); throw Object.assign(new Error("Session download storage is full (50 MB). Remove older downloads first."), { statusCode: 507 }); }
+      if (used + info.size > MAX_SESSION_DOWNLOAD_BYTES) { await deleteCompletedDownload(download, path); throw Object.assign(new Error("Session download storage is full (50 MB). Remove older downloads first."), { statusCode: 507 }); }
       const id = randomUUID();
       const filename = basename(String(download.suggestedFilename() || "download")).replace(/[\u0000-\u001f\u007f<>:"|?*]/g, "_").replaceAll("\\", "_").replace(/^\.+/, "").trim().slice(0, 120) || "download";
       const record = { id, filename, size: info.size, url: target, createdAt: new Date().toISOString(), path };
