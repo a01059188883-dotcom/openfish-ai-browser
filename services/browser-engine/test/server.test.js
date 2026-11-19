@@ -135,3 +135,14 @@ test("Worker keeps long upstream timeouts scoped to download routes", async () =
   assert.match(worker, /signal: AbortSignal\.timeout\(upstreamTimeoutMs\)/);
   assert.doesNotMatch(worker, /AbortSignal\.timeout\(120000\)/);
 });
+
+test("download responses encode RFC 5987 filename special characters", async () => {
+  const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
+  assert.match(server, /encodeURIComponent\(item\.filename\)\.replace\(\/\[!'\(\)\*\]\/g/);
+});
+
+test("mobile download refresh revokes stale object URLs", async () => {
+  const app = await readFile(new URL("../../../public/app.js", import.meta.url), "utf8");
+  assert.match(app, /for\(const objectUrl of downloadObjectUrls\.values\(\)\)URL\.revokeObjectURL\(objectUrl\)/);
+  assert.match(app, /downloadObjectUrls\.clear\(\)/);
+});
