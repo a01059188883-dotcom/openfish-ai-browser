@@ -1,7 +1,7 @@
 import mobileAdminHtml from "./mobile-admin.html";
 import { acquire, connect } from "@cloudflare/playwright";
 
-const VERSION = "2.12.0";
+const VERSION = "2.13.0";
 const MAX_BODY_BYTES = 512 * 1024;
 const guardedBrowserContexts = new WeakSet();
 const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/browser/sessions"]);
@@ -94,7 +94,7 @@ export default {
         if (raw.length > 16000) return json({ error: "Request too large." }, 413);
         body = raw || "{}";
       }
-      const response = await relayStub(env).fetch(new Request("https://relay.internal" + route[0], { method: request.method, headers: { "content-type": "application/json" }, body }));
+      const response = await relayStub(env).fetch(new Request("https://relay.internal" + route[0], { method: request.method, headers: { "content-type": "application/json", "x-openfish-session": request.headers.get("x-openfish-session") || "" }, body }));
       const headers = new Headers(response.headers);
       for (const [key, value] of Object.entries(cors)) headers.set(key, value);
       headers.set("x-openfish-version", VERSION);
@@ -109,7 +109,7 @@ export default {
       if (!readOnlyRoute && request.method !== "POST") return json({ error: "Method not allowed." }, 405);
       const body = request.method === "POST" ? await request.text() : "";
       if (body.length > 16000) return json({ error: "Request too large." }, 413);
-      return relayStub(env).fetch(new Request("https://relay.internal/cloud" + url.pathname.slice("/api/cloud-browser".length), { method: request.method, headers: { "content-type": "application/json" }, body: body || undefined }));
+      return relayStub(env).fetch(new Request("https://relay.internal/cloud" + url.pathname.slice("/api/cloud-browser".length), { method: request.method, headers: { "content-type": "application/json", "x-openfish-session": request.headers.get("x-openfish-session") || "" }, body: body || undefined }));
     }
     if (env.ASSETS && ["/app.css", "/app.js", "/favicon.ico", "/manifest.webmanifest"].includes(url.pathname)) return env.ASSETS.fetch(request);
     if (url.pathname === "/agent/connect") {
@@ -195,6 +195,9 @@ export class OpenFishRelay {
 
   async handleCloudBrowser(request) {
     const url = new URL(request.url);
+    const sessionId = request.headers.get("x-openfish-session") || "";
+    if (!/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) return new Response(JSON.stringify({ error: "A valid X-OpenFish-Session header is required." }), { status: 400, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+    const storageKey = key => "cloudBrowser:" + sessionId + ":" + key;
     const jsonResponse = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
     // Optional self-hosted Playwright engine takes priority when both secrets are configured.
     // Cloudflare Browser Run remains the fallback, preserving existing deployments.
@@ -206,7 +209,7 @@ export class OpenFishRelay {
       try {
         const upstream = await fetch(endpoint, {
           method,
-          headers: { "authorization": "Bearer " + this.env.BROWSER_ENGINE_TOKEN, ...(body ? { "content-type": "application/json" } : {}) },
+          headers: { "authorization": "Bearer " + this.env.BROWSER_ENGINE_TOKEN, "x-openfish-session": sessionId, ...(body ? { "content-type": "application/json" } : {}) },
           body,
           signal: AbortSignal.timeout(35000)
         });
@@ -235,22 +238,22 @@ export class OpenFishRelay {
     const getBrowser = async () => {
       if (!this.env.BROWSER) throw new Error("Cloudflare Browser Run 尚未绑定。请检查 Worker Browser Binding。");
       let browser = null;
-      const stored = await this.ctx.storage.get("cloudBrowserSessionId");
+      const stored = await this.ctx.storage.get(storageKey("cloudBrowserSessionId"));
       if (stored) {
         try { browser = await connect(this.env.BROWSER, stored); }
-        catch { await this.ctx.storage.delete("cloudBrowserSessionId"); }
+        catch { await this.ctx.storage.delete(storageKey("cloudBrowserSessionId")); }
       }
       if (!browser) {
         const acquired = await acquire(this.env.BROWSER);
         browser = await connect(this.env.BROWSER, acquired.sessionId);
-        await this.ctx.storage.put("cloudBrowserSessionId", acquired.sessionId);
+        await this.ctx.storage.put(storageKey("cloudBrowserSessionId"), acquired.sessionId);
       }
       const pages = browser.contexts().flatMap(context => context.pages());
-      let page = pages[Number(await this.ctx.storage.get("cloudBrowserActiveTabIndex")) || 0] || pages[0];
+      let page = pages[Number(await this.ctx.storage.get(storageKey("cloudBrowserActiveTabIndex"))) || 0] || pages[0];
       if (!page) {
         const context = browser.contexts()[0] || await browser.newContext();
         page = await context.newPage();
-        await this.ctx.storage.put("cloudBrowserActiveTabIndex", 0);
+        await this.ctx.storage.put(storageKey("cloudBrowserActiveTabIndex"), 0);
       }
       await page.setViewportSize({ width: 1280, height: 820 });
       const context = page.context();
@@ -298,25 +301,25 @@ export class OpenFishRelay {
       finally { if (browser) { try { await browser.disconnect(); } catch {} } }
     }
     if (url.pathname === "/cloud/status") {
-      const id = await this.ctx.storage.get("cloudBrowserSessionId");
+      const id = await this.ctx.storage.get(storageKey("cloudBrowserSessionId"));
       if (!id) return jsonResponse({ ok: true, connected: false, provider: "Cloudflare Browser Run", version: VERSION });
       try {
         const browser = await connect(this.env.BROWSER, id);
         const pages = browser.contexts().flatMap(context => context.pages());
-        const active = pages[Number(await this.ctx.storage.get("cloudBrowserActiveTabIndex")) || 0] || pages[0];
+        const active = pages[Number(await this.ctx.storage.get(storageKey("cloudBrowserActiveTabIndex"))) || 0] || pages[0];
         const current = active ? await active.url() : "";
         await browser.disconnect();
         return jsonResponse({ ok: true, connected: true, currentUrl: current, provider: "Cloudflare Browser Run", version: VERSION });
       } catch {
-        await this.ctx.storage.delete("cloudBrowserSessionId");
+        await this.ctx.storage.delete(storageKey("cloudBrowserSessionId"));
         return jsonResponse({ ok: true, connected: false, provider: "Cloudflare Browser Run", version: VERSION });
       }
     }
     if (url.pathname === "/cloud/close") {
-      const id = await this.ctx.storage.get("cloudBrowserSessionId");
+      const id = await this.ctx.storage.get(storageKey("cloudBrowserSessionId"));
       if (id) { try { const browser = await connect(this.env.BROWSER, id); await browser.close(); } catch {} }
-      await this.ctx.storage.delete("cloudBrowserSessionId");
-      await this.ctx.storage.delete("cloudBrowserActiveTabIndex");
+      await this.ctx.storage.delete(storageKey("cloudBrowserSessionId"));
+      await this.ctx.storage.delete(storageKey("cloudBrowserActiveTabIndex"));
       return jsonResponse({ ok: true, closed: true });
     }
     let payload = {};
@@ -335,13 +338,13 @@ export class OpenFishRelay {
           const context = page.context();
           page = await context.newPage();
           await page.setViewportSize({ width: 1280, height: 820 });
-          await this.ctx.storage.put("cloudBrowserActiveTabIndex", context.pages().indexOf(page));
+          await this.ctx.storage.put(storageKey("cloudBrowserActiveTabIndex"), context.pages().indexOf(page));
         } else if (action === "switchTab") {
           const pages = browser.contexts().flatMap(context => context.pages());
           const index = Number(payload.index);
           if (!Number.isInteger(index) || index < 0 || index >= pages.length) throw new Error("标签页编号无效");
           page = pages[index];
-          await this.ctx.storage.put("cloudBrowserActiveTabIndex", index);
+          await this.ctx.storage.put(storageKey("cloudBrowserActiveTabIndex"), index);
         } else if (action === "closeTab") {
           const pages = browser.contexts().flatMap(context => context.pages());
           const index = payload.index === undefined ? pages.indexOf(page) : Number(payload.index);
@@ -351,7 +354,7 @@ export class OpenFishRelay {
           const remaining = browser.contexts().flatMap(context => context.pages());
           page = remaining.includes(previouslyActive) ? previouslyActive : (remaining[Math.min(index, remaining.length - 1)] || await (browser.contexts()[0] || await browser.newContext()).newPage());
           await page.setViewportSize({ width: 1280, height: 820 });
-          await this.ctx.storage.put("cloudBrowserActiveTabIndex", Math.max(0, browser.contexts().flatMap(context => context.pages()).indexOf(page)));
+          await this.ctx.storage.put(storageKey("cloudBrowserActiveTabIndex"), Math.max(0, browser.contexts().flatMap(context => context.pages()).indexOf(page)));
         } else if (action === "back") await page.goBack({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => null);
         else if (action === "forward") await page.goForward({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => null);
         else if (action === "reload") await page.reload({ waitUntil: "domcontentloaded", timeout: 20000 });
