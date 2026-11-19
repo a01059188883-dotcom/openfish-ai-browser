@@ -290,7 +290,8 @@ export class OpenFishRelay {
       let browser;
       try {
         const connected = await getBrowser(); browser = connected.browser;
-        return jsonResponse({ ok: true, ...(await snapshot(connected.page)) });
+        const tabs = await Promise.all(browser.contexts().flatMap(context => context.pages()).map(async (tab, index) => ({ index, active: tab === connected.page, title: await tab.title().catch(() => ""), url: tab.url() })));
+        return jsonResponse({ ok: true, ...(await snapshot(connected.page)), tabs, activeIndex: tabs.findIndex(tab => tab.active) });
       } catch (error) { return jsonResponse({ error: String(error?.message || error).slice(0, 500) }, 502); }
       finally { if (browser) { try { await browser.disconnect(); } catch {} } }
     }
