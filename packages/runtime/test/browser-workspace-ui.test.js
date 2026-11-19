@@ -30,6 +30,11 @@ test("mobile browser workspace preserves legacy bookmarks and stores local histo
 test("mobile browser workspace has responsive library and reader layouts", () => {
   assert.match(css, /library-grid/);
   assert.match(css, /reader-content/);
+  assert.match(html, /id="downloads"/);
+  assert.match(html, /id="refreshDownloads"/);
+  assert.match(app, /async function downloadLink/);
+  assert.match(app, /async function loadDownloads/);
+  assert.match(app, /link-download/);
   assert.match(css, /@media\(max-width:640px\)/);
   assert.match(html, /v2\.13\.0/);
   assert.doesNotMatch(html, /Workers Free 每天最多 10 分钟/);
