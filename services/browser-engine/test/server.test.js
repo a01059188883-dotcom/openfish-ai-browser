@@ -94,5 +94,7 @@ test("release deployment builds and verifies Cloud Run before deploying the Work
   assert.match(workflow, /steps\.engine\.outputs\.url/);
   assert.match(workflow, /--no-traffic --tag=preflight/);
   assert.match(workflow, /--to-latest --remove-tags=preflight/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.doesNotMatch(workflow, /\n  push:/);
   assert.doesNotMatch(workflow, /secrets\.BROWSER_ENGINE_URL/);
 });
