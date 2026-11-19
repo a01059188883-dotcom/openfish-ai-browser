@@ -29,6 +29,10 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(worker.includes('await browser.close()'));
   assert.ok(!worker.includes("puppeteer."));
   assert.ok(worker.includes('validateTarget'));
+  assert.ok(worker.includes('context.route("**/*"'));
+  assert.ok(worker.includes('context.routeWebSocket'));
+  assert.ok(worker.includes('browser.disconnect()'));
+  assert.ok(worker.includes('guardedBrowserContexts'));
   for (const id of ["url", "back", "forward", "reload", "go", "viewport", "sendText", "bookmark", "bookmarks"]) assert.ok(html.includes('id="' + id + '"'));
   for (const route of ["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/navigate", "/api/cloud-browser/action", "/api/cloud-browser/close"]) assert.ok(worker.includes(route));
   assert.ok(app.includes("data:image/jpeg;base64,"));
