@@ -280,7 +280,13 @@ if (TOKEN.length < 32) {
   process.exit(1);
 }
 const server = http.createServer((req, res) => { handle(req, res).catch(error => send(res, 500, { error: String(error?.message || error) })); });
-try {\n  downloadStorage = await validateDownloadStorage();\n  server.listen(PORT, HOST, () => console.log(`OpenFish self-hosted browser engine listening on ${HOST}:${PORT}`));\n} catch (error) {\n  console.error("Download storage preflight failed:", error);\n  process.exit(1);\n}
+try {
+  downloadStorage = await validateDownloadStorage();
+  server.listen(PORT, HOST, () => console.log(`OpenFish self-hosted browser engine listening on ${HOST}:${PORT}`));
+} catch (error) {
+  console.error("Download storage preflight failed:", error);
+  process.exit(1);
+}
 async function shutdown() {
   server.close();
   for (const session of sessions.values()) await session.context.close().catch(() => {});
