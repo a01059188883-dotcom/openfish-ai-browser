@@ -16,6 +16,16 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(worker.includes('import { acquire, connect } from "@cloudflare/playwright"'));
   assert.ok(worker.includes('url.pathname.startsWith("/api/cloud-browser/")'));
   assert.ok(worker.includes('const storageKey = key => "cloudBrowser:" + sessionId + ":" + key'));
+  assert.ok(worker.includes('withCloudSessionLock'));
+  assert.ok(worker.includes('cloudBrowserLastUsedAt'));
+  assert.ok(worker.includes('cloudLocks = new Map()'));
+  assert.ok(worker.includes('"x-openfish-session": request.headers.get("x-openfish-session") || ""'));
+  assert.ok(worker.includes('access-control-allow-headers": "Authorization, Content-Type, X-OpenFish-Session"'));
+  assert.ok(app.includes('SESSION_KEY="openfish.browser.session"'));
+  assert.ok(app.includes('"X-OpenFish-Session":sessionId'));
+  assert.ok(admin.includes('ADMIN_SESSION_KEY="openfish.admin.browser.session"'));
+
+  assert.ok(worker.includes('const storageKey = key => "cloudBrowser:" + sessionId + ":" + key'));
   assert.ok(worker.includes('"x-openfish-session": sessionId'));
   assert.ok(app.includes('"X-OpenFish-Session":sessionId'));
   assert.ok(app.includes('SESSION_KEY="openfish.browser.session"'));
