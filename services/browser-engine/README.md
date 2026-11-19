@@ -44,3 +44,9 @@ Browserless's self-hosted Docker image is another option, but its repository use
 - Restrict egress at the server/firewall level. Application-level URL checks are defense in depth, not a replacement for network isolation.
 - Do not use this engine to bypass CAPTCHAs, authentication, paywalls, or site restrictions.
 - The default service is a single-user/single-page engine, not a multi-tenant SaaS.
+
+## Network request policy (engine 1.1.0)
+
+The engine validates the initial navigation URL and installs a browser-context request guard. The guard revalidates HTTP(S) destinations for page requests, subresources, and redirect hops; service workers are disabled so they cannot bypass the context route. Browser WebSocket connections are blocked. Private, loopback, link-local, metadata, multicast, and special-purpose IPv4/IPv6 ranges are rejected.
+
+This is defense in depth, not a complete sandbox. DNS validation and Chromium's later DNS lookup are separate operations, so DNS rebinding remains a time-of-check/time-of-use risk. For public hosting, enforce outbound firewall/egress rules that deny private, loopback, link-local, metadata, and reserved destinations at the network layer. Do not expose this service without TLS and a strong bearer token.
