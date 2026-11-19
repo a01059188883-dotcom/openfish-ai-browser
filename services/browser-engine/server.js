@@ -1,4 +1,7 @@
 import http from "node:http";
+import { randomUUID } from "node:crypto";
+import { readFile, stat } from "node:fs/promises";
+import { basename } from "node:path";
 import { chromium } from "playwright";
 import { validateTarget } from "./network-policy.js";
 
@@ -6,6 +9,8 @@ const PORT = Number(process.env.PORT || 8788);
 const TOKEN = process.env.OPENFISH_ENGINE_TOKEN || "";
 const HOST = process.env.HOST || "0.0.0.0";
 const MAX_BODY = 16_000;
+const MAX_DOWNLOAD_BYTES = 15 * 1024 * 1024;
+const MAX_SESSION_DOWNLOAD_BYTES = 50 * 1024 * 1024;
 const NAV_TIMEOUT = 25_000;
 const SESSION_TTL_MS = Math.max(60_000, Number(process.env.OPENFISH_ENGINE_SESSION_TTL_MS || 30 * 60 * 1000));
 const MAX_SESSIONS = Math.max(1, Math.min(50, Number(process.env.OPENFISH_ENGINE_MAX_SESSIONS || 10)));
@@ -44,7 +49,7 @@ async function createSession(id) {
   });
   const page = await context.newPage();
   page.setDefaultNavigationTimeout(NAV_TIMEOUT);
-  const session = { id, context, page, busy: false, lastUsedAt: Date.now(), createdAt: Date.now() };
+  const session = { id, context, page, downloads: new Map(), busy: false, lastUsedAt: Date.now(), createdAt: Date.now() };
   sessions.set(id, session);
   return session;
 }
@@ -112,8 +117,8 @@ async function handle(req, res) {
     if (session) { sessions.delete(id); await session.context.close().catch(() => {}); }
     return send(res, 200, { ok: true, closed: Boolean(session) });
   }
-  if (!["/status", "/view", "/navigate", "/action", "/tabs"].includes(url.pathname)) return send(res, 404, { error: "Not found" });
-  if ((url.pathname === "/status" || url.pathname === "/view" || url.pathname === "/tabs") ? req.method !== "GET" : req.method !== "POST") return send(res, 405, { error: "Method not allowed" });
+  if (!["/status", "/view", "/navigate", "/action", "/tabs", "/download", "/downloads", "/downloads/remove"].includes(url.pathname)) return send(res, 404, { error: "Not found" });
+  if ((url.pathname === "/status" || url.pathname === "/view" || url.pathname === "/tabs" || url.pathname === "/downloads") ? req.method !== "GET" : req.method !== "POST") return send(res, 405, { error: "Method not allowed" });
   let session;
   try {
     session = await getSession(id);
@@ -121,7 +126,40 @@ async function handle(req, res) {
     session.busy = true;
     if (url.pathname === "/status") return send(res, 200, { ok: true, connected: Boolean(session.context && !session.page.isClosed()), provider: "Self-hosted Playwright + Chromium", currentUrl: session.page.url(), sessionId: id });
     if (url.pathname === "/tabs") return send(res, 200, { ok: true, tabs: await listTabs(session), activeIndex: session.context.pages().indexOf(session.page) });
+    if (url.pathname === "/downloads") return send(res, 200, { ok: true, downloads: [...session.downloads.values()].map(({ data, ...item }) => item) });
     const payload = req.method === "POST" ? await readBody(req) : {};
+    if (url.pathname === "/downloads/remove") {
+      if (payload.approved !== true) throw Object.assign(new Error("Explicit approval is required to remove a download."), { statusCode: 403 });
+      if (!session.downloads.delete(String(payload.id || ""))) throw Object.assign(new Error("Download not found."), { statusCode: 404 });
+      return send(res, 200, { ok: true, removed: true, id: payload.id });
+    }
+    if (url.pathname === "/download") {
+      if (payload.approved !== true) throw Object.assign(new Error("Explicit approval is required to download a file."), { statusCode: 403 });
+      const target = await validateTarget(payload.url);
+      const waitForDownload = session.page.waitForEvent("download", { timeout: 30_000 });
+      const clicked = await session.page.locator("a[href]").evaluateAll((anchors, href) => {
+        const link = anchors.find(anchor => anchor.href === href);
+        if (!link) return false;
+        link.click();
+        return true;
+      }, target);
+      if (!clicked) { waitForDownload.catch(() => {}); throw Object.assign(new Error("The requested link is not present on the current page."), { statusCode: 404 }); }
+      let download;
+      try { download = await waitForDownload; }
+      catch (error) { throw Object.assign(new Error("The selected link did not start a browser download: " + error.message), { statusCode: 502 }); }
+      const path = await download.path();
+      if (!path) throw Object.assign(new Error("The browser did not provide a completed download file."), { statusCode: 502 });
+      const info = await stat(path);
+      if (info.size > MAX_DOWNLOAD_BYTES) throw Object.assign(new Error("Download exceeds the 15 MB per-file limit."), { statusCode: 413 });
+      const used = [...session.downloads.values()].reduce((sum, item) => sum + item.size, 0);
+      if (used + info.size > MAX_SESSION_DOWNLOAD_BYTES) throw Object.assign(new Error("Session download storage is full (50 MB). Remove older downloads first."), { statusCode: 507 });
+      const data = await readFile(path);
+      const id = randomUUID();
+      const filename = basename(String(download.suggestedFilename() || "download")).replace(/[\\x00-\\x1f\\x7f<>:"|?*]/g, "_").slice(0, 120) || "download";
+      const record = { id, filename, size: info.size, url: target, createdAt: new Date().toISOString(), data };
+      session.downloads.set(id, record);
+      return send(res, 200, { ok: true, download: { id, filename, size: info.size, url: target, createdAt: record.createdAt, dataBase64: data.toString("base64") } });
+    }
     const current = session.page;
     if (url.pathname === "/navigate") {
       const target = await validateTarget(payload.url);
