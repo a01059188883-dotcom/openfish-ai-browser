@@ -254,6 +254,13 @@ export class OpenFishRelay {
     const getBrowser = async () => {
       if (!this.env.BROWSER) throw new Error("Cloudflare Browser Run 尚未绑定。请检查 Worker Browser Binding。");
       let browser = null;
+      const lastUsedAt = await this.ctx.storage.get(storageKey("cloudBrowserLastUsedAt"));
+      if (lastUsedAt && Date.now() - Number(lastUsedAt) > 30 * 60 * 1000) {
+        const expiredId = await this.ctx.storage.get(storageKey("cloudBrowserSessionId"));
+        if (expiredId) { try { const expired = await connect(this.env.BROWSER, expiredId); await expired.close(); } catch {} }
+        await this.ctx.storage.delete(storageKey("cloudBrowserSessionId"));
+        await this.ctx.storage.delete(storageKey("cloudBrowserActiveTabIndex"));
+      }
       const stored = await this.ctx.storage.get(storageKey("cloudBrowserSessionId"));
       if (stored) {
         try { browser = await connect(this.env.BROWSER, stored); }
@@ -283,6 +290,7 @@ export class OpenFishRelay {
         });
         guardedBrowserContexts.add(context);
       }
+      await this.ctx.storage.put(storageKey("cloudBrowserLastUsedAt"), Date.now());
       return { browser, page };
     };
     const snapshot = async page => {
@@ -336,6 +344,7 @@ export class OpenFishRelay {
       if (id) { try { const browser = await connect(this.env.BROWSER, id); await browser.close(); } catch {} }
       await this.ctx.storage.delete(storageKey("cloudBrowserSessionId"));
       await this.ctx.storage.delete(storageKey("cloudBrowserActiveTabIndex"));
+      await this.ctx.storage.delete(storageKey("cloudBrowserLastUsedAt"));
       return jsonResponse({ ok: true, closed: true });
     }
     let payload = {};
