@@ -106,9 +106,10 @@ async function handle(req, res) {
       } else if (action === "closeTab") {
         const openPages = context.pages(), index = payload.index === undefined ? openPages.indexOf(page) : Number(payload.index);
         if (!Number.isInteger(index) || index < 0 || index >= openPages.length) throw new Error("标签页编号无效");
+        const previouslyActive = page;
         await openPages[index].close();
         const remaining = context.pages();
-        page = remaining[Math.min(index, remaining.length - 1)] || await context.newPage();
+        page = remaining.includes(previouslyActive) ? previouslyActive : (remaining[Math.min(index, remaining.length - 1)] || await context.newPage());
         page.setDefaultNavigationTimeout(NAV_TIMEOUT);
       } else if (action === "back") await current.goBack({ waitUntil: "domcontentloaded", timeout: 15_000 }).catch(() => null);
       else if (action === "forward") await current.goForward({ waitUntil: "domcontentloaded", timeout: 15_000 }).catch(() => null);
