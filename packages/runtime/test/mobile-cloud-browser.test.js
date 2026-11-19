@@ -32,7 +32,7 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(worker.includes('"x-openfish-session": sessionId'));
   assert.ok(app.includes('"X-OpenFish-Session":sessionId'));
   assert.ok(app.includes('SESSION_KEY="openfish.browser.session"'));
-  assert.ok(worker.includes('const readOnlyRoute = ["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/tabs"].includes(url.pathname)'));
+  assert.ok(worker.includes('const readOnlyRoute = ["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/tabs", "/api/cloud-browser/downloads"].includes(url.pathname)'));
   assert.ok(worker.includes('if (readOnlyRoute && request.method !== "GET")'));
   assert.ok(worker.includes('if (!readOnlyRoute && request.method !== "POST")'));
   assert.ok(worker.includes('/api/v1/browser/navigate'));
