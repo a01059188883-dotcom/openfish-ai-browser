@@ -92,7 +92,7 @@ test("release deployment builds and verifies Cloud Run before deploying the Work
   assert.ok(workflow.indexOf("Deploy self-hosted browser engine to Cloud Run") < workflow.indexOf("Deploy Cloudflare Worker and Durable Object"));
   assert.match(workflow, /google-github-actions\/auth@v2/);
   assert.match(workflow, /GCP_WORKLOAD_IDENTITY_PROVIDER/);
-  assert.match(workflow, /h\.version!==\"1\.3\.4\"/);
+  assert.match(workflow, /h\.version!==\"1\.3\.5\"/);
   assert.match(workflow, /steps\.engine\.outputs\.url/);
   assert.match(workflow, /--no-traffic --tag=preflight/);
   assert.match(workflow, /--to-latest --remove-tags=preflight/);
