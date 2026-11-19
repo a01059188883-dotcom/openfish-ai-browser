@@ -3,6 +3,7 @@ import { acquire, connect } from "@cloudflare/playwright";
 
 const VERSION = "2.11.0";
 const MAX_BODY_BYTES = 512 * 1024;
+const guardedBrowserContexts = new WeakSet();
 const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/browser/sessions"]);
 const ALLOWED_PATH = path => path === "/mcp" || path === "/health" ||
   path === "/.well-known/openfish-tools.json" ||
@@ -219,14 +220,14 @@ export class OpenFishRelay {
       let target;
       try { target = new URL(raw); } catch { throw new Error("请输入有效的网址"); }
       if (!["http:", "https:"].includes(target.protocol) || target.username || target.password) throw new Error("仅允许公开 HTTP/HTTPS 网页地址");
-      const host = target.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-      if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || host === "metadata.google.internal" || host === "169.254.169.254") throw new Error("出于安全原因，不能访问本机、内网或云元数据地址");
-      const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+      const host = target.hostname.toLowerCase().replace(/^\\[|\\]$/g, "").replace(/\\.$/, "");
+      if (host === "localhost" || host === "metadata.google.internal" || [".localhost", ".local", ".internal", ".home.arpa", ".test", ".invalid", ".example"].some(suffix => host.endsWith(suffix))) throw new Error("出于安全原因，不能访问本机、内网或云元数据地址");
+      const ipv4 = host.match(/^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$/);
       if (ipv4) {
-        const [a,b] = ipv4.slice(1).map(Number);
-        if (a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127)) throw new Error("不能访问私有或保留 IP 地址");
+        const [a,b,c] = ipv4.slice(1).map(Number);
+        if (a === 0 || a === 10 || a === 127 || a >= 224 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && (b === 0 || b === 168)) || (a === 192 && b === 88 && c === 99) || (a === 198 && (b === 18 || b === 19 || b === 51 && c === 100)) || (a === 203 && b === 0 && c === 113)) throw new Error("不能访问私有或保留 IP 地址");
       }
-      if (host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:")) throw new Error("不能访问私有 IPv6 地址");
+      if (host === "::" || host === "::1" || host.startsWith("fc") || host.startsWith("fd") || /^fe[89ab]/.test(host) || host.startsWith("ff") || host.startsWith("::ffff:") || host.startsWith("2001:db8:") || /^2001:0(?::|$)/.test(host) || /^2001:(10|20)(?::|$)/.test(host) || host.startsWith("2001:2:") || host.startsWith("2002:") || host.startsWith("64:ff9b:")) throw new Error("不能访问私有或保留 IPv6 地址");
       return target.toString();
     };
     const getBrowser = async () => {
@@ -249,6 +250,17 @@ export class OpenFishRelay {
         page = await context.newPage();
       }
       await page.setViewportSize({ width: 1280, height: 820 });
+      const context = page.context();
+      if (!guardedBrowserContexts.has(context)) {
+        if (typeof context.routeWebSocket === "function") {
+          context.routeWebSocket("**/*", socket => socket.close({ code: 1008, reason: "WebSocket access is disabled by OpenFish network policy." }));
+        }
+        await context.route("**/*", async route => {
+          try { validateTarget(route.request().url()); await route.continue(); }
+          catch { await route.abort("blockedbyclient").catch(() => {}); }
+        });
+        guardedBrowserContexts.add(context);
+      }
       return { browser, page };
     };
     const snapshot = async page => {
@@ -268,7 +280,7 @@ export class OpenFishRelay {
         const connected = await getBrowser(); browser = connected.browser;
         return jsonResponse({ ok: true, ...(await snapshot(connected.page)) });
       } catch (error) { return jsonResponse({ error: String(error?.message || error).slice(0, 500) }, 502); }
-      finally { if (browser) { try { await browser.close(); } catch {} } }
+      finally { if (browser) { try { await browser.disconnect(); } catch {} } }
     }
     if (url.pathname === "/cloud/status") {
       const id = await this.ctx.storage.get("cloudBrowserSessionId");
