@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+
+test("Docker image includes the extracted network policy module", async () => {
+  const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
+  assert.match(dockerfile, /COPY server\\.js network-policy\\.js \.\//);
+});
 
 test("self-hosted engine requires a long private token and exposes authenticated health", async t => {
   const port = 19000 + Math.floor(Math.random() * 1000);
