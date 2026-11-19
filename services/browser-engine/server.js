@@ -1,5 +1,5 @@
 import http from "node:http";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { readFile, stat, unlink } from "node:fs/promises";
 import { basename } from "node:path";
 import { chromium } from "playwright";
@@ -18,6 +18,16 @@ let browser;
 let browserPromise;
 const sessions = new Map();
 const sessionCreations = new Map();
+
+function hasValidToken(req) {
+  if (TOKEN.length < 32 || typeof req.headers.authorization !== "string") return false;
+  const prefix = "Bearer ";
+  const header = req.headers.authorization;
+  if (!header.startsWith(prefix)) return false;
+  const supplied = Buffer.from(header.slice(prefix.length));
+  const expected = Buffer.from(TOKEN);
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
+}
 
 function send(res, status, data) {
   const body = JSON.stringify(data);
@@ -107,7 +117,7 @@ async function readBody(req) {
   catch { throw Object.assign(new Error("Invalid JSON body."), { statusCode: 400 }); }
 }
 async function handle(req, res) {
-  if (TOKEN.length < 32 || req.headers.authorization !== `Bearer ${TOKEN}`) return send(res, 401, { error: "Unauthorized" });
+  if (!hasValidToken(req)) return send(res, 401, { error: "Unauthorized" });
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
   if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.3.2", activeSessions: sessions.size, maxSessions: MAX_SESSIONS });
   const id = sessionId(req);
