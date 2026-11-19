@@ -1,8 +1,9 @@
 import mobileAdminHtml from "./mobile-admin.html";
 import { acquire, connect } from "@cloudflare/playwright";
 
-const VERSION = "2.10.1";
+const VERSION = "2.13.5";
 const MAX_BODY_BYTES = 512 * 1024;
+const guardedBrowserContexts = new WeakSet();
 const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/browser/sessions"]);
 const ALLOWED_PATH = path => path === "/mcp" || path === "/health" ||
   path === "/.well-known/openfish-tools.json" ||
@@ -72,17 +73,18 @@ export default {
         paths: {
           "/api/v1/browser/status": { get: { summary: "Browser session status", responses: { "200": { description: "Current cloud browser status" } } } },
           "/api/v1/browser/view": { get: { summary: "Read current page and screenshot", responses: { "200": { description: "Current page snapshot" } } } },
+          "/api/v1/browser/tabs": { get: { summary: "List tabs in the active browser session", responses: { "200": { description: "Open browser tabs and active tab index" } } } },
           "/api/v1/browser/navigate": { post: { summary: "Navigate to a public HTTP(S) URL", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["url"], properties: { url: { type: "string", format: "uri" } } } } } }, responses: { "200": { description: "Navigation result" } } } },
-          "/api/v1/browser/action": { post: { summary: "Interact with the active page", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["action"], properties: { action: { type: "string", enum: ["back", "forward", "reload", "click", "type", "press", "scroll", "clickLink"] }, x: { type: "number" }, y: { type: "number" }, text: { type: "string" }, key: { type: "string" }, deltaY: { type: "number" }, url: { type: "string", format: "uri" } } } } } }, responses: { "200": { description: "Action result" } } } },
+          "/api/v1/browser/action": { post: { summary: "Interact with the active page", requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["action"], properties: { action: { type: "string", enum: ["back", "forward", "reload", "click", "type", "press", "scroll", "clickLink", "newTab", "switchTab", "closeTab"] }, x: { type: "number" }, y: { type: "number" }, text: { type: "string" }, key: { type: "string" }, deltaY: { type: "number" }, index: { type: "integer", minimum: 0 }, url: { type: "string", format: "uri" } } } } } }, responses: { "200": { description: "Action result" } } } },
           "/api/v1/browser/close": { post: { summary: "Close the active browser session", responses: { "200": { description: "Session closed" } } } }
         }
       }), { headers: { "content-type": "application/vnd.oai.openapi+json;version=3.1", "cache-control": "public, max-age=300", "x-openfish-version": VERSION } });
     }
     if (url.pathname.startsWith("/api/v1/browser/")) {
-      const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type", "access-control-max-age": "86400", "cache-control": "no-store" };
+      const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type, X-OpenFish-Session", "access-control-max-age": "86400", "cache-control": "no-store" };
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
       if (!authorized(request, env)) return json({ error: "Unauthorized. Supply the OpenFish relay Bearer token." }, 401);
-      const routes = { "/api/v1/browser/status": ["/cloud/status", "GET"], "/api/v1/browser/view": ["/cloud/view", "GET"], "/api/v1/browser/navigate": ["/cloud/navigate", "POST"], "/api/v1/browser/action": ["/cloud/action", "POST"], "/api/v1/browser/close": ["/cloud/close", "POST"] };
+      const routes = { "/api/v1/browser/status": ["/cloud/status", "GET"], "/api/v1/browser/view": ["/cloud/view", "GET"], "/api/v1/browser/tabs": ["/cloud/tabs", "GET"], "/api/v1/browser/navigate": ["/cloud/navigate", "POST"], "/api/v1/browser/action": ["/cloud/action", "POST"], "/api/v1/browser/close": ["/cloud/close", "POST"] };
       const route = routes[url.pathname];
       if (!route) return json({ error: "Browser API route not found." }, 404);
       if (request.method !== route[1]) return json({ error: "Method not allowed." }, 405);
@@ -92,7 +94,7 @@ export default {
         if (raw.length > 16000) return json({ error: "Request too large." }, 413);
         body = raw || "{}";
       }
-      const response = await relayStub(env).fetch(new Request("https://relay.internal" + route[0], { method: request.method, headers: { "content-type": "application/json" }, body }));
+      const response = await relayStub(env).fetch(new Request("https://relay.internal" + route[0], { method: request.method, headers: { "content-type": "application/json", "x-openfish-session": request.headers.get("x-openfish-session") || "" }, body }));
       const headers = new Headers(response.headers);
       for (const [key, value] of Object.entries(cors)) headers.set(key, value);
       headers.set("x-openfish-version", VERSION);
@@ -100,13 +102,14 @@ export default {
     }
     if (url.pathname.startsWith("/api/cloud-browser/")) {
       if (!authorized(request, env)) return json({ error: "Unauthorized. Supply the relay Bearer token." }, 401);
-      const allowed = new Set(["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/navigate", "/api/cloud-browser/action", "/api/cloud-browser/close"]);
+      const allowed = new Set(["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/tabs", "/api/cloud-browser/navigate", "/api/cloud-browser/action", "/api/cloud-browser/close", "/api/cloud-browser/download", "/api/cloud-browser/downloads", "/api/cloud-browser/downloads/file", "/api/cloud-browser/downloads/remove"]);
       if (!allowed.has(url.pathname)) return json({ error: "Cloud browser route not found." }, 404);
-      if ((url.pathname.endsWith("/status") || url.pathname.endsWith("/view")) && request.method !== "GET") return json({ error: "Method not allowed." }, 405);
-      if (!url.pathname.endsWith("/status") && !url.pathname.endsWith("/view") && request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+      const readOnlyRoute = ["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/tabs", "/api/cloud-browser/downloads"].includes(url.pathname);
+      if (readOnlyRoute && request.method !== "GET") return json({ error: "Method not allowed." }, 405);
+      if (!readOnlyRoute && request.method !== "POST") return json({ error: "Method not allowed." }, 405);
       const body = request.method === "POST" ? await request.text() : "";
       if (body.length > 16000) return json({ error: "Request too large." }, 413);
-      return relayStub(env).fetch(new Request("https://relay.internal/cloud" + url.pathname.slice("/api/cloud-browser".length), { method: request.method, headers: { "content-type": "application/json" }, body: body || undefined }));
+      return relayStub(env).fetch(new Request("https://relay.internal/cloud" + url.pathname.slice("/api/cloud-browser".length), { method: request.method, headers: { "content-type": "application/json", "x-openfish-session": request.headers.get("x-openfish-session") || "" }, body: body || undefined }));
     }
     if (env.ASSETS && ["/app.css", "/app.js", "/favicon.ico", "/manifest.webmanifest"].includes(url.pathname)) return env.ASSETS.fetch(request);
     if (url.pathname === "/agent/connect") {
@@ -153,11 +156,11 @@ export default {
 
 export class OpenFishRelay {
   constructor(ctx, env) {
-    this.ctx = ctx; this.env = env; this.pending = new Map(); this.maxPending = 32; this.requestTimeoutMs = 45000;
+    this.ctx = ctx; this.env = env; this.pending = new Map(); this.cloudLocks = new Map(); this.maxPending = 32; this.requestTimeoutMs = 45000;
   }
   async fetch(request) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/cloud/")) return this.handleCloudBrowser(request);
+    if (url.pathname.startsWith("/cloud/")) return this.withCloudSessionLock(request);
     if (url.pathname === "/connect") {
       if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") return new Response("WebSocket required", { status: 426 });
       for (const socket of this.ctx.getWebSockets()) {
@@ -190,22 +193,43 @@ export class OpenFishRelay {
     });
   }
 
+  async withCloudSessionLock(request) {
+    const id = request.headers.get("x-openfish-session") || "";
+    if (!/^[a-zA-Z0-9_-]{8,80}$/.test(id)) return json({ error: "A valid X-OpenFish-Session header is required." }, 400);
+    const previous = this.cloudLocks.get(id) || Promise.resolve();
+    let release;
+    const current = new Promise(resolve => { release = resolve; });
+    const queued = previous.then(() => current);
+    this.cloudLocks.set(id, queued);
+    await previous;
+    try { return await this.handleCloudBrowser(request); }
+    finally {
+      release();
+      if (this.cloudLocks.get(id) === queued) this.cloudLocks.delete(id);
+    }
+  }
+
   async handleCloudBrowser(request) {
     const url = new URL(request.url);
+    const sessionId = request.headers.get("x-openfish-session") || "";
+    if (!/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) return new Response(JSON.stringify({ error: "A valid X-OpenFish-Session header is required." }), { status: 400, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+    const storageKey = key => "cloudBrowser:" + sessionId + ":" + key;
     const jsonResponse = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
     // Optional self-hosted Playwright engine takes priority when both secrets are configured.
     // Cloudflare Browser Run remains the fallback, preserving existing deployments.
     if (this.env.BROWSER_ENGINE_URL && this.env.BROWSER_ENGINE_TOKEN) {
       const endpoint = new URL(url.pathname.slice("/cloud".length), this.env.BROWSER_ENGINE_URL.endsWith("/") ? this.env.BROWSER_ENGINE_URL : this.env.BROWSER_ENGINE_URL + "/");
-      const method = url.pathname === "/cloud/status" || url.pathname === "/cloud/view" ? "GET" : "POST";
+      const method = url.pathname === "/cloud/status" || url.pathname === "/cloud/view" || url.pathname === "/cloud/tabs" || url.pathname === "/cloud/downloads" ? "GET" : "POST";
       const body = method === "POST" ? await request.text() : undefined;
       if (body && body.length > 16000) return jsonResponse({ error: "Request too large." }, 413);
+      // File transfer may legitimately take longer; keep ordinary browser RPCs bounded.
+      const upstreamTimeoutMs = url.pathname.startsWith("/cloud/download") ? 120000 : 45000;
       try {
         const upstream = await fetch(endpoint, {
           method,
-          headers: { "authorization": "Bearer " + this.env.BROWSER_ENGINE_TOKEN, ...(body ? { "content-type": "application/json" } : {}) },
+          headers: { "authorization": "Bearer " + this.env.BROWSER_ENGINE_TOKEN, "x-openfish-session": sessionId, ...(body ? { "content-type": "application/json" } : {}) },
           body,
-          signal: AbortSignal.timeout(35000)
+          signal: AbortSignal.timeout(upstreamTimeoutMs)
         });
         const headers = new Headers(upstream.headers);
         headers.set("cache-control", "no-store");
@@ -215,40 +239,61 @@ export class OpenFishRelay {
         return jsonResponse({ error: "Self-hosted browser engine unavailable: " + String(error?.message || error).slice(0, 250), code: "ENGINE_UNAVAILABLE" }, 502);
       }
     }
+    if (["/cloud/download", "/cloud/downloads", "/cloud/downloads/file", "/cloud/downloads/remove"].includes(url.pathname)) return jsonResponse({ error: "Cloud downloads require the self-hosted Playwright engine. The configured Browser Run fallback does not expose a verified file-transfer API." }, 501);
     const validateTarget = raw => {
       let target;
       try { target = new URL(raw); } catch { throw new Error("请输入有效的网址"); }
       if (!["http:", "https:"].includes(target.protocol) || target.username || target.password) throw new Error("仅允许公开 HTTP/HTTPS 网页地址");
-      const host = target.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-      if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || host === "metadata.google.internal" || host === "169.254.169.254") throw new Error("出于安全原因，不能访问本机、内网或云元数据地址");
-      const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+      const host = target.hostname.toLowerCase().replace(/^\\[|\\]$/g, "").replace(/\\.$/, "");
+      if (host === "localhost" || host === "metadata.google.internal" || [".localhost", ".local", ".internal", ".home.arpa", ".test", ".invalid", ".example"].some(suffix => host.endsWith(suffix))) throw new Error("出于安全原因，不能访问本机、内网或云元数据地址");
+      const ipv4 = host.match(/^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$/);
       if (ipv4) {
-        const [a,b] = ipv4.slice(1).map(Number);
-        if (a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127)) throw new Error("不能访问私有或保留 IP 地址");
+        const [a,b,c] = ipv4.slice(1).map(Number);
+        if (a === 0 || a === 10 || a === 127 || a >= 224 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && (b === 0 || b === 168)) || (a === 192 && b === 88 && c === 99) || (a === 198 && (b === 18 || b === 19 || b === 51 && c === 100)) || (a === 203 && b === 0 && c === 113)) throw new Error("不能访问私有或保留 IP 地址");
       }
-      if (host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:")) throw new Error("不能访问私有 IPv6 地址");
+      if (host === "::" || host === "::1" || host.startsWith("fc") || host.startsWith("fd") || /^fe[89ab]/.test(host) || host.startsWith("ff") || host.startsWith("::ffff:") || host.startsWith("2001:db8:") || /^2001:0(?::|$)/.test(host) || /^2001:(10|20)(?::|$)/.test(host) || host.startsWith("2001:2:") || host.startsWith("2002:") || host.startsWith("64:ff9b:")) throw new Error("不能访问私有或保留 IPv6 地址");
       return target.toString();
     };
     const getBrowser = async () => {
       if (!this.env.BROWSER) throw new Error("Cloudflare Browser Run 尚未绑定。请检查 Worker Browser Binding。");
       let browser = null;
-      const stored = await this.ctx.storage.get("cloudBrowserSessionId");
+      const lastUsedAt = await this.ctx.storage.get(storageKey("cloudBrowserLastUsedAt"));
+      if (lastUsedAt && Date.now() - Number(lastUsedAt) > 30 * 60 * 1000) {
+        const expiredId = await this.ctx.storage.get(storageKey("cloudBrowserSessionId"));
+        if (expiredId) { try { const expired = await connect(this.env.BROWSER, expiredId); await expired.close(); } catch {} }
+        await this.ctx.storage.delete(storageKey("cloudBrowserSessionId"));
+        await this.ctx.storage.delete(storageKey("cloudBrowserActiveTabIndex"));
+      }
+      const stored = await this.ctx.storage.get(storageKey("cloudBrowserSessionId"));
       if (stored) {
         try { browser = await connect(this.env.BROWSER, stored); }
-        catch { await this.ctx.storage.delete("cloudBrowserSessionId"); }
+        catch { await this.ctx.storage.delete(storageKey("cloudBrowserSessionId")); }
       }
       if (!browser) {
         const acquired = await acquire(this.env.BROWSER);
         browser = await connect(this.env.BROWSER, acquired.sessionId);
-        await this.ctx.storage.put("cloudBrowserSessionId", acquired.sessionId);
+        await this.ctx.storage.put(storageKey("cloudBrowserSessionId"), acquired.sessionId);
       }
       const pages = browser.contexts().flatMap(context => context.pages());
-      let page = pages[0];
+      let page = pages[Number(await this.ctx.storage.get(storageKey("cloudBrowserActiveTabIndex"))) || 0] || pages[0];
       if (!page) {
         const context = browser.contexts()[0] || await browser.newContext();
         page = await context.newPage();
+        await this.ctx.storage.put(storageKey("cloudBrowserActiveTabIndex"), 0);
       }
       await page.setViewportSize({ width: 1280, height: 820 });
+      const context = page.context();
+      if (!guardedBrowserContexts.has(context)) {
+        if (typeof context.routeWebSocket === "function") {
+          context.routeWebSocket("**/*", socket => socket.close({ code: 1008, reason: "WebSocket access is disabled by OpenFish network policy." }));
+        }
+        await context.route("**/*", async route => {
+          try { validateTarget(route.request().url()); await route.continue(); }
+          catch { await route.abort("blockedbyclient").catch(() => {}); }
+        });
+        guardedBrowserContexts.add(context);
+      }
+      await this.ctx.storage.put(storageKey("cloudBrowserLastUsedAt"), Date.now());
       return { browser, page };
     };
     const snapshot = async page => {
@@ -262,32 +307,47 @@ export class OpenFishRelay {
       const shot = await page.screenshot({ type: "jpeg", quality: 62, fullPage: false });
       return { ...details, screenshot: bytesToBase64(new Uint8Array(shot)), screenshotType: "image/jpeg" };
     };
+    if (url.pathname === "/cloud/tabs") {
+      let browser;
+      try {
+        const connected = await getBrowser(); browser = connected.browser;
+        const pages = browser.contexts().flatMap(context => context.pages());
+        const activeIndex = pages.indexOf(connected.page);
+        const tabs = await Promise.all(pages.map(async (tab, index) => ({ index, active: index === activeIndex, title: await tab.title().catch(() => ""), url: tab.url() })));
+        return jsonResponse({ ok: true, tabs, activeIndex });
+      } catch (error) { return jsonResponse({ error: String(error?.message || error).slice(0, 500) }, 502); }
+      finally { if (browser) { try { await browser.disconnect(); } catch {} } }
+    }
     if (url.pathname === "/cloud/view") {
       let browser;
       try {
         const connected = await getBrowser(); browser = connected.browser;
-        return jsonResponse({ ok: true, ...(await snapshot(connected.page)) });
+        const tabs = await Promise.all(browser.contexts().flatMap(context => context.pages()).map(async (tab, index) => ({ index, active: tab === connected.page, title: await tab.title().catch(() => ""), url: tab.url() })));
+        return jsonResponse({ ok: true, ...(await snapshot(connected.page)), tabs, activeIndex: tabs.findIndex(tab => tab.active) });
       } catch (error) { return jsonResponse({ error: String(error?.message || error).slice(0, 500) }, 502); }
-      finally { if (browser) { try { await browser.close(); } catch {} } }
+      finally { if (browser) { try { await browser.disconnect(); } catch {} } }
     }
     if (url.pathname === "/cloud/status") {
-      const id = await this.ctx.storage.get("cloudBrowserSessionId");
-      if (!id) return jsonResponse({ ok: true, connected: false, provider: "Cloudflare Browser Run", version: VERSION, freeAllowance: "10 minutes/day on Workers Free" });
+      const id = await this.ctx.storage.get(storageKey("cloudBrowserSessionId"));
+      if (!id) return jsonResponse({ ok: true, connected: false, provider: "Cloudflare Browser Run", version: VERSION });
       try {
         const browser = await connect(this.env.BROWSER, id);
         const pages = browser.contexts().flatMap(context => context.pages());
-        const current = pages[0] ? await pages[0].url() : "";
+        const active = pages[Number(await this.ctx.storage.get(storageKey("cloudBrowserActiveTabIndex"))) || 0] || pages[0];
+        const current = active ? await active.url() : "";
         await browser.disconnect();
-        return jsonResponse({ ok: true, connected: true, currentUrl: current, provider: "Cloudflare Browser Run", version: VERSION, freeAllowance: "10 minutes/day on Workers Free" });
+        return jsonResponse({ ok: true, connected: true, currentUrl: current, provider: "Cloudflare Browser Run", version: VERSION });
       } catch {
-        await this.ctx.storage.delete("cloudBrowserSessionId");
-        return jsonResponse({ ok: true, connected: false, provider: "Cloudflare Browser Run", version: VERSION, freeAllowance: "10 minutes/day on Workers Free" });
+        await this.ctx.storage.delete(storageKey("cloudBrowserSessionId"));
+        return jsonResponse({ ok: true, connected: false, provider: "Cloudflare Browser Run", version: VERSION });
       }
     }
     if (url.pathname === "/cloud/close") {
-      const id = await this.ctx.storage.get("cloudBrowserSessionId");
+      const id = await this.ctx.storage.get(storageKey("cloudBrowserSessionId"));
       if (id) { try { const browser = await connect(this.env.BROWSER, id); await browser.close(); } catch {} }
-      await this.ctx.storage.delete("cloudBrowserSessionId");
+      await this.ctx.storage.delete(storageKey("cloudBrowserSessionId"));
+      await this.ctx.storage.delete(storageKey("cloudBrowserActiveTabIndex"));
+      await this.ctx.storage.delete(storageKey("cloudBrowserLastUsedAt"));
       return jsonResponse({ ok: true, closed: true });
     }
     let payload = {};
@@ -296,13 +356,34 @@ export class OpenFishRelay {
     try {
       const connected = await getBrowser();
       browser = connected.browser;
-      const page = connected.page;
+      let page = connected.page;
       if (url.pathname === "/cloud/navigate") {
         const target = validateTarget(payload.url);
         await page.goto(target, { waitUntil: "domcontentloaded", timeout: 25000 });
       } else if (url.pathname === "/cloud/action") {
         const action = payload.action;
-        if (action === "back") await page.goBack({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => null);
+        if (action === "newTab") {
+          const context = page.context();
+          page = await context.newPage();
+          await page.setViewportSize({ width: 1280, height: 820 });
+          await this.ctx.storage.put(storageKey("cloudBrowserActiveTabIndex"), context.pages().indexOf(page));
+        } else if (action === "switchTab") {
+          const pages = browser.contexts().flatMap(context => context.pages());
+          const index = Number(payload.index);
+          if (!Number.isInteger(index) || index < 0 || index >= pages.length) throw new Error("标签页编号无效");
+          page = pages[index];
+          await this.ctx.storage.put(storageKey("cloudBrowserActiveTabIndex"), index);
+        } else if (action === "closeTab") {
+          const pages = browser.contexts().flatMap(context => context.pages());
+          const index = payload.index === undefined ? pages.indexOf(page) : Number(payload.index);
+          if (!Number.isInteger(index) || index < 0 || index >= pages.length) throw new Error("标签页编号无效");
+          const previouslyActive = page;
+          await pages[index].close();
+          const remaining = browser.contexts().flatMap(context => context.pages());
+          page = remaining.includes(previouslyActive) ? previouslyActive : (remaining[Math.min(index, remaining.length - 1)] || await (browser.contexts()[0] || await browser.newContext()).newPage());
+          await page.setViewportSize({ width: 1280, height: 820 });
+          await this.ctx.storage.put(storageKey("cloudBrowserActiveTabIndex"), Math.max(0, browser.contexts().flatMap(context => context.pages()).indexOf(page)));
+        } else if (action === "back") await page.goBack({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => null);
         else if (action === "forward") await page.goForward({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => null);
         else if (action === "reload") await page.reload({ waitUntil: "domcontentloaded", timeout: 20000 });
         else if (action === "click") {
@@ -327,7 +408,8 @@ export class OpenFishRelay {
         } else throw new Error("不支持的浏览器操作");
       }
       const result = await snapshot(page);
-      return jsonResponse({ ok: true, ...result });
+      const tabs = await Promise.all(browser.contexts().flatMap(context => context.pages()).map(async (tab, index) => ({ index, active: tab === page, title: await tab.title().catch(() => ""), url: tab.url() })));
+      return jsonResponse({ ok: true, ...result, tabs, activeIndex: tabs.findIndex(tab => tab.active) });
     } catch (error) {
       return jsonResponse({ error: String(error?.message || error).slice(0, 500), code: /429|limit|quota/i.test(String(error)) ? "BROWSER_LIMIT" : "BROWSER_ERROR" }, 502);
     } finally {
