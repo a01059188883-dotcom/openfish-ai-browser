@@ -145,4 +145,5 @@ test("mobile download refresh revokes stale object URLs", async () => {
   const app = await readFile(new URL("../../../public/app.js", import.meta.url), "utf8");
   assert.match(app, /for\(const objectUrl of downloadObjectUrls\.values\(\)\)URL\.revokeObjectURL\(objectUrl\)/);
   assert.match(app, /downloadObjectUrls\.clear\(\)/);
+  assert.ok(app.indexOf('const result=await api("/api/cloud-browser/downloads")') < app.indexOf("URL.revokeObjectURL(objectUrl)"), "keep old save links alive if refresh fails");
 });
