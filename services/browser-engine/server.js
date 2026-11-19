@@ -12,6 +12,15 @@ let context;
 let page;
 let busy = false;
 
+async function listTabs() {
+  const pages = context?.pages?.() || [];
+  return Promise.all(pages.map(async (tab, index) => ({
+    index, active: tab === page,
+    title: await tab.title().catch(() => ""),
+    url: tab.url()
+  })));
+}
+
 function send(res, status, data) {
   const body = JSON.stringify(data);
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "content-length": Buffer.byteLength(body) });
@@ -35,7 +44,10 @@ async function ensurePage() {
     page = await context.newPage();
     page.setDefaultNavigationTimeout(NAV_TIMEOUT);
   }
-  if (!page || page.isClosed()) page = await context.newPage();
+  const openPages = context.pages();
+  if (!openPages.length) page = await context.newPage();
+  else if (!page || page.isClosed() || !openPages.includes(page)) page = openPages[0];
+  for (const tab of context.pages()) tab.setDefaultNavigationTimeout(NAV_TIMEOUT);
   return page;
 }
 async function snapshot(current) {
@@ -61,7 +73,7 @@ async function readBody(req) {
 async function handle(req, res) {
   if (TOKEN.length < 32 || req.headers.authorization !== `Bearer ${TOKEN}`) return send(res, 401, { error: "Unauthorized" });
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.1.0" });
+  if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.2.0" });
   if (url.pathname === "/status" && req.method === "GET") {
     return send(res, 200, { ok: true, connected: Boolean(browser?.isConnected() && page && !page.isClosed()), provider: "Self-hosted Playwright + Chromium", currentUrl: page && !page.isClosed() ? page.url() : "" });
   }
@@ -70,19 +82,35 @@ async function handle(req, res) {
     browser = context = page = undefined;
     return send(res, 200, { ok: true, closed: true });
   }
-  if (!["/view", "/navigate", "/action"].includes(url.pathname)) return send(res, 404, { error: "Not found" });
-  if ((url.pathname === "/view" && req.method !== "GET") || (url.pathname !== "/view" && req.method !== "POST")) return send(res, 405, { error: "Method not allowed" });
+  if (!["/view", "/navigate", "/action", "/tabs"].includes(url.pathname)) return send(res, 404, { error: "Not found" });
+  if ((url.pathname === "/view" || url.pathname === "/tabs") ? req.method !== "GET" : req.method !== "POST") return send(res, 405, { error: "Method not allowed" });
   if (busy) return send(res, 429, { error: "Browser is busy. Retry shortly." });
   busy = true;
   try {
     const payload = req.method === "POST" ? await readBody(req) : {};
     const current = await ensurePage();
-    if (url.pathname === "/navigate") {
+    if (url.pathname === "/tabs") {
+      return send(res, 200, { ok: true, tabs: await listTabs(), activeIndex: context.pages().indexOf(page) });
+    } else if (url.pathname === "/navigate") {
       const target = await validateTarget(payload.url);
       await current.goto(target, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
     } else if (url.pathname === "/action") {
       const action = payload.action;
-      if (action === "back") await current.goBack({ waitUntil: "domcontentloaded", timeout: 15_000 }).catch(() => null);
+      if (action === "newTab") {
+        page = await context.newPage();
+        page.setDefaultNavigationTimeout(NAV_TIMEOUT);
+      } else if (action === "switchTab") {
+        const index = Number(payload.index), openPages = context.pages();
+        if (!Number.isInteger(index) || index < 0 || index >= openPages.length) throw new Error("标签页编号无效");
+        page = openPages[index];
+      } else if (action === "closeTab") {
+        const openPages = context.pages(), index = payload.index === undefined ? openPages.indexOf(page) : Number(payload.index);
+        if (!Number.isInteger(index) || index < 0 || index >= openPages.length) throw new Error("标签页编号无效");
+        await openPages[index].close();
+        const remaining = context.pages();
+        page = remaining[Math.min(index, remaining.length - 1)] || await context.newPage();
+        page.setDefaultNavigationTimeout(NAV_TIMEOUT);
+      } else if (action === "back") await current.goBack({ waitUntil: "domcontentloaded", timeout: 15_000 }).catch(() => null);
       else if (action === "forward") await current.goForward({ waitUntil: "domcontentloaded", timeout: 15_000 }).catch(() => null);
       else if (action === "reload") await current.reload({ waitUntil: "domcontentloaded", timeout: 20_000 });
       else if (action === "click") {
@@ -105,7 +133,7 @@ async function handle(req, res) {
         await current.goto(target, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
       } else throw new Error("不支持的浏览器操作");
     }
-    return send(res, 200, await snapshot(current));
+    return send(res, 200, { ...(await snapshot(page)), tabs: await listTabs(), activeIndex: context.pages().indexOf(page) });
   } catch (error) {
     return send(res, 502, { error: String(error?.message || error).slice(0, 500), code: /429|limit|quota/i.test(String(error)) ? "BROWSER_LIMIT" : "BROWSER_ERROR" });
   } finally { busy = false; }
