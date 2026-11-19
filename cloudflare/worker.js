@@ -1,7 +1,7 @@
 import mobileAdminHtml from "./mobile-admin.html";
 import { acquire, connect } from "@cloudflare/playwright";
 
-const VERSION = "2.13.2";
+const VERSION = "2.13.3";
 const MAX_BODY_BYTES = 512 * 1024;
 const guardedBrowserContexts = new WeakSet();
 const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/browser/sessions"]);
