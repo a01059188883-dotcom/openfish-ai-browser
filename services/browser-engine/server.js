@@ -1,7 +1,6 @@
 import http from "node:http";
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
 import { chromium } from "playwright";
+import { validateTarget } from "./network-policy.js";
 
 const PORT = Number(process.env.PORT || 8788);
 const TOKEN = process.env.OPENFISH_ENGINE_TOKEN || "";
@@ -18,39 +17,20 @@ function send(res, status, data) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "content-length": Buffer.byteLength(body) });
   res.end(body);
 }
-function isPrivateIPv4(ip) {
-  const p = ip.split(".").map(Number);
-  return p.length !== 4 || p.some(n => !Number.isInteger(n) || n < 0 || n > 255) ||
-    p[0] === 0 || p[0] === 10 || p[0] === 127 || p[0] >= 224 ||
-    (p[0] === 169 && p[1] === 254) || (p[0] === 172 && p[1] >= 16 && p[1] <= 31) ||
-    (p[0] === 192 && p[1] === 168) || (p[0] === 100 && p[1] >= 64 && p[1] <= 127) ||
-    (p[0] === 192 && p[1] === 0) || (p[0] === 198 && (p[1] === 18 || p[1] === 19));
-}
-function isPrivateIPv6(ip) {
-  const v = ip.toLowerCase().split("%")[0];
-  return v === "::" || v === "::1" || v.startsWith("fc") || v.startsWith("fd") || /^fe[89ab]/.test(v) ||
-    v.startsWith("::ffff:") || v === "2001:db8::";
-}
-export async function validateTarget(raw) {
-  let target;
-  try { target = new URL(raw); } catch { throw new Error("请输入有效的网址"); }
-  if (!["http:", "https:"].includes(target.protocol) || target.username || target.password) throw new Error("仅允许公开 HTTP/HTTPS 网页地址");
-  const host = target.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || host === "metadata.google.internal") throw new Error("不能访问本机、内网或云元数据地址");
-  if (isIP(host) === 4 && isPrivateIPv4(host)) throw new Error("不能访问私有或保留 IP 地址");
-  if (isIP(host) === 6 && isPrivateIPv6(host)) throw new Error("不能访问私有或保留 IPv6 地址");
-  if (!isIP(host)) {
-    const records = await lookup(host, { all: true, verbatim: true });
-    if (!records.length || records.some(x => isIP(x.address) === 4 ? isPrivateIPv4(x.address) : isPrivateIPv6(x.address))) {
-      throw new Error("域名解析到私有或保留 IP，已阻止访问");
-    }
-  }
-  return target.toString();
-}
 async function ensurePage() {
   if (!browser || !browser.isConnected()) {
     browser = await chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
-    context = await browser.newContext({ viewport: { width: 1280, height: 820 }, acceptDownloads: false });
+    context = await browser.newContext({ viewport: { width: 1280, height: 820 }, acceptDownloads: false, serviceWorkers: "block" });
+    // Re-check every HTTP(S) request, including subresources and redirect hops.
+    // Host-level egress filtering is still required to close DNS-rebinding TOCTOU gaps.
+    await context.route("**/*", async route => {
+      try {
+        await validateTarget(route.request().url());
+        await route.continue();
+      } catch {
+        await route.abort("blockedbyclient").catch(() => {});
+      }
+    });
     page = await context.newPage();
     page.setDefaultNavigationTimeout(NAV_TIMEOUT);
   }
