@@ -12,6 +12,7 @@ const MAX_SESSIONS = Math.max(1, Math.min(50, Number(process.env.OPENFISH_ENGINE
 let browser;
 let browserPromise;
 const sessions = new Map();
+const sessionCreations = new Map();
 
 function send(res, status, data) {
   const body = JSON.stringify(data);
@@ -59,7 +60,12 @@ async function reapExpired() {
 async function getSession(id) {
   await reapExpired();
   let session = sessions.get(id);
-  if (!session) session = await createSession(id);
+  if (!session) {
+    let pending = sessionCreations.get(id);
+    if (!pending) { pending = createSession(id); sessionCreations.set(id, pending); }
+    try { session = await pending; }
+    finally { if (sessionCreations.get(id) === pending) sessionCreations.delete(id); }
+  }
   session.lastUsedAt = Date.now();
   if (!session.page || session.page.isClosed()) {
     session.page = await session.context.newPage();
