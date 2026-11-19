@@ -15,6 +15,10 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(config.includes('[assets]'));
   assert.ok(worker.includes('import { acquire, connect } from "@cloudflare/playwright"'));
   assert.ok(worker.includes('url.pathname.startsWith("/api/cloud-browser/")'));
+  assert.ok(worker.includes('const storageKey = key => "cloudBrowser:" + sessionId + ":" + key'));
+  assert.ok(worker.includes('"x-openfish-session": sessionId'));
+  assert.ok(app.includes('"X-OpenFish-Session":sessionId'));
+  assert.ok(app.includes('SESSION_KEY="openfish.browser.session"'));
   assert.ok(worker.includes('const readOnlyRoute = ["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/tabs"].includes(url.pathname)'));
   assert.ok(worker.includes('if (readOnlyRoute && request.method !== "GET")'));
   assert.ok(worker.includes('if (!readOnlyRoute && request.method !== "POST")'));
@@ -24,7 +28,7 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(worker.includes('url.pathname === "/cloud/tabs"'));
   assert.ok(worker.includes('/api/v1/openapi.json'));
   assert.ok(worker.includes('access-control-allow-origin'));
-  assert.ok(worker.includes('const VERSION = "2.12.0"'));
+  assert.ok(worker.includes('const VERSION = "2.13.0"'));
   assert.ok(worker.includes('if (!authorized(request, env))'));
   assert.ok(worker.includes('acquire(this.env.BROWSER)'));
   assert.ok(worker.includes('connect(this.env.BROWSER, acquired.sessionId)'));
