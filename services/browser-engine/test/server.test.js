@@ -168,3 +168,9 @@ test("production download storage is bounded tmpfs and fails closed when unavail
   assert.match(workflow, /--add-volume mount-path=\/downloads,type=in-memory,size-limit=64Mi/);
   assert.match(workflow, /OPENFISH_DOWNLOADS_DIR=\/downloads,OPENFISH_REQUIRE_DOWNLOADS_TMPFS=true/);
 });
+
+test("stream disconnects do not attempt to write a JSON error after headers", async () => {
+  const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
+  assert.match(server, /if \(res\.headersSent \|\| res\.destroyed\) \{ if \(!res\.destroyed\) res\.destroy\(error\); return; \}/);
+  assert.match(server, /handle\(req, res\)\.catch\(error => \{ if \(res\.headersSent \|\| res\.destroyed\)/);
+});
