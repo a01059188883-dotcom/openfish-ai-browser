@@ -92,5 +92,7 @@ test("release deployment builds and verifies Cloud Run before deploying the Work
   assert.match(workflow, /GCP_WORKLOAD_IDENTITY_PROVIDER/);
   assert.match(workflow, /h\.version!==\"1\.3\.2\"/);
   assert.match(workflow, /steps\.engine\.outputs\.url/);
+  assert.match(workflow, /--no-traffic --tag=preflight/);
+  assert.match(workflow, /--to-latest --remove-tags=preflight/);
   assert.doesNotMatch(workflow, /secrets\.BROWSER_ENGINE_URL/);
 });
