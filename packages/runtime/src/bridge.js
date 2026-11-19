@@ -11,7 +11,7 @@ import { downloadLink, listDownloads, removeDownload } from "./download-manager.
 import { addBookmark, listBookmarks, removeBookmark, listHistory, clearHistory, addReadingItem, listReadingItems, removeReadingItem, setTabOrganization, getLibraryStats, removeWorkspace, exportBrowserLibrary, importBrowserLibrary } from "./browser-library.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const VERSION = "2.13.4";
+const VERSION = "2.13.5";
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 const startedAt = Date.now();
 const metrics = { requests: 0, errors: 0, events: [] };
