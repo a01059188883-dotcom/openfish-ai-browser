@@ -1,0 +1,66 @@
+/* OpenFish v2.13.5 responsive workspace UI */
+:root{
+  --bg:#07111f;--panel:#101d30;--panel-2:#0b1728;--line:#263a53;
+  --text:#edf4ff;--muted:#9aacc4;--accent:#63e4c2;--accent-2:#83b3ff;
+  --radius:18px;--shadow:0 14px 38px rgba(0,0,0,.22)
+}
+html{scroll-behavior:smooth;scroll-padding-top:82px}
+body{background:radial-gradient(ellipse at 12% -8%,rgba(48,108,145,.25),transparent 38%),radial-gradient(ellipse at 95% 15%,rgba(24,112,94,.11),transparent 32%),var(--bg);line-height:1.5}
+.top{height:68px;padding-inline:max(14px,calc((100vw - 1120px)/2));background:rgba(7,17,31,.88);border-color:rgba(130,160,194,.16)}
+.brand{gap:12px}.logo{display:grid;place-items:center;width:38px;height:38px;border:1px solid rgba(99,228,194,.3);border-radius:13px;background:rgba(99,228,194,.09);font-size:22px;box-shadow:0 0 28px rgba(99,228,194,.1)}
+.brand b{font-size:18px;letter-spacing:-.35px}.brand small{font-size:9px;letter-spacing:1.55px}
+.shell{max-width:1120px;padding:26px 18px calc(60px + env(safe-area-inset-bottom))}
+.welcome{margin:10px 2px 22px;gap:18px}.welcome h1{font-size:clamp(24px,3vw,34px);letter-spacing:-.8px}.welcome p{font-size:13px;line-height:1.6}.eyebrow{font-size:10px;letter-spacing:2.1px}
+.state,.provider,.count{background:rgba(99,228,194,.07);border-color:rgba(99,228,194,.24);font-weight:650}
+.address{gap:7px;padding:9px;border-radius:17px;background:linear-gradient(145deg,rgba(20,37,58,.98),rgba(12,25,42,.98));border-color:#2b405b;box-shadow:var(--shadow)}
+.address button{min-width:40px;min-height:42px;background:#1a2c43;border:1px solid #2c4058;font-size:19px}
+.address input{min-height:42px;background:#071321;border-color:#2a405a;font-size:14px}
+.address select{min-height:42px;min-width:96px;background:#071321;border-color:#2a405a;font-size:12px}
+.address .go{min-width:72px;background:linear-gradient(135deg,#16856f,#126451);font-size:13px}
+.quick{gap:9px;padding:14px 2px 17px;scrollbar-width:none}.quick button{padding:9px 14px;border-radius:999px;background:#101f32;border-color:#2a405a;font-size:12px}.quick button:active{border-color:var(--accent)}
+.tab-strip{margin:4px 0 12px;gap:10px}.tabs{padding:4px 1px 8px}.tab-item{background:#0e1b2d;border-color:#2a3e57;border-radius:11px;padding:4px}.tab-item.active{background:rgba(25,91,76,.38);border-color:#398d78}.tab-select{font-size:12px}.add-tab{min-height:38px;padding:8px 13px;border-color:#2c6559;background:rgba(28,105,88,.16);font-weight:650}
+.browser-card,.interact,.below,.notice{margin-top:16px;border-radius:var(--radius);border-color:var(--line);background:linear-gradient(150deg,rgba(17,31,50,.98),rgba(12,24,40,.98));box-shadow:var(--shadow)}
+.browser-head{padding:16px 18px;border-color:#263a53}.page-heading b{font-size:14px}.page-heading small{font-size:11px}.head-actions button{min-width:40px;min-height:38px}
+.viewport{min-height:clamp(320px,55vw,650px);background:#e8edf5}.viewport img{max-height:76vh;object-fit:contain}.empty{max-width:430px}.orb{display:grid;place-items:center;width:74px;height:74px;margin:0 auto 12px;border-radius:24px;background:#d8f5ed;color:#168b73;font-size:40px}
+.empty h2{font-size:20px;letter-spacing:-.3px}.empty p{line-height:1.7}.primary{min-height:42px;background:linear-gradient(135deg,#16856f,#126451);box-shadow:0 7px 18px rgba(20,125,104,.2)}
+.toolbar{gap:8px;padding:12px 14px;scrollbar-width:thin;border-top:1px solid #253950}.toolbar button,.action-row button{min-height:38px;padding:9px 13px;border-radius:10px;background:#172940;border-color:#2b4059;font-size:12px}.toolbar #closeBrowser{color:#ffb7bc;border-color:#64404a;background:#301f2b}
+.section-title{padding:17px 18px;gap:12px}.section-title b{font-size:14px;letter-spacing:-.15px}.section-title small{font-size:11px;line-height:1.55}.section-title button,.head-actions button,.view-tabs button,.text-button{min-height:36px;background:#172940;border-color:#2b4059}
+.type-row{gap:8px;padding:0 15px 13px}.type-row input{min-height:42px;background:#071321;border-color:#2a405a}.type-row button{min-height:42px;padding:0 16px;background:#16745f}.action-row{padding:0 15px 16px;gap:8px}
+.page-text{padding:0 18px 18px;line-height:1.75;font-size:13px}.view-tabs{padding:0 18px 14px}.view-tabs button{border-radius:999px;padding:8px 14px}.view-tabs button.active{background:#145348;border-color:#287565}
+.links{padding:0 16px 16px;gap:8px}.links a,.bookmark-row a,.library-row a{background:#0b1728;border:1px solid #20344c;border-radius:10px;padding:10px 12px;line-height:1.45}.bookmark-row{gap:9px}.bookmark-row button,.row-delete{min-height:36px;border-radius:9px}
+.filter{min-height:42px;background:#071321;border-color:#2a405a;border-radius:10px;margin-bottom:13px}
+.library-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.library-grid .below{margin-top:16px}.library-grid .below:last-child{grid-column:1/-1}
+.settings summary{padding:4px 0;font-size:14px}.settings-grid{padding-bottom:4px}.settings-grid p{line-height:1.7}.backup-actions button{min-height:38px;border-radius:9px}
+.notice{padding:17px 18px}.notice b{font-size:13px}.notice p{line-height:1.75}
+footer{padding:28px 8px 12px;color:#8295af;line-height:1.8}
+#toast{bottom:calc(18px + env(safe-area-inset-bottom));border:1px solid #3b5875;box-shadow:0 12px 34px #0008;line-height:1.5}
+button,a,input,select{ -webkit-tap-highlight-color:transparent }
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(min-width:900px){
+ .shell{padding-top:34px}.library-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.library-grid .below:last-child{grid-column:auto}
+ .browser-card{overflow:hidden}.toolbar{flex-wrap:wrap}.viewport{min-height:560px}
+ .below,.interact{transition:border-color .18s}.below:hover,.interact:hover{border-color:#39536f}
+}
+@media(max-width:700px){
+ .top{height:62px;padding:0 13px}.brand b{font-size:16px}.brand small{font-size:8px}.logo{width:34px;height:34px}.top-actions{gap:6px}.state{font-size:10px;padding:6px 8px}.admin{font-size:11px;padding:8px 9px}
+ .shell{padding:17px 12px calc(46px + env(safe-area-inset-bottom))}
+ .welcome{margin:8px 2px 16px;align-items:flex-start}.welcome h1{font-size:23px}.welcome p{max-width:260px;font-size:12px}.provider{font-size:9px;padding:6px 8px}
+ .address{display:grid;grid-template-columns:38px 38px 38px minmax(0,1fr) 76px;gap:5px;padding:7px;border-radius:14px}
+ .address button{min-width:0;width:100%;min-height:40px;font-size:17px}.address input{grid-column:1/-1;grid-row:2;min-width:0;width:100%;min-height:44px;font-size:14px;padding:10px 12px}
+ .address select{grid-column:4;grid-row:1;min-width:0;width:100%;height:40px;font-size:10px}.address .go{grid-column:5;grid-row:1;width:100%;min-width:0;min-height:40px;padding:0 8px}
+ .quick{padding:12px 1px 13px}.quick button{padding:9px 13px}
+ .tab-strip{gap:6px}.tab-item{max-width:150px}.tab-select{max-width:112px;font-size:11px}.add-tab{font-size:10px;padding:8px 9px}
+ .browser-head{padding:13px}.page-heading b{font-size:13px}.page-heading small{max-width:62vw}.head-actions{gap:5px}.head-actions button{width:36px;min-width:36px;height:36px}
+ .viewport{min-height:300px}.viewport img{width:100%;height:auto;max-height:none;object-fit:contain}
+ .toolbar{padding:10px;gap:7px;scroll-snap-type:x proximity}.toolbar button{flex:0 0 auto;min-height:40px;padding:9px 12px;scroll-snap-align:start}
+ .section-title{padding:14px 14px}.section-title small{max-width:70vw}.type-row{padding:0 12px 12px}.type-row input{font-size:13px}.type-row button{padding:0 12px}.action-row{padding:0 12px 13px}
+ .library-grid{grid-template-columns:1fr;gap:0}.library-grid .below:last-child{grid-column:auto}
+ .settings-grid{gap:9px}.settings-grid select{min-height:40px}.backup-actions{gap:7px}.backup-actions button{flex:1}
+ .notice{padding:15px}.page-text{max-height:260px}
+}
+@media(max-width:380px){
+ .welcome{gap:6px}.welcome h1{font-size:21px}.welcome p{font-size:11px}.provider{font-size:8px}
+ .address{grid-template-columns:34px 34px 34px minmax(0,1fr) 68px}.address button{font-size:15px}.address select{font-size:9px}
+ .tab-item{max-width:132px}.tab-select{max-width:95px}.add-tab{font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}

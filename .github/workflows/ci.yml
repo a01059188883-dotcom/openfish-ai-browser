@@ -13,3 +13,7 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run check
       - run: npm test
+      - name: Build self-hosted Chromium engine image
+        run: docker build --pull -f services/browser-engine/Dockerfile -t openfish-browser-engine:ci services/browser-engine
+      - name: Validate Cloudflare Worker bundle without deploying
+        run: npx --yes wrangler@4 deploy --dry-run --config cloudflare/wrangler.toml

@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.11.0**.
+Open-source, free-first browser automation starter. Version: **2.13.5**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -32,7 +32,7 @@ npm run start:mcp
 ```
 Configure your MCP host to launch `node packages/mcp-server/src/index.js` from this project directory using stdio.
 
-## Visual admin dashboard\nOpen `http://127.0.0.1:8787/admin` after starting the bridge to open the local control panel. It displays bridge uptime, API request/error counts, browser connection mode, recent API activity, and a task planner with explicit approval before execution. Dashboard telemetry is held in process memory and resets when the bridge restarts. The panel is served only by the local bridge; it is not a public cloud admin site.\n\n## Unified local runtime (v1.3.0)\nThe bridge is the single owner of the Playwright browser. Both the Chrome side panel and the stdio MCP server call the same local bridge API; MCP no longer launches a second browser process. Start `npm run start:bridge` before launching either client. The MCP server exposes `open_page`, `read_page`, `plan_task`, `execute_plan`, `click_element`, `fill_element`, `take_screenshot`, `list_interactive_elements`, and `get_accessibility_snapshot`.\n\n## Review and execution flow
+## Visual admin dashboard\nOpen `http://127.0.0.1:8787/admin` after starting the bridge to open the local control panel. It displays bridge uptime, API request/error counts, browser connection mode, recent API activity, and a task planner with explicit approval before execution. Dashboard telemetry is held in process memory and resets when the bridge restarts. The panel is served only by the local bridge; it is not a public cloud admin site.\n\n## Unified local runtime (v1.3.3)\nThe bridge is the single owner of the Playwright browser. Both the Chrome side panel and the stdio MCP server call the same local bridge API; MCP no longer launches a second browser process. Start `npm run start:bridge` before launching either client. The MCP server exposes `open_page`, `read_page`, `plan_task`, `execute_plan`, `click_element`, `fill_element`, `take_screenshot`, `list_interactive_elements`, and `get_accessibility_snapshot`.\n\n## Review and execution flow
 1. Ask the local AI planner to generate a plan for the current page.
 2. Review the complete plan in the Chrome side panel or MCP response.
 3. Explicitly approve the exact plan using the side-panel confirmation or the MCP `execute_plan` tool with `approved: true`.
@@ -51,7 +51,7 @@ This is a local-first developer tool, not yet a hardened multi-user SaaS. Before
 - Manually complete any blocked high-risk action only after independently reviewing the page and consequences.
 - Stop if the page content or requested action differs from the plan you approved.
 
-## Multi-platform AI integration (v1.3.0)
+## Multi-platform AI integration (v1.3.3)
 OpenFish provides a provider-neutral tool catalog and schema adapters so AI clients can integrate without changing the browser runtime:
 - `GET /api/v1/tools` or `GET /.well-known/openfish-tools.json`: canonical tool catalog and discovery metadata.
 - `GET /api/v1/adapters/openai`: OpenAI function-tool schema.
@@ -62,18 +62,18 @@ OpenFish provides a provider-neutral tool catalog and schema adapters so AI clie
 These are schema and REST compatibility interfaces, not direct hosted integrations with every vendor SDK. Clients must call the tool endpoint from their own agent runtime. The local bridge remains bound to loopback and is not safe to expose publicly without authentication, per-user isolation, rate limits, and network/SSRF hardening. Actions that change page state require `approved: true`; sensitive and irreversible targets remain blocked.
 
 
-## Network destination protection (v1.3.0)
+## Network destination protection (v1.3.3)
 The runtime rejects loopback, private, link-local, metadata, and reserved IP literals plus common local-only hostnames. A Playwright context request guard applies the same checks to HTTP(S) subresources and redirect destinations, not only the first navigation URL. This is defense in depth, not a complete network sandbox: DNS rebinding and private-address resolution behind an otherwise public hostname require deployment-level egress filtering or a hardened outbound proxy. Keep the bridge bound to loopback and do not expose it directly to the internet.
 
 
-## Admin console AI integration panel (v1.3.0)
+## Admin console AI integration panel (v1.3.3)
 The local dashboard now displays provider-specific integration endpoints for OpenAI-compatible function tools, Anthropic tool use, Gemini function declarations, and the OpenFish tool discovery manifest. Endpoint paths can be copied from the console, and the available tool catalog is loaded live from the bridge. These are local compatibility interfaces, not hosted vendor connections.
 
 
-## Admin task templates (v1.3.0)
+## Admin task templates (v1.3.3)
 The dashboard supports creating, reading/loading, updating, and deleting reusable task templates. Templates are stored in the current browser's local storage only; they are not synced to the MCP process or other devices. The dashboard activity feed remains process-memory telemetry and is not a durable task-history database.
 
-## Approval boundary (v1.3.0)
+## Approval boundary (v1.3.3)
 MCP `click_element` and `fill_element` now require an explicit `approved: true` argument for the exact action. The bridge independently checks this value before execution. Existing plan execution continues to require explicit approval. Sensitive fields and irreversible actions remain blocked by runtime policy.
 
 ## Current scope and deployment limitations
@@ -169,7 +169,7 @@ The cloud browser can now be called directly by first-party plugins without rout
 - `POST /api/v1/browser/action` — back/forward/reload/click/type/press/scroll/clickLink actions.
 - `POST /api/v1/browser/close` — close the current cloud browser session.
 
-Send `Authorization: Bearer YOUR_OPENFISH_RELAY_TOKEN` with every browser API request. The token is a private single-owner credential; do not embed it in public client-side code or distribute it to third parties. Browser API CORS is enabled for first-party browser extensions, but CORS is not an authentication boundary. The API is intended for your own trusted plugins. Navigation blocks localhost, private IP literals, and common metadata/local hostnames. Cloudflare Browser Run free usage is limited and may be exhausted; the API does not create unlimited free compute.
+Send `Authorization: Bearer YOUR_OPENFISH_RELAY_TOKEN` with every browser API request. The token is a private single-owner credential; do not embed it in public client-side code or distribute it to third parties. The `X-OpenFish-Session` value is a client-generated isolation key, not a user identity or authorization credential: anyone who possesses the shared relay token can select another session ID. Do not expose this deployment as a public multi-tenant service; use a separate authenticated gateway and per-user authorization before inviting multiple users. Browser API CORS is enabled for first-party browser extensions, but CORS is not an authentication boundary. The API is intended for your own trusted plugins. Navigation blocks localhost, private IP literals, and common metadata/local hostnames. Cloudflare Browser Run free usage is limited and may be exhausted; the API does not create unlimited free compute.
 
 
 ## Browser engine: Cloudflare Playwright + Chromium (v2.10.1)
@@ -185,8 +185,48 @@ References:
 - https://github.com/browserless/browserless
 - https://github.com/lightpanda-io/browser
 
-## Browser network egress hardening (v2.11.0)
+## Browser network egress hardening (v2.13.4)
 
 The self-hosted Playwright engine now validates browser-context HTTP(S) requests, not only the initial navigation URL. Subresources and redirect hops are checked; service workers are disabled; page WebSocket connections are blocked. IPv4 and IPv6 private, loopback, link-local, metadata, multicast, documentation, benchmarking, and other special-purpose ranges are rejected. The Cloudflare Browser Run fallback applies the same URL checks to browser-context requests when the platform exposes the routing APIs, and viewing a page disconnects the Worker from the session without closing the session itself.
 
 **Important limitation:** hostname validation and the browser's later DNS resolution are separate operations. DNS rebinding cannot be fully prevented by application checks alone. A public deployment must also enforce outbound network rules that block private, loopback, link-local, metadata, and reserved destinations. This release does not claim a complete SSRF-proof network sandbox.
+
+
+
+## Self-hosted cloud browser engine (v2.13.4)
+
+The mobile cloud browser uses the free/open-source Playwright + Chromium engine on Cloud Run. The release deployment workflow deploys the engine first, checks its authenticated `/health` response and expected engine version, then deploys the Cloudflare Worker and writes the discovered Cloud Run URL and shared engine token as Worker secrets.
+
+Configure these GitHub repository secrets:
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`: full Google Workload Identity Federation provider resource name.
+- `GCP_SERVICE_ACCOUNT`: Google service account email that GitHub Actions may impersonate.
+- `BROWSER_ENGINE_TOKEN`: random secret of at least 32 characters; it is injected as Cloud Run's `OPENFISH_ENGINE_TOKEN` and stored as the Worker secret. Never commit or paste it into source code.
+- Existing `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `OPENFISH_RELAY_TOKEN`.
+
+The Cloud Run URL is discovered by the deployment workflow; `BROWSER_ENGINE_URL` is no longer a GitHub secret that must be copied manually. The workflow deploys service `openfish-browser-engine` in `asia-northeast3`, with scale-to-zero and a one-instance maximum, then verifies the authenticated health response before continuing to Cloudflare.
+
+The Playwright/Chromium engine is open-source and has no software license fee, but **Cloud Run hosting is not guaranteed to be free**. Request-based billing and scale-to-zero reduce idle charges, but usage beyond applicable free-tier allowances is billed. The Cloud Run free tier is calculated using `us-central1` rates; `asia-northeast3` (Seoul) is a Tier 2 region, and Cloud Build/Artifact Registry may have separate charges. Check the active billing account and set budget alerts before running a production deployment.
+
+Google Cloud setup is still required once: enable Cloud Run, Cloud Build, Artifact Registry, and IAM Credentials APIs; configure a Workload Identity Pool/provider restricted to this GitHub repository and the `main` branch; grant that provider's repository principal `roles/iam.workloadIdentityUser` on the deployment service account. The service account needs the permissions required to build and deploy the service (Cloud Run Admin, Service Account User on the runtime identity, Cloud Build build permissions, and Artifact Registry write access). Do not create or commit a long-lived service-account key.
+
+The engine requires the matching Bearer token and a client-specific `X-OpenFish-Session` header. It isolates browser contexts per session and provides bounded cloud download delivery (15 MB per file, 50 MB in-memory per session). Browser Run fallback remains for compatibility, but its download endpoint returns HTTP 501 because no verified file-transfer implementation exists there.
+
+CI builds the Docker image and validates the Worker bundle without deploying. The production deployment workflow is manual-only (`workflow_dispatch`) so merging prerequisite pull requests cannot unexpectedly deploy an incomplete release. It requires the configured GitHub and Google Cloud credentials. An authenticated health check is not a substitute for testing a real iPhone session and file handoff.
+
+## Browser workspace refresh (v2.13.4)
+
+The mobile browser workspace now has selectable Google, Bing and DuckDuckGo search, local browsing history, searchable bookmarks, page-text copy and a simplified reading view. Local history and bookmarks stay in the current device's browser storage; they are not synced to the cloud browser session. The cloud browser service now supports multiple tabs in its active browser context; tab indexes are session-scoped and are not durable identities. This release does not add paid browser providers.
+
+## Browser ecosystem review and integrated module map (v2.13.4)
+
+The public-source review used these projects as architecture references, not as wholesale code imports:
+
+- [Playwright](https://github.com/microsoft/playwright) — cross-browser automation, browser contexts, navigation, downloads and test primitives; already the core automation layer in OpenFish.
+- [Browser Use](https://github.com/browser-use/browser-use) — MIT-licensed agent patterns for accessibility-first actions, persistent browser work and local-model integration. OpenFish keeps its own approval gate and does not depend on the paid Browser Use Cloud.
+- [Steel Browser](https://github.com/steel-dev/steel-browser) — Apache-2.0 reference for session lifecycle, browser APIs, observability and cleanup. Its standalone server is not bundled as a second competing engine.
+- [Blanc](https://github.com/bnfy/blanc) — MIT-licensed desktop-browser reference for tab organization, favorites/history/downloads, permissions, privacy and compact browser chrome. Its Electron desktop implementation is not copied into this mobile/cloud product.
+- Browserless was reviewed but not selected as a required dependency: its published open-source licensing is SSPL-1.0 OR a commercial license, which is not a safe default for a free-first deployment.
+
+OpenFish's existing runtime module set includes Chromium/Playwright navigation, isolated sessions, local tab management, bookmarks, browsing history, reading list, downloads, tab organization, page diagnostics, accessibility snapshots, reader-content extraction, screenshots, AI task planning, explicit action approval, MCP/REST tool discovery and provider adapters. The v2.13.4 mobile workspace adds searchable local history and favorites, selectable search engines, page-text copy and a simplified reading view while preserving the existing legacy bookmark storage key.
+
+**Not represented as completed in this release:** durable per-tab profiles, private-profile isolation in the mobile cloud UI, built-in network ad blocking, extension installation management, browser sync, and a full native desktop browser shell. These require separate backend, permission and security work; the UI does not expose fake controls for them.

@@ -1,14 +1,14 @@
 {
   "name": "openfish-ai-browser",
-  "version": "2.11.0",
+  "version": "2.13.5",
   "private": true,
   "type": "module",
   "description": "Free-first open-source AI browser automation with MCP and Chrome extension",
   "scripts": {
     "start:bridge": "node --env-file=.env packages/runtime/src/bridge.js",
     "start:mcp": "node packages/mcp-server/src/index.js",
-    "check": "node --check packages/runtime/src/bridge.js && node --check packages/runtime/src/browser.js && node --check packages/runtime/src/browser-library.js && node --check packages/runtime/src/download-manager.js && node --check packages/runtime/src/ai-planner.js && node --check packages/runtime/src/safety.js && node --check packages/runtime/src/api-keys.js && node --check packages/runtime/src/client-registry.js && node --check packages/runtime/src/relay-agent.js && node --check services/browser-engine/server.js && node --check services/browser-engine/network-policy.js && node --check cloudflare/worker.js && node --check public/app.js && node --check packages/runtime/src/executor.js && node --check packages/mcp-server/src/index.js && node --check packages/mcp-server/src/http.js && node --check packages/chrome-extension/sidepanel.js && node --check packages/admin/app.js",
-    "test": "node --test packages/runtime/test/*.test.js services/browser-engine/test/*.test.js",
+    "check": "node --check packages/runtime/src/bridge.js && node --check packages/runtime/src/browser.js && node --check packages/runtime/src/browser-library.js && node --check packages/runtime/src/download-manager.js && node --check packages/runtime/src/ai-planner.js && node --check packages/runtime/src/safety.js && node --check packages/runtime/src/api-keys.js && node --check packages/runtime/src/client-registry.js && node --check packages/runtime/src/relay-agent.js && node --check services/browser-engine/server.js && node --check services/browser-engine/network-policy.js && node --check services/browser-engine/download-storage.js && node --check cloudflare/worker.js && node --check public/app.js && node --check packages/runtime/src/executor.js && node --check packages/mcp-server/src/index.js && node --check packages/mcp-server/src/http.js && node --check packages/chrome-extension/sidepanel.js && node --check packages/admin/app.js",
+    "test": "node --test packages/runtime/test/*.test.js services/browser-engine/test/*.test.js public/*.test.js",
     "start:mcp:http": "node packages/mcp-server/src/http.js",
     "start:relay-agent": "node --env-file=.env packages/runtime/src/relay-agent.js",
     "dev:relay": "npx wrangler dev --config cloudflare/wrangler.toml",
