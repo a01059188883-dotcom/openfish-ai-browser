@@ -84,3 +84,13 @@ test("mobile downloads remain resumable and require an explicit save tap", async
   assert.match(app, /downloadObjectUrls/);
   assert.match(worker, /api\/cloud-browser\/downloads\/file/);
 });
+
+test("release deployment builds and verifies Cloud Run before deploying the Worker", async () => {
+  const workflow = await readFile(new URL("../../../.github/workflows/deploy-relay.yml", import.meta.url), "utf8");
+  assert.ok(workflow.indexOf("Deploy self-hosted browser engine to Cloud Run") < workflow.indexOf("Deploy Cloudflare Worker and Durable Object"));
+  assert.match(workflow, /google-github-actions\/auth@v2/);
+  assert.match(workflow, /GCP_WORKLOAD_IDENTITY_PROVIDER/);
+  assert.match(workflow, /h\.version!==\"1\.3\.2\"/);
+  assert.match(workflow, /steps\.engine\.outputs\.url/);
+  assert.doesNotMatch(workflow, /secrets\.BROWSER_ENGINE_URL/);
+});
