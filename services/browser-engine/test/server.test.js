@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 test("Docker image includes the extracted network policy module", async () => {
   const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
-  assert.match(dockerfile, /COPY server\\.js network-policy\\.js \.\//);
+  assert.ok(dockerfile.includes("COPY server.js network-policy.js ./"));
 });
 
 test("self-hosted engine requires a long private token and exposes authenticated health", async t => {
