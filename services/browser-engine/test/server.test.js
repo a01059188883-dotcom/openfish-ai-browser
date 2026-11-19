@@ -147,3 +147,12 @@ test("mobile download refresh revokes stale object URLs", async () => {
   assert.match(app, /downloadObjectUrls\.clear\(\)/);
   assert.ok(app.indexOf('const result=await api("/api/cloud-browser/downloads")') < app.indexOf("URL.revokeObjectURL(objectUrl)"), "keep old save links alive if refresh fails");
 });
+
+test("completed downloads rejected by either storage limit are deleted", async () => {
+  const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
+  assert.match(server, /async function deleteCompletedDownload\(download, path\)/);
+  assert.match(server, /await download\.delete\(\)\.catch\(async \(\) =>/);
+  assert.match(server, /if \(info\.size > MAX_DOWNLOAD_BYTES\) \{ await deleteCompletedDownload\(download, path\);/);
+  assert.match(server, /if \(used \+ info\.size > MAX_SESSION_DOWNLOAD_BYTES\) \{ await deleteCompletedDownload\(download, path\);/);
+  assert.doesNotMatch(server, /await download\.cancel\(\)/);
+});
