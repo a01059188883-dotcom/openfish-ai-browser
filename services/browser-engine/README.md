@@ -45,10 +45,15 @@ Browserless's self-hosted Docker image is another option, but its repository use
 - Do not use this engine to bypass CAPTCHAs, authentication, paywalls, or site restrictions.
 - Session contexts are isolated from one another in memory, but the shared bearer token is a service credential, not end-user identity. Do not expose it to untrusted clients or treat this as a complete multi-tenant identity system.
 
-## Network request policy and tab lifecycle (engine 1.3.4)
+## Network request policy, tab lifecycle, and streamed downloads (engine 1.3.5)
 
 The engine validates the initial navigation URL and installs a browser-context request guard. The guard revalidates HTTP(S) destinations for page requests, subresources, and redirect hops; service workers are disabled so they cannot bypass the context route. Browser WebSocket connections are blocked. Private, loopback, link-local, metadata, multicast, and special-purpose IPv4/IPv6 ranges are rejected.
 
 This is defense in depth, not a complete sandbox. DNS validation and Chromium's later DNS lookup are separate operations, so DNS rebinding remains a time-of-check/time-of-use risk. For public hosting, enforce outbound firewall/egress rules that deny private, loopback, link-local, metadata, and reserved destinations at the network layer. Do not expose this service without TLS and a strong bearer token.
 
 Tab indexes are scoped to the active in-memory browser context and may change when a tab closes. The cloud relay serializes browser actions per session; it does not yet provide durable per-tab profiles or multi-tenant isolation.
+
+ 
+## Download transfer behavior (engine 1.3.5)
+
+Completed downloads are retained as Playwright-managed temporary files. The file retrieval endpoint streams the file as `application/octet-stream` with a content length and safe content-disposition metadata; it no longer reads the entire file into a Node.js Buffer or expands it into Base64 JSON. The mobile client receives a Blob directly, avoiding Base64 decoding and its additional memory copies. The per-file and per-session size checks still occur after Chromium completes the download; they are not a hard in-progress disk quota. Enforce container ephemeral-storage limits and network egress controls, and do not treat this application-level check as a filesystem sandbox.
