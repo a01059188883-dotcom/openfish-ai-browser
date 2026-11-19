@@ -43,7 +43,7 @@ test("self-hosted engine exposes real multi-tab management actions", async () =>
   assert.match(server, /action === "newTab"/);
   assert.match(server, /action === "switchTab"/);
   assert.match(server, /action === "closeTab"/);
-  assert.match(server, /tabs: await listTabs\(\)/);
+  assert.match(server, /tabs: await listTabs\(session\)/);
 });
 
 
