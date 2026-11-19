@@ -38,7 +38,7 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   for (const id of ["url", "back", "forward", "reload", "go", "viewport", "sendText", "bookmark", "bookmarks", "tabs", "addTab"]) assert.ok(html.includes('id="' + id + '"'));
   for (const route of ["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/tabs", "/api/cloud-browser/navigate", "/api/cloud-browser/action", "/api/cloud-browser/close"]) assert.ok(worker.includes(route));
   assert.ok(app.includes("data:image/jpeg;base64,"));
-  assert.ok(app.includes("(e.clientY-r.top)/r.height*820"));
+  assert.ok(app.includes("(event.clientY-rect.top)/rect.height*820"));
   assert.ok(app.includes("/api/cloud-browser/navigate"));
   assert.ok(app.includes("/api/cloud-browser/action"));
   assert.ok(app.includes('action:"newTab"'));
