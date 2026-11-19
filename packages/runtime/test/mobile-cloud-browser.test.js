@@ -15,6 +15,9 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(config.includes('[assets]'));
   assert.ok(worker.includes('import { acquire, connect } from "@cloudflare/playwright"'));
   assert.ok(worker.includes('url.pathname.startsWith("/api/cloud-browser/")'));
+  assert.ok(worker.includes('const readOnlyRoute = ["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/tabs"].includes(url.pathname)'));
+  assert.ok(worker.includes('if (readOnlyRoute && request.method !== "GET")'));
+  assert.ok(worker.includes('if (!readOnlyRoute && request.method !== "POST")'));
   assert.ok(worker.includes('/api/v1/browser/navigate'));
   assert.ok(worker.includes('/api/v1/browser/action'));
   assert.ok(worker.includes('/api/v1/browser/tabs'));
