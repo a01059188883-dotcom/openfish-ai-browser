@@ -25,6 +25,12 @@
 
 # Changelog
 
+## 2.13.2 - 2026-11-19
+- Automate Cloud Run engine deployment with Google Workload Identity Federation, authenticated health/version verification, then Cloudflare Worker deployment and secret synchronization.
+- Derive the Cloud Run service URL during deployment rather than requiring a manually copied GitHub secret.
+- Synchronize OpenFish suite version to 2.13.2 and self-hosted browser engine version to 1.3.2.
+
+
 ## 2.13.1 - 2026-11-19
 - Make cloud downloads resumable within the active browser session.
 - Replace automatic post-fetch download triggering with an explicit user-tapped save link for improved iPhone Safari compatibility.
