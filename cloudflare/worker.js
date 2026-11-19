@@ -1,7 +1,7 @@
 import mobileAdminHtml from "./mobile-admin.html";
 import { acquire, connect } from "@cloudflare/playwright";
 
-const VERSION = "2.13.3";
+const VERSION = "2.13.4";
 const MAX_BODY_BYTES = 512 * 1024;
 const guardedBrowserContexts = new WeakSet();
 const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/browser/sessions"]);
@@ -227,7 +227,7 @@ export class OpenFishRelay {
           method,
           headers: { "authorization": "Bearer " + this.env.BROWSER_ENGINE_TOKEN, "x-openfish-session": sessionId, ...(body ? { "content-type": "application/json" } : {}) },
           body,
-          signal: AbortSignal.timeout(35000)
+          signal: AbortSignal.timeout(120000)
         });
         const headers = new Headers(upstream.headers);
         headers.set("cache-control", "no-store");
