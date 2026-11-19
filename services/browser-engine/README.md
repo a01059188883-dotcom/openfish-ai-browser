@@ -57,3 +57,8 @@ Tab indexes are scoped to the active in-memory browser context and may change wh
 ## Download transfer behavior (engine 1.3.5)
 
 Completed downloads are retained as Playwright-managed temporary files. The file retrieval endpoint streams the file as `application/octet-stream` with a content length and safe content-disposition metadata; it no longer reads the entire file into a Node.js Buffer or expands it into Base64 JSON. The mobile client receives a Blob directly, avoiding Base64 decoding and its additional memory copies. The per-file and per-session size checks still occur after Chromium completes the download; they are not a hard in-progress disk quota. Enforce container ephemeral-storage limits and network egress controls, and do not treat this application-level check as a filesystem sandbox.
+
+
+## Download transfer behavior (engine 1.3.5)
+
+Completed downloads remain in Playwright-managed temporary files. The retrieval endpoint streams the file as application/octet-stream with content length and content-disposition metadata. It no longer loads the entire file into a Node.js Buffer or expands it into Base64 JSON. The mobile client receives a Blob directly, avoiding Base64 decoding and its extra memory copies. The per-file and per-session size checks still occur after Chromium completes the download; they are not a hard in-progress disk quota. Enforce container ephemeral-storage limits and network egress controls.
