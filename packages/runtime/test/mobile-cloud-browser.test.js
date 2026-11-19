@@ -41,9 +41,9 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(app.includes("(event.clientY-rect.top)/rect.height*820"));
   assert.ok(app.includes("/api/cloud-browser/navigate"));
   assert.ok(app.includes("/api/cloud-browser/action"));
-  assert.ok(app.includes('action:"newTab"'));
-  assert.ok(app.includes('action:"switchTab"'));
-  assert.ok(app.includes('action:"closeTab"'));
+  assert.ok(app.includes('act("newTab")'));
+  assert.ok(app.includes('act("switchTab"'));
+  assert.ok(app.includes('act("closeTab"'));
   assert.ok(app.includes("function renderTabs"));
   assert.ok(admin.includes('id="cloudStatus"'));
   assert.ok(admin.includes('id="cloudClose"'));
