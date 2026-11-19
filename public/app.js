@@ -33,10 +33,15 @@ function render(d){
  const links=$("links");links.replaceChildren();(d.links||[]).slice(0,30).forEach(link=>{const row=document.createElement("div");row.className="bookmark-row";const a=document.createElement("a");a.href="#";a.textContent=(link.text||"网页链接")+" · "+link.href;a.addEventListener("click",event=>{event.preventDefault();navigate(link.href)});const download=document.createElement("button");download.className="link-download";download.type="button";download.textContent="下载";download.title="尝试将此链接作为文件下载";download.addEventListener("click",()=>downloadLink(link.href));row.append(a,download);links.append(row)});
  renderTabs(d.tabs||[]);setState("浏览器在线",d.provider||"云端浏览器已连接");
 }
-function decodeDownload(data){const binary=atob(data.dataBase64),bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return new Blob([bytes],{type:"application/octet-stream"})}
-function addDownloadSaveLink(item,data){
+async function apiFile(path,body){
+ if(!token){token=prompt("请输入 Cloudflare Relay Token（与管理后台使用的 Token 相同）")||"";if(!token)throw Error("需要 Relay Token 才能使用云端浏览器");sessionStorage.setItem(TOKEN_KEY,token)}
+ const response=await fetch(path,{method:"POST",headers:{"Authorization":"Bearer "+token,"X-OpenFish-Session":sessionId,"Content-Type":"application/json"},body:JSON.stringify(body),cache:"no-store"});
+ if(!response.ok){const data=await response.json().catch(()=>({}));if(response.status===401){sessionStorage.removeItem(TOKEN_KEY);token=""}throw Error(data.error||("HTTP "+response.status))}
+ return response.blob();
+}
+function addDownloadSaveLink(item,blob){
  const host=$("downloads"),old=downloadObjectUrls.get(item.id);if(old)URL.revokeObjectURL(old);
- const objectUrl=URL.createObjectURL(decodeDownload(data));downloadObjectUrls.set(item.id,objectUrl);
+ const objectUrl=URL.createObjectURL(blob);downloadObjectUrls.set(item.id,objectUrl);
  const row=document.createElement("div");row.className="bookmark-row";
  const label=document.createElement("span");label.textContent=item.filename+" · "+(item.size/1024).toFixed(1)+" KB";
  const link=document.createElement("a");link.href=objectUrl;link.download=item.filename;link.textContent="点按保存到手机";link.className="download-save-link";
@@ -44,7 +49,7 @@ function addDownloadSaveLink(item,data){
 }
 async function downloadLink(url){
  if(!confirm("确认下载此链接的文件？单个文件上限 15 MB。"))return;
- try{const result=await api("/api/cloud-browser/download",{url,approved:true});await loadDownloads(false);addDownloadSaveLink(result.download,result.download)}
+ try{const result=await api("/api/cloud-browser/download",{url,approved:true});await loadDownloads(false);toast("下载已完成，请在下载列表中点按“准备保存”")}
  catch(error){toast("下载失败："+error.message)}
 }
 async function loadDownloads(showEmpty=true){
@@ -55,7 +60,7 @@ async function loadDownloads(showEmpty=true){
   const label=document.createElement("span");label.textContent=item.filename+" · "+(item.size/1024).toFixed(1)+" KB";
   const save=document.createElement("button");save.type="button";save.textContent="准备保存";save.addEventListener("click",async()=>{
    save.disabled=true;save.textContent="正在准备…";
-   try{const result=await api("/api/cloud-browser/downloads/file",{id:item.id,approved:true});addDownloadSaveLink(item,result.download)}
+   try{const blob=await apiFile("/api/cloud-browser/downloads/file",{id:item.id,approved:true});addDownloadSaveLink(item,blob)}
    catch(error){toast("文件读取失败："+error.message);save.disabled=false;save.textContent="重试保存"}
   });
   const remove=document.createElement("button");remove.type="button";remove.textContent="移除";remove.addEventListener("click",async()=>{
