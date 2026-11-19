@@ -1,6 +1,8 @@
 import http from "node:http";
 import { randomUUID, timingSafeEqual } from "node:crypto";
-import { readFile, stat, unlink } from "node:fs/promises";
+import { stat, unlink } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
 import { basename } from "node:path";
 import { chromium } from "playwright";
 import { validateTarget } from "./network-policy.js";
@@ -124,7 +126,7 @@ async function readBody(req) {
 async function handle(req, res) {
   if (!hasValidToken(req)) return send(res, 401, { error: "Unauthorized" });
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.3.4", activeSessions: sessions.size, maxSessions: MAX_SESSIONS });
+  if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.3.5", activeSessions: sessions.size, maxSessions: MAX_SESSIONS });
   const id = sessionId(req);
   if (!id) return send(res, 400, { error: "A valid X-OpenFish-Session header is required." });
   if (url.pathname === "/close" && req.method === "POST") {
@@ -148,7 +150,17 @@ async function handle(req, res) {
       if (payload.approved !== true) throw Object.assign(new Error("Explicit approval is required to retrieve a download."), { statusCode: 403 });
       const item = session.downloads.get(String(payload.id || ""));
       if (!item) throw Object.assign(new Error("Download not found. It may have expired with the browser session."), { statusCode: 404 });
-      return send(res, 200, { ok: true, download: { id: item.id, filename: item.filename, size: item.size, url: item.url, createdAt: item.createdAt, dataBase64: item.data.toString("base64") } });
+      const fallbackName = item.filename.replace(/[^a-zA-Z0-9._-]/g, "_") || "download";
+      res.writeHead(200, {
+        "content-type": "application/octet-stream",
+        "content-length": String(item.size),
+        "content-disposition": `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(item.filename)}`,
+        "cache-control": "no-store",
+        "x-openfish-download-id": item.id,
+        "x-openfish-download-filename": encodeURIComponent(item.filename)
+      });
+      await pipeline(createReadStream(item.path), res);
+      return;
     }
     if (url.pathname === "/downloads/remove") {
       if (payload.approved !== true) throw Object.assign(new Error("Explicit approval is required to remove a download."), { statusCode: 403 });
@@ -178,12 +190,11 @@ async function handle(req, res) {
       if (info.size > MAX_DOWNLOAD_BYTES) { await download.cancel().catch(() => {}); throw Object.assign(new Error("Download exceeds the 15 MB per-file limit."), { statusCode: 413 }); }
       const used = [...session.downloads.values()].reduce((sum, item) => sum + item.size, 0);
       if (used + info.size > MAX_SESSION_DOWNLOAD_BYTES) { await download.cancel().catch(() => {}); throw Object.assign(new Error("Session download storage is full (50 MB). Remove older downloads first."), { statusCode: 507 }); }
-      const data = await readFile(path);
       const id = randomUUID();
       const filename = basename(String(download.suggestedFilename() || "download")).replace(/[\u0000-\u001f\u007f<>:"|?*]/g, "_").replaceAll("\\", "_").replace(/^\.+/, "").trim().slice(0, 120) || "download";
-      const record = { id, filename, size: info.size, url: target, createdAt: new Date().toISOString(), data, path };
+      const record = { id, filename, size: info.size, url: target, createdAt: new Date().toISOString(), path };
       session.downloads.set(id, record);
-      return send(res, 200, { ok: true, download: { id, filename, size: info.size, url: target, createdAt: record.createdAt, dataBase64: data.toString("base64") } });
+      return send(res, 200, { ok: true, download: { id, filename, size: info.size, url: target, createdAt: record.createdAt } });
     }
     const current = session.page;
     if (url.pathname === "/navigate") {
