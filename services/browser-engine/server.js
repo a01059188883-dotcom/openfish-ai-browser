@@ -1,9 +1,9 @@
 import http from "node:http";
 import { randomUUID, timingSafeEqual } from "node:crypto";
-import { stat, unlink } from "node:fs/promises";
+import { mkdir, stat, statfs, unlink, writeFile } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
-import { basename } from "node:path";
+import { basename, join } from "node:path";
 import { chromium } from "playwright";
 import { validateTarget } from "./network-policy.js";
 
@@ -13,9 +13,12 @@ const HOST = process.env.HOST || "0.0.0.0";
 const MAX_BODY = 16_000;
 const MAX_DOWNLOAD_BYTES = 15 * 1024 * 1024;
 const MAX_SESSION_DOWNLOAD_BYTES = 50 * 1024 * 1024;
+const DOWNLOADS_DIR = process.env.OPENFISH_DOWNLOADS_DIR || "";
+const REQUIRE_DOWNLOADS_TMPFS = process.env.OPENFISH_REQUIRE_DOWNLOADS_TMPFS === "true";
 const NAV_TIMEOUT = 25_000;
 const SESSION_TTL_MS = Math.max(60_000, Number(process.env.OPENFISH_ENGINE_SESSION_TTL_MS || 30 * 60 * 1000));
 const MAX_SESSIONS = Math.max(1, Math.min(50, Number(process.env.OPENFISH_ENGINE_MAX_SESSIONS || 10)));
+let downloadStorage = { mode: "playwright-default" };
 let browser;
 let browserPromise;
 const sessions = new Map();
@@ -42,7 +45,7 @@ function sessionId(req) {
 }
 async function getBrowser() {
   if (browser?.isConnected()) return browser;
-  if (!browserPromise) browserPromise = chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] })
+  if (!browserPromise) browserPromise = chromium.launch({ headless: true, ...(DOWNLOADS_DIR ? { downloadsPath: DOWNLOADS_DIR } : {}), args: ["--no-sandbox", "--disable-dev-shm-usage"] })
     .then(value => { browser = value; return value; })
     .finally(() => { browserPromise = null; });
   return browserPromise;
@@ -64,6 +67,25 @@ async function createSession(id) {
   const session = { id, context, page, downloads: new Map(), busy: false, lastUsedAt: Date.now(), createdAt: Date.now() };
   sessions.set(id, session);
   return session;
+}
+async function validateDownloadStorage() {
+  if (!DOWNLOADS_DIR) {
+    if (REQUIRE_DOWNLOADS_TMPFS) throw new Error("Required bounded download storage path is not configured.");
+    return { mode: "playwright-default" };
+  }
+  await mkdir(DOWNLOADS_DIR, { recursive: true });
+  const fsInfo = await statfs(DOWNLOADS_DIR);
+  const capacityBytes = fsInfo.bsize * fsInfo.blocks;
+  if (REQUIRE_DOWNLOADS_TMPFS && fsInfo.type !== 0x01021994) {
+    throw new Error("Required download storage is not a Linux tmpfs volume.");
+  }
+  const probe = join(DOWNLOADS_DIR, ".openfish-write-check-" + randomUUID());
+  await writeFile(probe, "ok", { flag: "wx" });
+  await unlink(probe);
+  if (REQUIRE_DOWNLOADS_TMPFS && capacityBytes > 64 * 1024 * 1024 + fsInfo.bsize) {
+    throw new Error("Download tmpfs capacity exceeds the configured 64 MiB safety ceiling.");
+  }
+  return { mode: REQUIRE_DOWNLOADS_TMPFS ? "required-tmpfs" : "configured", capacityBytes };
 }
 async function deleteCompletedDownload(download, path) {
   // download.path() resolves only after completion; cancel() cannot remove a completed file.
@@ -132,7 +154,7 @@ async function readBody(req) {
 async function handle(req, res) {
   if (!hasValidToken(req)) return send(res, 401, { error: "Unauthorized" });
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.3.5", activeSessions: sessions.size, maxSessions: MAX_SESSIONS });
+  if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.3.5", activeSessions: sessions.size, maxSessions: MAX_SESSIONS, downloadStorage });
   const id = sessionId(req);
   if (!id) return send(res, 400, { error: "A valid X-OpenFish-Session header is required." });
   if (url.pathname === "/close" && req.method === "POST") {
@@ -258,7 +280,7 @@ if (TOKEN.length < 32) {
   process.exit(1);
 }
 const server = http.createServer((req, res) => { handle(req, res).catch(error => send(res, 500, { error: String(error?.message || error) })); });
-server.listen(PORT, HOST, () => console.log(`OpenFish self-hosted browser engine listening on ${HOST}:${PORT}`));
+try {\n  downloadStorage = await validateDownloadStorage();\n  server.listen(PORT, HOST, () => console.log(`OpenFish self-hosted browser engine listening on ${HOST}:${PORT}`));\n} catch (error) {\n  console.error("Download storage preflight failed:", error);\n  process.exit(1);\n}
 async function shutdown() {
   server.close();
   for (const session of sessions.values()) await session.context.close().catch(() => {});
