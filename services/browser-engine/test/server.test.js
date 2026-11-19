@@ -30,6 +30,9 @@ test("self-hosted engine requires a long private token and exposes authenticated
   assert.equal(ready, true, "engine should start: " + childError);
   const denied = await fetch(base + "/status");
   assert.equal(denied.status, 401);
+  const missingSession = await fetch(base + "/status", { headers: { authorization: "Bearer " + token } });
+  assert.equal(missingSession.status, 400);
+  assert.match((await missingSession.json()).error, /X-OpenFish-Session/);
   const allowed = await fetch(base + "/health", { headers: { authorization: "Bearer " + token } });
   assert.equal(allowed.status, 200);
   const health = await allowed.json();
