@@ -39,7 +39,7 @@ test("self-hosted engine requires a long private token and exposes authenticated
   assert.equal(allowed.status, 200);
   const health = await allowed.json();
   assert.equal(health.engine, "OpenFish Self-hosted Playwright");
-  assert.equal(health.version, "1.3.3");
+  assert.equal(health.version, "1.3.4");
 });
 
 test("self-hosted engine exposes real multi-tab management actions", async () => {
@@ -105,4 +105,13 @@ test("engine bearer authentication uses constant-time token comparison", async (
   const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
   assert.match(server, /timingSafeEqual/);
   assert.match(server, /supplied\.length === expected\.length && timingSafeEqual\(supplied, expected\)/);
+});
+
+ 
+test("engine reaps idle sessions periodically and refuses to close a busy session", async () => {
+  const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
+  assert.match(server, /const sessionReaper = setInterval\(/);
+  assert.match(server, /sessionReaper\.unref\(\)/);
+  assert.match(server, /void reapExpired\(\)\.catch\(/);
+  assert.match(server, /session\?\.busy\) return send\(res, 429/);
 });
