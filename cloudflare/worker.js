@@ -323,7 +323,7 @@ export class OpenFishRelay {
     try {
       const connected = await getBrowser();
       browser = connected.browser;
-      const page = connected.page;
+      let page = connected.page;
       if (url.pathname === "/cloud/navigate") {
         const target = validateTarget(payload.url);
         await page.goto(target, { waitUntil: "domcontentloaded", timeout: 25000 });
