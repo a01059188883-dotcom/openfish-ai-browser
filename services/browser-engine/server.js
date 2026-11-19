@@ -154,7 +154,7 @@ async function handle(req, res) {
       res.writeHead(200, {
         "content-type": "application/octet-stream",
         "content-length": String(item.size),
-        "content-disposition": `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(item.filename)}`,
+        "content-disposition": `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(item.filename).replace(/[!'()*]/g, char => "%" + char.charCodeAt(0).toString(16).toUpperCase())}`,
         "cache-control": "no-store",
         "x-openfish-download-id": item.id,
         "x-openfish-download-filename": encodeURIComponent(item.filename)
