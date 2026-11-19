@@ -81,7 +81,7 @@ export default {
       }), { headers: { "content-type": "application/vnd.oai.openapi+json;version=3.1", "cache-control": "public, max-age=300", "x-openfish-version": VERSION } });
     }
     if (url.pathname.startsWith("/api/v1/browser/")) {
-      const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type", "access-control-max-age": "86400", "cache-control": "no-store" };
+      const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type, X-OpenFish-Session", "access-control-max-age": "86400", "cache-control": "no-store" };
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
       if (!authorized(request, env)) return json({ error: "Unauthorized. Supply the OpenFish relay Bearer token." }, 401);
       const routes = { "/api/v1/browser/status": ["/cloud/status", "GET"], "/api/v1/browser/view": ["/cloud/view", "GET"], "/api/v1/browser/tabs": ["/cloud/tabs", "GET"], "/api/v1/browser/navigate": ["/cloud/navigate", "POST"], "/api/v1/browser/action": ["/cloud/action", "POST"], "/api/v1/browser/close": ["/cloud/close", "POST"] };
