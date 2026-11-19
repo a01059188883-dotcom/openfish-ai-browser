@@ -1,6 +1,6 @@
 # OpenFish Self-hosted Browser Engine
 
-A free/open-source Playwright + Chromium service intended to replace Cloudflare Browser Run when deployed on compute you control. It exposes the same browser operation shapes used by OpenFish: `/status`, `/view`, `/navigate`, `/action`, and `/close`.
+A free/open-source Playwright + Chromium service intended to replace Cloudflare Browser Run when deployed on compute you control. It exposes the browser operation shapes used by OpenFish: `/status`, `/view`, `/navigate`, `/action`, `/tabs`, and `/close`.
 
 ## Run with Docker
 
@@ -27,7 +27,7 @@ All routes require `Authorization: Bearer <OPENFISH_ENGINE_TOKEN>`.
 - `POST /action` with the existing OpenFish action payload
 - `POST /close`
 
-The service keeps one browser page in memory. Restarting the container or calling `/close` ends that session. It includes URL validation and DNS resolution checks to block private/reserved network destinations. Keep outbound network controls enabled at the host level too.
+The service keeps one isolated browser context with multiple pages (tabs) in memory. `GET /tabs` lists the open tabs; `/action` supports `newTab`, `switchTab` and `closeTab` in addition to navigation and page interaction. Restarting the container or calling `/close` ends that session. It includes URL validation and DNS resolution checks to block private/reserved network destinations. Keep outbound network controls enabled at the host level too.
 
 ## Hosting options and realistic limits
 
@@ -45,8 +45,10 @@ Browserless's self-hosted Docker image is another option, but its repository use
 - Do not use this engine to bypass CAPTCHAs, authentication, paywalls, or site restrictions.
 - The default service is a single-user/single-page engine, not a multi-tenant SaaS.
 
-## Network request policy (engine 1.1.0)
+## Network request policy and tab lifecycle (engine 1.2.0)
 
 The engine validates the initial navigation URL and installs a browser-context request guard. The guard revalidates HTTP(S) destinations for page requests, subresources, and redirect hops; service workers are disabled so they cannot bypass the context route. Browser WebSocket connections are blocked. Private, loopback, link-local, metadata, multicast, and special-purpose IPv4/IPv6 ranges are rejected.
 
 This is defense in depth, not a complete sandbox. DNS validation and Chromium's later DNS lookup are separate operations, so DNS rebinding remains a time-of-check/time-of-use risk. For public hosting, enforce outbound firewall/egress rules that deny private, loopback, link-local, metadata, and reserved destinations at the network layer. Do not expose this service without TLS and a strong bearer token.
+
+Tab indexes are scoped to the active in-memory browser context and may change when a tab closes. The cloud relay serializes browser actions per session; it does not yet provide durable per-tab profiles or multi-tenant isolation.
