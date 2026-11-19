@@ -117,7 +117,7 @@ async function handle(req, res) {
     if (session) { sessions.delete(id); await session.context.close().catch(() => {}); }
     return send(res, 200, { ok: true, closed: Boolean(session) });
   }
-  if (!["/status", "/view", "/navigate", "/action", "/tabs", "/download", "/downloads", "/downloads/remove"].includes(url.pathname)) return send(res, 404, { error: "Not found" });
+  if (!["/status", "/view", "/navigate", "/action", "/tabs", "/download", "/downloads", "/downloads/file", "/downloads/remove"].includes(url.pathname)) return send(res, 404, { error: "Not found" });
   if ((url.pathname === "/status" || url.pathname === "/view" || url.pathname === "/tabs" || url.pathname === "/downloads") ? req.method !== "GET" : req.method !== "POST") return send(res, 405, { error: "Method not allowed" });
   let session;
   try {
@@ -128,6 +128,12 @@ async function handle(req, res) {
     if (url.pathname === "/tabs") return send(res, 200, { ok: true, tabs: await listTabs(session), activeIndex: session.context.pages().indexOf(session.page) });
     if (url.pathname === "/downloads") return send(res, 200, { ok: true, downloads: [...session.downloads.values()].map(({ data, path, ...item }) => item) });
     const payload = req.method === "POST" ? await readBody(req) : {};
+    if (url.pathname === "/downloads/file") {
+      if (payload.approved !== true) throw Object.assign(new Error("Explicit approval is required to retrieve a download."), { statusCode: 403 });
+      const item = session.downloads.get(String(payload.id || ""));
+      if (!item) throw Object.assign(new Error("Download not found. It may have expired with the browser session."), { statusCode: 404 });
+      return send(res, 200, { ok: true, download: { id: item.id, filename: item.filename, size: item.size, url: item.url, createdAt: item.createdAt, dataBase64: item.data.toString("base64") } });
+    }
     if (url.pathname === "/downloads/remove") {
       if (payload.approved !== true) throw Object.assign(new Error("Explicit approval is required to remove a download."), { statusCode: 403 });
       const item = session.downloads.get(String(payload.id || ""));
