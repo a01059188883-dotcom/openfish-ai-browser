@@ -1,6 +1,6 @@
 (()=>{
 "use strict";
-const $=id=>document.getElementById(id), TOKEN_KEY="openfish.relay.token", BOOKMARK_KEY="openfish.bookmarks.v2", HISTORY_KEY="openfish.history.v1", SEARCH_KEY="openfish.searchEngine";
+const $=id=>document.getElementById(id), TOKEN_KEY="openfish.relay.token", BOOKMARK_KEY="openfish.bookmarks", HISTORY_KEY="openfish.history.v1", SEARCH_KEY="openfish.searchEngine";
 let token=sessionStorage.getItem(TOKEN_KEY)||"",currentUrl="",lastView=null,busy=false,readerMode=false;
 const readStore=(key,fallback)=>{try{const v=JSON.parse(localStorage.getItem(key)||"null");return Array.isArray(v)?v:fallback}catch{return fallback}};
 let bookmarks=readStore(BOOKMARK_KEY,[]),historyItems=readStore(HISTORY_KEY,[]);
@@ -42,7 +42,7 @@ $("scrollUp").addEventListener("click",()=>act("scroll",{deltaY:-650}));$("scrol
 $("sendText").addEventListener("click",()=>{const text=$("typing").value;if(!text)return;act("type",{text});$("typing").value=""});$("typing").addEventListener("keydown",e=>{if(e.key==="Enter")$("sendText").click()});
 $("enter").addEventListener("click",()=>act("press",{key:"Enter"}));$("tabKey").addEventListener("click",()=>act("press",{key:"Tab"}));$("escKey").addEventListener("click",()=>act("press",{key:"Escape"}));$("pageUp").addEventListener("click",()=>act("press",{key:"PageUp"}));$("pageDown").addEventListener("click",()=>act("press",{key:"PageDown"}));$("refreshInfo").addEventListener("click",()=>act("reload"));
 document.querySelectorAll("[data-url]").forEach(button=>button.addEventListener("click",()=>navigate(button.dataset.url)));
-document.querySelectorAll("[data-view]").forEach(button=>button.addEventListener("click",()=>{document.querySelectorAll("[data-view]").forEach(x=>x.classList.toggle("active",x===button));$("pageText").classList.toggle("hidden",button.dataset.view==="links");$("links").classList.toggle("hidden",button.dataset.view!=="links");if(button.dataset.view==="reader")$("reader").click()}));
+document.querySelectorAll("[data-view]").forEach(button=>button.addEventListener("click",()=>{document.querySelectorAll("[data-view]").forEach(x=>x.classList.toggle("active",x===button));$("pageText").classList.toggle("hidden",button.dataset.view==="links");$("links").classList.toggle("hidden",button.dataset.view!=="links");if(button.dataset.view==="reader"||button.dataset.view==="summary"){readerMode=button.dataset.view==="reader";if(lastView)render(lastView);$("reader").textContent=readerMode?"截图视图":"阅读"}}));
 $("bookmarkSearch").addEventListener("input",renderBookmarks);$("historySearch").addEventListener("input",renderHistory);
 $("clearHistory").addEventListener("click",()=>{if(!historyItems.length)return;if(!confirm("清空本机保存的浏览历史？"))return;historyItems=[];save(HISTORY_KEY,historyItems);renderHistory()});
 const savedSearch=localStorage.getItem(SEARCH_KEY)||"google";$("searchEngine").value=savedSearch;$("searchEngineSetting").value=savedSearch;
