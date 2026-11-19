@@ -39,7 +39,7 @@ test("self-hosted engine requires a long private token and exposes authenticated
   assert.equal(allowed.status, 200);
   const health = await allowed.json();
   assert.equal(health.engine, "OpenFish Self-hosted Playwright");
-  assert.equal(health.version, "1.3.4");
+  assert.equal(health.version, "1.3.5");
 });
 
 test("self-hosted engine exposes real multi-tab management actions", async () => {
@@ -114,4 +114,14 @@ test("engine reaps idle sessions periodically and refuses to close a busy sessio
   assert.match(server, /sessionReaper\.unref\(\)/);
   assert.match(server, /void reapExpired\(\)\.catch\(/);
   assert.match(server, /session\?\.busy\) return send\(res, 429/);
+});
+
+ 
+test("download retrieval streams the stored file without base64 buffering", async () => {
+  const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
+  assert.match(server, /createReadStream\(item\.path\)/);
+  assert.match(server, /await pipeline\(createReadStream\(item\.path\), res\)/);
+  assert.match(server, /content-disposition/);
+  assert.doesNotMatch(server, /dataBase64: data\.toString\("base64"\)/);
+  assert.doesNotMatch(server, /const data = await readFile\(path\)/);
 });
