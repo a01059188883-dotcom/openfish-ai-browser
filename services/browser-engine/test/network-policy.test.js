@@ -11,7 +11,7 @@ test("blocks private, loopback, link-local and reserved IPv4 ranges", () => {
 });
 
 test("blocks private and special-purpose IPv6 ranges", () => {
-  for (const ip of ["::", "::1", "fc00::1", "fd12::1", "fe80::1", "ff02::1", "::ffff:127.0.0.1", "2001:db8::1", "2001:2::1", "2002::1", "64:ff9b::a00:1"]) {
+  for (const ip of ["::", "::1", "fc00::1", "fd12::1", "fe80::1", "ff02::1", "::ffff:127.0.0.1", "2001:db8::1", "2001:0::1", "2001:10::1", "2001:20::1", "2001:2::1", "2002::1", "64:ff9b::a00:1"]) {
     assert.equal(isPrivateIPv6(ip), true, ip);
   }
   assert.equal(isPrivateIPv6("2606:4700:4700::1111"), false);
