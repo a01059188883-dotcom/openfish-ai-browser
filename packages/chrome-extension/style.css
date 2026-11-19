@@ -70,3 +70,28 @@ textarea{min-height:104px;line-height:1.55}
 
 /* v2.5.0 command center and portable backup */
 .command-palette{position:sticky;top:0;z-index:20;padding:12px;border:1px solid #4a6a89;border-radius:12px;background:#101e30;box-shadow:0 10px 30px #0008}.command-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}.command-palette input,.page-search input{min-width:0;width:100%;padding:9px 10px;border:1px solid #304761;border-radius:9px;background:#0b1524;color:var(--text);font:inherit}.command-results{display:grid;gap:5px;max-height:260px;overflow:auto;margin-top:8px}.command-item{text-align:left;padding:9px 10px;background:#17283b;border-color:#314a65}.command-item:hover{border-color:var(--mint)}.page-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;margin-top:9px}.page-search button{width:auto}.backup-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}.backup-actions button{font-size:11px;padding:8px 5px}
+
+
+/* OpenFish v2.13.5 extension side-panel visual system */
+:root{--bg:#07111f;--panel:#101d30;--line:#293e57;--text:#edf4ff;--muted:#9aacc4;--mint:#63e4c2}
+body{background:radial-gradient(ellipse at 90% -10%,rgba(40,112,132,.2),transparent 38%),var(--bg);line-height:1.55}
+header{background:rgba(8,18,31,.94);border-color:#263a53;padding:13px 15px}
+.logo{border:1px solid #2b6b5e;box-shadow:0 0 22px rgba(99,228,194,.1)}
+header h1{letter-spacing:-.25px}header small{font-size:10px}.status{color:var(--mint)}
+.panel{background:linear-gradient(150deg,#14243a,#101b2b);border-color:#2a4059;border-radius:15px;padding:15px;box-shadow:0 9px 24px rgba(0,0,0,.14)}
+h2{font-size:14px;letter-spacing:-.15px}
+button{min-height:40px;border-color:#344d68;background:#1a2d45;border-radius:10px;transition:transform .14s,border-color .14s}
+button:hover:not(:disabled){border-color:#6483a4;transform:translateY(-1px)}button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
+.primary{background:linear-gradient(135deg,#16856f,#126451);border-color:#16856f}
+textarea,input{border-color:#304760;border-radius:10px;background:#091625;color:var(--text)}
+.output{border:1px solid #273d57;background:#091625;border-radius:10px;line-height:1.65}
+.command-palette{border-color:#35604f;background:#102335;border-radius:14px;box-shadow:0 14px 34px #0006}
+.command-results{gap:6px}.command-results button{text-align:left}
+.tabs-list,.workspace-list,.downloads-list,.library-list{gap:8px}
+.tab-row,.workspace-row,.download-row,.library-row{border-color:#2a4059;border-radius:11px;background:#0c192a;padding:10px}
+.tab-row.active{border-color:#398d78;background:#10312d}
+.section-heading{gap:10px}.section-heading h2{line-height:1.3}
+.browser-controls button,.browser-tools button,.library-actions button,.backup-actions button,.library-tabs button{min-height:40px}
+.library-tabs button.selected{background:#145348;border-color:#287565;color:#fff}
+.screenshot-preview{border-color:#2a4059;background:#091625}
+@media(max-width:360px){body{padding:9px}header{margin:-9px -9px 11px;padding:10px 9px}.panel{padding:12px}.browser-tools{gap:6px}.browser-tools button{padding:8px 6px;font-size:11px}}

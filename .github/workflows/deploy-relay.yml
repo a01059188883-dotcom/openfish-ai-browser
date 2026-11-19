@@ -2,6 +2,8 @@ name: Deploy OpenFish Relay
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 concurrency:
   group: openfish-production-deploy
@@ -70,18 +72,19 @@ jobs:
             --port 8080 \
             --cpu 1 --memory 2Gi --concurrency 80 --timeout 300 \
             --min 0 --max 1 --no-traffic --tag=preflight \
-            --set-env-vars "OPENFISH_ENGINE_TOKEN=${BROWSER_ENGINE_TOKEN}" \
+            --add-volume mount-path=/downloads,type=in-memory,size-limit=64Mi \
+            --set-env-vars "OPENFISH_ENGINE_TOKEN=${BROWSER_ENGINE_TOKEN},OPENFISH_DOWNLOADS_DIR=/downloads,OPENFISH_REQUIRE_DOWNLOADS_TMPFS=true" \
             --quiet
           PREFLIGHT_URL="$(gcloud run services describe openfish-browser-engine --project openfish-ai-browser --region asia-northeast3 --format='value(status.traffic[?tag=preflight].url)')"
           case "$PREFLIGHT_URL" in https://*) ;; *) echo "Cloud Run did not return a tagged preflight URL"; exit 1 ;; esac
           for attempt in $(seq 1 18); do
             if curl --fail --silent --show-error --max-time 10 -H "Authorization: Bearer ${BROWSER_ENGINE_TOKEN}" "$PREFLIGHT_URL/health" > /tmp/openfish-engine-health.json; then
-              node -e 'const h=require("/tmp/openfish-engine-health.json"); if(!h.ok || h.version!=="1.3.3") process.exit(1);'
+              node -e 'const h=require("/tmp/openfish-engine-health.json"); if(!h.ok || h.version!=="1.3.5" || h.downloadStorage?.mode!=="required-tmpfs" || !(h.downloadStorage.capacityBytes>0) || h.downloadStorage.capacityBytes>64*1024*1024+4096) process.exit(1);'
               gcloud run services update-traffic openfish-browser-engine --project openfish-ai-browser --region asia-northeast3 --to-latest --remove-tags=preflight --quiet
               ENGINE_URL="$(gcloud run services describe openfish-browser-engine --project openfish-ai-browser --region asia-northeast3 --format='value(status.url)')"
               case "$ENGINE_URL" in https://*) ;; *) echo "Cloud Run did not return an HTTPS service URL"; exit 1 ;; esac
               curl --fail --silent --show-error --max-time 10 -H "Authorization: Bearer ${BROWSER_ENGINE_TOKEN}" "$ENGINE_URL/health" > /tmp/openfish-engine-health.json
-              node -e 'const h=require("/tmp/openfish-engine-health.json"); if(!h.ok || h.version!=="1.3.3") process.exit(1);'
+              node -e 'const h=require("/tmp/openfish-engine-health.json"); if(!h.ok || h.version!=="1.3.5") process.exit(1);'
               echo "url=$ENGINE_URL" >> "$GITHUB_OUTPUT"
               exit 0
             fi
