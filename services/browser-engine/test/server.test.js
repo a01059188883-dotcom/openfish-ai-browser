@@ -45,3 +45,16 @@ test("self-hosted engine exposes real multi-tab management actions", async () =>
   assert.match(server, /action === "closeTab"/);
   assert.match(server, /tabs: await listTabs\(\)/);
 });
+
+
+test("self-hosted engine enforces independent session identifiers and per-session contexts", async () => {
+  const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
+  assert.match(server, /const sessions = new Map\(\)/);
+  assert.match(server, /x-openfish-session/);
+  assert.match(server, /sessions\.get\(id\)/);
+  assert.match(server, /instance\.newContext\(/);
+  assert.match(server, /OPENFISH_ENGINE_SESSION_TTL_MS/);
+  assert.match(server, /OPENFISH_ENGINE_MAX_SESSIONS/);
+  assert.match(server, /acceptDownloads: true/);
+  assert.match(server, /session\.context\.close\(\)/);
+});
