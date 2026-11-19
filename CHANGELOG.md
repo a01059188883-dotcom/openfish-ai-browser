@@ -25,10 +25,10 @@
 
 # Changelog
 
-## 2.13.2 - 2026-11-19
+## 2.13.3 - 2026-11-19
 - Automate Cloud Run engine deployment with Google Workload Identity Federation, authenticated health/version verification, then Cloudflare Worker deployment and secret synchronization.
 - Derive the Cloud Run service URL during deployment rather than requiring a manually copied GitHub secret.
-- Synchronize OpenFish suite version to 2.13.2 and self-hosted browser engine version to 1.3.2.
+- Synchronize OpenFish suite version to 2.13.3 and self-hosted browser engine version to 1.3.3.
 
 
 ## 2.13.1 - 2026-11-19
