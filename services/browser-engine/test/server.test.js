@@ -61,3 +61,13 @@ test("self-hosted engine enforces independent session identifiers and per-sessio
   assert.match(server, /acceptDownloads: true/);
   assert.match(server, /session\.context\.close\(\)/);
 });
+
+test("cloud download API is approval-gated and bounded per session", async () => {
+  const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
+  assert.match(server, /url\.pathname === "\/download"/);
+  assert.match(server, /payload\.approved !== true/);
+  assert.match(server, /MAX_DOWNLOAD_BYTES = 15 \* 1024 \* 1024/);
+  assert.match(server, /MAX_SESSION_DOWNLOAD_BYTES = 50 \* 1024 \* 1024/);
+  assert.match(server, /session\.downloads\.set\(id, record\)/);
+  assert.match(server, /url\.pathname === "\/downloads\/remove"/);
+});
