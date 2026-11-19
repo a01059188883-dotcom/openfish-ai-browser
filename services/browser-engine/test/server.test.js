@@ -128,3 +128,10 @@ test("download retrieval streams the stored file without base64 buffering", asyn
 
  
 
+
+test("Worker keeps long upstream timeouts scoped to download routes", async () => {
+  const worker = await readFile(new URL("../../../cloudflare/worker.js", import.meta.url), "utf8");
+  assert.match(worker, /url\.pathname\.startsWith\("\/cloud\/download"\) \? 120000 : 45000/);
+  assert.match(worker, /signal: AbortSignal\.timeout\(upstreamTimeoutMs\)/);
+  assert.doesNotMatch(worker, /AbortSignal\.timeout\(120000\)/);
+});
