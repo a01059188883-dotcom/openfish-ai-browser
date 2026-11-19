@@ -192,6 +192,18 @@ The self-hosted Playwright engine now validates browser-context HTTP(S) requests
 **Important limitation:** hostname validation and the browser's later DNS resolution are separate operations. DNS rebinding cannot be fully prevented by application checks alone. A public deployment must also enforce outbound network rules that block private, loopback, link-local, metadata, and reserved destinations. This release does not claim a complete SSRF-proof network sandbox.
 
 
+
+## Self-hosted cloud browser engine (v2.13.0)
+
+The mobile cloud browser prefers the free/open-source Playwright + Chromium engine deployed on your own Cloud Run service. Configure these GitHub repository secrets before deploying the Worker:
+
+- `BROWSER_ENGINE_URL`: the HTTPS Cloud Run service URL, for example `https://openfish-browser-engine-<project-number>.asia-northeast3.run.app`.
+- `BROWSER_ENGINE_TOKEN`: a random secret of at least 32 characters. Set the exact same value as Cloud Run's `OPENFISH_ENGINE_TOKEN`; never commit or paste it into source code.
+
+The Worker deployment workflow installs both values as Worker secrets. The engine requires the matching Bearer token and a client-specific `X-OpenFish-Session` header. It isolates browser contexts per session and provides bounded cloud download delivery (15 MB per file, 50 MB in-memory per session). Browser Run fallback remains in code for compatibility, but its download endpoint returns HTTP 501 because no verified file-transfer implementation exists there.
+
+Build the engine image from `services/browser-engine/Dockerfile` and deploy it to Cloud Run using an authorized Google Cloud deployment identity. This repository's current CI builds the Docker image but does not deploy Cloud Run. Verify the engine `/health` endpoint and a real authenticated browser session before publishing. Do not claim a Cloud Run deployment from a successful Docker build or Wrangler dry-run.
+
 ## Browser workspace refresh (v2.13.0)
 
 The mobile browser workspace now has selectable Google, Bing and DuckDuckGo search, local browsing history, searchable bookmarks, page-text copy and a simplified reading view. Local history and bookmarks stay in the current device's browser storage; they are not synced to the cloud browser session. The cloud browser service now supports multiple tabs in its active browser context; tab indexes are session-scoped and are not durable identities. This release does not add paid browser providers.
