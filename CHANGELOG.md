@@ -35,8 +35,7 @@
 - Make cloud downloads resumable within the active browser session.
 - Replace automatic post-fetch download triggering with an explicit user-tapped save link for improved iPhone Safari compatibility.
 - Retain prepared object URLs until page exit or explicit removal, with retry and expiry messaging.
-- Synchronize OpenFish release metadata to 2.13.1 and self-hosted engine metadata to 1.3.2.
-- Add GitHub Actions Workload Identity Federation deployment for Cloud Run; verify the authenticated engine health/version before deploying Cloudflare Worker.
+- Synchronize OpenFish release metadata to 2.13.1 and self-hosted engine metadata to 1.3.1.
 
 
 ## 1.0.0 - 2026-11-13
