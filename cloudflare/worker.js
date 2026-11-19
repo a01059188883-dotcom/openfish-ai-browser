@@ -102,7 +102,7 @@ export default {
     }
     if (url.pathname.startsWith("/api/cloud-browser/")) {
       if (!authorized(request, env)) return json({ error: "Unauthorized. Supply the relay Bearer token." }, 401);
-      const allowed = new Set(["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/tabs", "/api/cloud-browser/navigate", "/api/cloud-browser/action", "/api/cloud-browser/close", "/api/cloud-browser/download", "/api/cloud-browser/downloads", "/api/cloud-browser/downloads/remove"]);
+      const allowed = new Set(["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/tabs", "/api/cloud-browser/navigate", "/api/cloud-browser/action", "/api/cloud-browser/close", "/api/cloud-browser/download", "/api/cloud-browser/downloads", "/api/cloud-browser/downloads/file", "/api/cloud-browser/downloads/remove"]);
       if (!allowed.has(url.pathname)) return json({ error: "Cloud browser route not found." }, 404);
       const readOnlyRoute = ["/api/cloud-browser/status", "/api/cloud-browser/view", "/api/cloud-browser/tabs", "/api/cloud-browser/downloads"].includes(url.pathname);
       if (readOnlyRoute && request.method !== "GET") return json({ error: "Method not allowed." }, 405);
@@ -237,7 +237,7 @@ export class OpenFishRelay {
         return jsonResponse({ error: "Self-hosted browser engine unavailable: " + String(error?.message || error).slice(0, 250), code: "ENGINE_UNAVAILABLE" }, 502);
       }
     }
-    if (["/cloud/download", "/cloud/downloads", "/cloud/downloads/remove"].includes(url.pathname)) return jsonResponse({ error: "Cloud downloads require the self-hosted Playwright engine. The configured Browser Run fallback does not expose a verified file-transfer API." }, 501);
+    if (["/cloud/download", "/cloud/downloads", "/cloud/downloads/file", "/cloud/downloads/remove"].includes(url.pathname)) return jsonResponse({ error: "Cloud downloads require the self-hosted Playwright engine. The configured Browser Run fallback does not expose a verified file-transfer API." }, 501);
     const validateTarget = raw => {
       let target;
       try { target = new URL(raw); } catch { throw new Error("请输入有效的网址"); }
