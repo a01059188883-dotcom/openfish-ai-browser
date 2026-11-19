@@ -31,9 +31,9 @@ async function getBrowser() {
   return browserPromise;
 }
 async function createSession(id) {
-  if (sessions.size >= MAX_SESSIONS) {
+  if (sessions.size + sessionCreations.size > MAX_SESSIONS) {
     await reapExpired();
-    if (sessions.size >= MAX_SESSIONS) throw Object.assign(new Error("Browser session limit reached. Close an idle session and retry."), { statusCode: 429 });
+    if (sessions.size + sessionCreations.size > MAX_SESSIONS) throw Object.assign(new Error("Browser session limit reached. Close an idle session and retry."), { statusCode: 429 });
   }
   const instance = await getBrowser();
   const context = await instance.newContext({ viewport: { width: 1280, height: 820 }, acceptDownloads: true, serviceWorkers: "block" });
@@ -62,7 +62,7 @@ async function getSession(id) {
   let session = sessions.get(id);
   if (!session) {
     let pending = sessionCreations.get(id);
-    if (!pending) { pending = createSession(id); sessionCreations.set(id, pending); }
+    if (!pending) { pending = Promise.resolve().then(() => createSession(id)); sessionCreations.set(id, pending); }
     try { session = await pending; }
     finally { if (sessionCreations.get(id) === pending) sessionCreations.delete(id); }
   }
