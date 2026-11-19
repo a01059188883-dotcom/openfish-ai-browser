@@ -23,6 +23,7 @@ async function ensurePage() {
     context = await browser.newContext({ viewport: { width: 1280, height: 820 }, acceptDownloads: false, serviceWorkers: "block" });
     // Re-check every HTTP(S) request, including subresources and redirect hops.
     // Host-level egress filtering is still required to close DNS-rebinding TOCTOU gaps.
+    await context.routeWebSocket("**/*", socket => socket.close({ code: 1008, reason: "WebSocket access is disabled by OpenFish network policy." }));
     await context.route("**/*", async route => {
       try {
         await validateTarget(route.request().url());
@@ -60,7 +61,7 @@ async function readBody(req) {
 async function handle(req, res) {
   if (TOKEN.length < 32 || req.headers.authorization !== `Bearer ${TOKEN}`) return send(res, 401, { error: "Unauthorized" });
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.0.0" });
+  if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.1.0" });
   if (url.pathname === "/status" && req.method === "GET") {
     return send(res, 200, { ok: true, connected: Boolean(browser?.isConnected() && page && !page.isClosed()), provider: "Self-hosted Playwright + Chromium", currentUrl: page && !page.isClosed() ? page.url() : "" });
   }
