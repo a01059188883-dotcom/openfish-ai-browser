@@ -72,6 +72,11 @@ async function reapExpired() {
     }
   }
 }
+const sessionReaper = setInterval(() => {
+  void reapExpired().catch(error => console.error("Session cleanup failed:", error));
+}, Math.min(60_000, Math.max(10_000, Math.floor(SESSION_TTL_MS / 2))));
+sessionReaper.unref();
+
 async function getSession(id) {
   await reapExpired();
   let session = sessions.get(id);
@@ -119,11 +124,12 @@ async function readBody(req) {
 async function handle(req, res) {
   if (!hasValidToken(req)) return send(res, 401, { error: "Unauthorized" });
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.3.3", activeSessions: sessions.size, maxSessions: MAX_SESSIONS });
+  if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.3.4", activeSessions: sessions.size, maxSessions: MAX_SESSIONS });
   const id = sessionId(req);
   if (!id) return send(res, 400, { error: "A valid X-OpenFish-Session header is required." });
   if (url.pathname === "/close" && req.method === "POST") {
     const session = sessions.get(id);
+    if (session?.busy) return send(res, 429, { error: "This browser session is busy. Retry closing it shortly." });
     if (session) { sessions.delete(id); await session.context.close().catch(() => {}); }
     return send(res, 200, { ok: true, closed: Boolean(session) });
   }
