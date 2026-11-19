@@ -345,11 +345,12 @@ export class OpenFishRelay {
           const pages = browser.contexts().flatMap(context => context.pages());
           const index = payload.index === undefined ? pages.indexOf(page) : Number(payload.index);
           if (!Number.isInteger(index) || index < 0 || index >= pages.length) throw new Error("标签页编号无效");
+          const previouslyActive = page;
           await pages[index].close();
           const remaining = browser.contexts().flatMap(context => context.pages());
-          page = remaining[Math.min(index, remaining.length - 1)] || await (browser.contexts()[0] || await browser.newContext()).newPage();
+          page = remaining.includes(previouslyActive) ? previouslyActive : (remaining[Math.min(index, remaining.length - 1)] || await (browser.contexts()[0] || await browser.newContext()).newPage());
           await page.setViewportSize({ width: 1280, height: 820 });
-          await this.ctx.storage.put("cloudBrowserActiveTabIndex", Math.max(0, remaining.indexOf(page)));
+          await this.ctx.storage.put("cloudBrowserActiveTabIndex", Math.max(0, browser.contexts().flatMap(context => context.pages()).indexOf(page)));
         } else if (action === "back") await page.goBack({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => null);
         else if (action === "forward") await page.goForward({ waitUntil: "domcontentloaded", timeout: 15000 }).catch(() => null);
         else if (action === "reload") await page.reload({ waitUntil: "domcontentloaded", timeout: 20000 });
