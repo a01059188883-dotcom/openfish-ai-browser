@@ -1,9 +1,9 @@
 import http from "node:http";
 import { randomUUID, timingSafeEqual } from "node:crypto";
-import { mkdir, stat, statfs, unlink, writeFile } from "node:fs/promises";
+import { stat, unlink } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
-import { basename, join } from "node:path";
+import { basename } from "node:path";
 import { chromium } from "playwright";
 import { validateTarget } from "./network-policy.js";
 import { deleteCompletedDownload, validateDownloadStorage } from "./download-storage.js";
