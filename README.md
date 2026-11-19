@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.12.0**.
+Open-source, free-first browser automation starter. Version: **2.13.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -185,18 +185,18 @@ References:
 - https://github.com/browserless/browserless
 - https://github.com/lightpanda-io/browser
 
-## Browser network egress hardening (v2.12.0)
+## Browser network egress hardening (v2.13.0)
 
 The self-hosted Playwright engine now validates browser-context HTTP(S) requests, not only the initial navigation URL. Subresources and redirect hops are checked; service workers are disabled; page WebSocket connections are blocked. IPv4 and IPv6 private, loopback, link-local, metadata, multicast, documentation, benchmarking, and other special-purpose ranges are rejected. The Cloudflare Browser Run fallback applies the same URL checks to browser-context requests when the platform exposes the routing APIs, and viewing a page disconnects the Worker from the session without closing the session itself.
 
 **Important limitation:** hostname validation and the browser's later DNS resolution are separate operations. DNS rebinding cannot be fully prevented by application checks alone. A public deployment must also enforce outbound network rules that block private, loopback, link-local, metadata, and reserved destinations. This release does not claim a complete SSRF-proof network sandbox.
 
 
-## Browser workspace refresh (v2.12.0)
+## Browser workspace refresh (v2.13.0)
 
 The mobile browser workspace now has selectable Google, Bing and DuckDuckGo search, local browsing history, searchable bookmarks, page-text copy and a simplified reading view. Local history and bookmarks stay in the current device's browser storage; they are not synced to the cloud browser session. The cloud browser service now supports multiple tabs in its active browser context; tab indexes are session-scoped and are not durable identities. This release does not add paid browser providers.
 
-## Browser ecosystem review and integrated module map (v2.12.0)
+## Browser ecosystem review and integrated module map (v2.13.0)
 
 The public-source review used these projects as architecture references, not as wholesale code imports:
 
@@ -206,6 +206,6 @@ The public-source review used these projects as architecture references, not as 
 - [Blanc](https://github.com/bnfy/blanc) — MIT-licensed desktop-browser reference for tab organization, favorites/history/downloads, permissions, privacy and compact browser chrome. Its Electron desktop implementation is not copied into this mobile/cloud product.
 - Browserless was reviewed but not selected as a required dependency: its published open-source licensing is SSPL-1.0 OR a commercial license, which is not a safe default for a free-first deployment.
 
-OpenFish's existing runtime module set includes Chromium/Playwright navigation, isolated sessions, local tab management, bookmarks, browsing history, reading list, downloads, tab organization, page diagnostics, accessibility snapshots, reader-content extraction, screenshots, AI task planning, explicit action approval, MCP/REST tool discovery and provider adapters. The v2.12.0 mobile workspace adds searchable local history and favorites, selectable search engines, page-text copy and a simplified reading view while preserving the existing legacy bookmark storage key.
+OpenFish's existing runtime module set includes Chromium/Playwright navigation, isolated sessions, local tab management, bookmarks, browsing history, reading list, downloads, tab organization, page diagnostics, accessibility snapshots, reader-content extraction, screenshots, AI task planning, explicit action approval, MCP/REST tool discovery and provider adapters. The v2.13.0 mobile workspace adds searchable local history and favorites, selectable search engines, page-text copy and a simplified reading view while preserving the existing legacy bookmark storage key.
 
 **Not represented as completed in this release:** durable per-tab profiles, private-profile isolation in the mobile cloud UI, built-in network ad blocking, extension installation management, browser sync, and a full native desktop browser shell. These require separate backend, permission and security work; the UI does not expose fake controls for them.
