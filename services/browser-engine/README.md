@@ -18,7 +18,7 @@ Keep this service behind a TLS reverse proxy or private network. Do not expose p
 
 ## API
 
-All routes require `Authorization: Bearer <OPENFISH_ENGINE_TOKEN>`.
+All browser routes require both `Authorization: Bearer <OPENFISH_ENGINE_TOKEN>` and a client-generated `X-OpenFish-Session` ID (8–80 URL-safe characters). `/health` requires only the bearer token so container health probes do not create browser sessions.
 
 - `GET /health`
 - `GET /status`
