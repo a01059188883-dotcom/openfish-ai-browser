@@ -36,6 +36,6 @@ test("mobile browser workspace has responsive library and reader layouts", () =>
   assert.match(app, /async function loadDownloads/);
   assert.match(app, /link-download/);
   assert.match(css, /@media\(max-width:640px\)/);
-  assert.match(html, /v2\.13\.2/);
+  assert.match(html, /v2\.13\.3/);
   assert.doesNotMatch(html, /Workers Free 每天最多 10 分钟/);
 });
