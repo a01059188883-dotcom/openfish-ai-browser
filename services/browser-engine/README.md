@@ -27,7 +27,7 @@ All routes require `Authorization: Bearer <OPENFISH_ENGINE_TOKEN>`.
 - `POST /action` with the existing OpenFish action payload
 - `POST /close`
 
-The service keeps one isolated browser context with multiple pages (tabs) in memory. `GET /tabs` lists the open tabs; `/action` supports `newTab`, `switchTab` and `closeTab` in addition to navigation and page interaction. Restarting the container or calling `/close` ends that session. It includes URL validation and DNS resolution checks to block private/reserved network destinations. Keep outbound network controls enabled at the host level too.
+The service maintains a separate browser context per validated X-OpenFish-Session ID, with multiple pages (tabs) inside that session. Session contexts expire after 30 minutes of inactivity by default (configurable with OPENFISH_ENGINE_SESSION_TTL_MS); active sessions are capped by OPENFISH_ENGINE_MAX_SESSIONS. `GET /tabs` lists the open tabs; `/action` supports `newTab`, `switchTab` and `closeTab` in addition to navigation and page interaction. Restarting the container or calling `/close` ends that session. It includes URL validation and DNS resolution checks to block private/reserved network destinations. Keep outbound network controls enabled at the host level too.
 
 ## Hosting options and realistic limits
 
@@ -43,9 +43,9 @@ Browserless's self-hosted Docker image is another option, but its repository use
 - Put the service behind an authenticated reverse proxy or private network.
 - Restrict egress at the server/firewall level. Application-level URL checks are defense in depth, not a replacement for network isolation.
 - Do not use this engine to bypass CAPTCHAs, authentication, paywalls, or site restrictions.
-- The default service is a single-user/single-page engine, not a multi-tenant SaaS.
+- Session contexts are isolated from one another in memory, but the shared bearer token is a service credential, not end-user identity. Do not expose it to untrusted clients or treat this as a complete multi-tenant identity system.
 
-## Network request policy and tab lifecycle (engine 1.2.0)
+## Network request policy and tab lifecycle (engine 1.3.0)
 
 The engine validates the initial navigation URL and installs a browser-context request guard. The guard revalidates HTTP(S) destinations for page requests, subresources, and redirect hops; service workers are disabled so they cannot bypass the context route. Browser WebSocket connections are blocked. Private, loopback, link-local, metadata, multicast, and special-purpose IPv4/IPv6 ranges are rejected.
 
