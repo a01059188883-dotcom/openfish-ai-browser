@@ -97,6 +97,10 @@ test("GitHub Actions relay deployment requires all Cloudflare secrets and instal
   assert.ok(workflow.includes("secrets.CLOUDFLARE_API_TOKEN"));
   assert.ok(workflow.includes("secrets.CLOUDFLARE_ACCOUNT_ID"));
   assert.ok(workflow.includes("secrets.OPENFISH_RELAY_TOKEN"));
+  assert.ok(workflow.includes("secrets.BROWSER_ENGINE_URL"));
+  assert.ok(workflow.includes("secrets.BROWSER_ENGINE_TOKEN"));
+  assert.ok(workflow.includes("wrangler@4 secret put BROWSER_ENGINE_URL"));
+  assert.ok(workflow.includes("wrangler@4 secret put BROWSER_ENGINE_TOKEN"));
   assert.ok(workflow.includes("wrangler@4 deploy"));
   assert.ok(workflow.includes("wrangler@4 secret put OPENFISH_RELAY_TOKEN"));
   assert.ok(workflow.includes("npm run check"));
