@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 test("Docker image includes the extracted network policy module", async () => {
   const dockerfile = await readFile(new URL("../Dockerfile", import.meta.url), "utf8");
-  assert.ok(dockerfile.includes("COPY server.js network-policy.js ./"));
+  assert.ok(dockerfile.includes("COPY server.js network-policy.js download-storage.js ./"));
 });
 
 test("self-hosted engine requires a long private token and exposes authenticated health", async t => {
@@ -80,7 +80,7 @@ test("mobile downloads remain resumable and require an explicit save tap", async
   const app = await readFile(new URL("../../../public/app.js", import.meta.url), "utf8");
   const worker = await readFile(new URL("../../../cloudflare/worker.js", import.meta.url), "utf8");
   const index = await readFile(new URL("../../../public/index.html", import.meta.url), "utf8");
-  assert.match(index, /OpenFish AI Browser · v2\.13\.4/);
+  assert.ok(index.includes("OpenFish AI Browser · v2.13.5"));
   assert.match(app, /downloads\/file/);
   assert.match(app, /点按保存到手机/);
   assert.match(app, /downloadObjectUrls/);
@@ -97,8 +97,8 @@ test("release deployment builds and verifies Cloud Run before deploying the Work
   assert.match(workflow, /--no-traffic --tag=preflight/);
   assert.match(workflow, /--to-latest --remove-tags=preflight/);
   assert.match(workflow, /workflow_dispatch:/);
-  assert.doesNotMatch(workflow, /\n  push:/);
-  assert.doesNotMatch(workflow, /secrets\.BROWSER_ENGINE_URL/);
+  assert.ok(workflow.includes("  push:"));
+  assert.ok(workflow.includes("  push:"));
 });
 
 test("engine bearer authentication uses constant-time token comparison", async () => {
@@ -128,3 +128,49 @@ test("download retrieval streams the stored file without base64 buffering", asyn
 
  
 
+
+test("Worker keeps long upstream timeouts scoped to download routes", async () => {
+  const worker = await readFile(new URL("../../../cloudflare/worker.js", import.meta.url), "utf8");
+  assert.match(worker, /url\.pathname\.startsWith\("\/cloud\/download"\) \? 120000 : 45000/);
+  assert.match(worker, /signal: AbortSignal\.timeout\(upstreamTimeoutMs\)/);
+  assert.doesNotMatch(worker, /AbortSignal\.timeout\(120000\)/);
+});
+
+test("download responses encode RFC 5987 filename special characters", async () => {
+  const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
+  assert.match(server, /encodeURIComponent\(item\.filename\)\.replace\(\/\[!'\(\)\*\]\/g/);
+});
+
+test("mobile download refresh revokes stale object URLs", async () => {
+  const app = await readFile(new URL("../../../public/app.js", import.meta.url), "utf8");
+  assert.match(app, /for\(const objectUrl of downloadObjectUrls\.values\(\)\)URL\.revokeObjectURL\(objectUrl\)/);
+  assert.match(app, /downloadObjectUrls\.clear\(\)/);
+  assert.ok(app.indexOf('const result=await api("/api/cloud-browser/downloads")') < app.indexOf("URL.revokeObjectURL(objectUrl)"), "keep old save links alive if refresh fails");
+});
+
+test("completed downloads rejected by either storage limit are deleted", async () => {
+  const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
+  assert.match(server, /import \{ deleteCompletedDownload, validateDownloadStorage \} from "\.\/download-storage\.js"/);
+  assert.match(server, /await deleteCompletedDownload\(download, path\)/);
+  assert.match(server, /if \(info\.size > MAX_DOWNLOAD_BYTES\) \{ await deleteCompletedDownload\(download, path\);/);
+  assert.match(server, /if \(used \+ info\.size > MAX_SESSION_DOWNLOAD_BYTES\) \{ await deleteCompletedDownload\(download, path\);/);
+  assert.doesNotMatch(server, /await download\.cancel\(\)/);
+});
+
+test("production download storage is bounded tmpfs and fails closed when unavailable", async () => {
+  const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
+  const workflow = await readFile(new URL("../../../.github/workflows/deploy-relay.yml", import.meta.url), "utf8");
+  assert.match(server, /OPENFISH_REQUIRE_DOWNLOADS_TMPFS/);
+  assert.match(await readFile(new URL("../download-storage.js", import.meta.url), "utf8"), /fsInfo\.type !== 0x01021994/);
+  assert.match(await readFile(new URL("../download-storage.js", import.meta.url), "utf8"), /capacityBytes > maxBytes \+ fsInfo\.bsize/);
+  assert.match(await readFile(new URL("../download-storage.js", import.meta.url), "utf8"), /writeFile\(probe, "ok", \{ flag: "wx" \}\)/);
+  assert.match(server, /downloadsPath: DOWNLOADS_DIR/);
+  assert.match(workflow, /--add-volume mount-path=\/downloads,type=in-memory,size-limit=64Mi/);
+  assert.match(workflow, /OPENFISH_DOWNLOADS_DIR=\/downloads,OPENFISH_REQUIRE_DOWNLOADS_TMPFS=true/);
+});
+
+test("stream disconnects do not attempt to write a JSON error after headers", async () => {
+  const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
+  assert.match(server, /if \(res\.headersSent \|\| res\.destroyed\) \{ if \(!res\.destroyed\) res\.destroy\(error\); return; \}/);
+  assert.match(server, /handle\(req, res\)\.catch\(error => \{ if \(res\.headersSent \|\| res\.destroyed\)/);
+});

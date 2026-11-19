@@ -6,6 +6,7 @@ import { pipeline } from "node:stream/promises";
 import { basename } from "node:path";
 import { chromium } from "playwright";
 import { validateTarget } from "./network-policy.js";
+import { deleteCompletedDownload, validateDownloadStorage } from "./download-storage.js";
 
 const PORT = Number(process.env.PORT || 8788);
 const TOKEN = process.env.OPENFISH_ENGINE_TOKEN || "";
@@ -13,9 +14,12 @@ const HOST = process.env.HOST || "0.0.0.0";
 const MAX_BODY = 16_000;
 const MAX_DOWNLOAD_BYTES = 15 * 1024 * 1024;
 const MAX_SESSION_DOWNLOAD_BYTES = 50 * 1024 * 1024;
+const DOWNLOADS_DIR = process.env.OPENFISH_DOWNLOADS_DIR || "";
+const REQUIRE_DOWNLOADS_TMPFS = process.env.OPENFISH_REQUIRE_DOWNLOADS_TMPFS === "true";
 const NAV_TIMEOUT = 25_000;
 const SESSION_TTL_MS = Math.max(60_000, Number(process.env.OPENFISH_ENGINE_SESSION_TTL_MS || 30 * 60 * 1000));
 const MAX_SESSIONS = Math.max(1, Math.min(50, Number(process.env.OPENFISH_ENGINE_MAX_SESSIONS || 10)));
+let downloadStorage = { mode: "playwright-default" };
 let browser;
 let browserPromise;
 const sessions = new Map();
@@ -42,7 +46,7 @@ function sessionId(req) {
 }
 async function getBrowser() {
   if (browser?.isConnected()) return browser;
-  if (!browserPromise) browserPromise = chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] })
+  if (!browserPromise) browserPromise = chromium.launch({ headless: true, ...(DOWNLOADS_DIR ? { downloadsPath: DOWNLOADS_DIR } : {}), args: ["--no-sandbox", "--disable-dev-shm-usage"] })
     .then(value => { browser = value; return value; })
     .finally(() => { browserPromise = null; });
   return browserPromise;
@@ -126,7 +130,7 @@ async function readBody(req) {
 async function handle(req, res) {
   if (!hasValidToken(req)) return send(res, 401, { error: "Unauthorized" });
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.3.5", activeSessions: sessions.size, maxSessions: MAX_SESSIONS });
+  if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.3.5", activeSessions: sessions.size, maxSessions: MAX_SESSIONS, downloadStorage });
   const id = sessionId(req);
   if (!id) return send(res, 400, { error: "A valid X-OpenFish-Session header is required." });
   if (url.pathname === "/close" && req.method === "POST") {
@@ -154,7 +158,7 @@ async function handle(req, res) {
       res.writeHead(200, {
         "content-type": "application/octet-stream",
         "content-length": String(item.size),
-        "content-disposition": `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(item.filename)}`,
+        "content-disposition": `attachment; filename="${fallbackName}"; filename*=UTF-8''${encodeURIComponent(item.filename).replace(/[!'()*]/g, char => "%" + char.charCodeAt(0).toString(16).toUpperCase())}`,
         "cache-control": "no-store",
         "x-openfish-download-id": item.id,
         "x-openfish-download-filename": encodeURIComponent(item.filename)
@@ -187,9 +191,9 @@ async function handle(req, res) {
       const path = await download.path();
       if (!path) throw Object.assign(new Error("The browser did not provide a completed download file."), { statusCode: 502 });
       const info = await stat(path);
-      if (info.size > MAX_DOWNLOAD_BYTES) { await download.cancel().catch(() => {}); throw Object.assign(new Error("Download exceeds the 15 MB per-file limit."), { statusCode: 413 }); }
+      if (info.size > MAX_DOWNLOAD_BYTES) { await deleteCompletedDownload(download, path); throw Object.assign(new Error("Download exceeds the 15 MB per-file limit."), { statusCode: 413 }); }
       const used = [...session.downloads.values()].reduce((sum, item) => sum + item.size, 0);
-      if (used + info.size > MAX_SESSION_DOWNLOAD_BYTES) { await download.cancel().catch(() => {}); throw Object.assign(new Error("Session download storage is full (50 MB). Remove older downloads first."), { statusCode: 507 }); }
+      if (used + info.size > MAX_SESSION_DOWNLOAD_BYTES) { await deleteCompletedDownload(download, path); throw Object.assign(new Error("Session download storage is full (50 MB). Remove older downloads first."), { statusCode: 507 }); }
       const id = randomUUID();
       const filename = basename(String(download.suggestedFilename() || "download")).replace(/[\u0000-\u001f\u007f<>:"|?*]/g, "_").replaceAll("\\", "_").replace(/^\.+/, "").trim().slice(0, 120) || "download";
       const record = { id, filename, size: info.size, url: target, createdAt: new Date().toISOString(), path };
@@ -242,6 +246,7 @@ async function handle(req, res) {
     }
     return send(res, 200, { ...(await snapshot(session.page)), tabs: await listTabs(session), activeIndex: session.context.pages().indexOf(session.page), sessionId: id });
   } catch (error) {
+    if (res.headersSent || res.destroyed) { if (!res.destroyed) res.destroy(error); return; }
     return send(res, error.statusCode || 502, { error: String(error?.message || error).slice(0, 500), code: /429|limit|quota/i.test(String(error)) ? "BROWSER_LIMIT" : "BROWSER_ERROR" });
   } finally {
     if (session) { session.busy = false; session.lastUsedAt = Date.now(); }
@@ -251,8 +256,14 @@ if (TOKEN.length < 32) {
   console.error("OPENFISH_ENGINE_TOKEN must be set to a random secret of at least 32 characters.");
   process.exit(1);
 }
-const server = http.createServer((req, res) => { handle(req, res).catch(error => send(res, 500, { error: String(error?.message || error) })); });
-server.listen(PORT, HOST, () => console.log(`OpenFish self-hosted browser engine listening on ${HOST}:${PORT}`));
+const server = http.createServer((req, res) => { handle(req, res).catch(error => { if (res.headersSent || res.destroyed) { if (!res.destroyed) res.destroy(error); } else send(res, 500, { error: String(error?.message || error) }); }); });
+try {
+  downloadStorage = await validateDownloadStorage({ directory: DOWNLOADS_DIR, required: REQUIRE_DOWNLOADS_TMPFS });
+  server.listen(PORT, HOST, () => console.log(`OpenFish self-hosted browser engine listening on ${HOST}:${PORT}`));
+} catch (error) {
+  console.error("Download storage preflight failed:", error);
+  process.exit(1);
+}
 async function shutdown() {
   server.close();
   for (const session of sessions.values()) await session.context.close().catch(() => {});
