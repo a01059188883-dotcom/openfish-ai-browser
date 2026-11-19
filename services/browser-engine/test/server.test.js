@@ -127,10 +127,4 @@ test("download retrieval streams the stored file without base64 buffering", asyn
 });
 
  
-test("download retrieval streams files without Base64 buffering", async () => {
-  const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
-  assert.match(server, /createReadStream\(item\.path\)/);
-  assert.match(server, /await pipeline\(createReadStream\(item\.path\), res\)/);
-  assert.match(server, /content-disposition/);
-  assert.doesNotMatch(server, /dataBase64: data\.toString/);
-});
+
