@@ -209,7 +209,7 @@ Google Cloud setup is still required once: enable Cloud Run, Cloud Build, Artifa
 
 The engine requires the matching Bearer token and a client-specific `X-OpenFish-Session` header. It isolates browser contexts per session and provides bounded cloud download delivery (15 MB per file, 50 MB in-memory per session). Browser Run fallback remains for compatibility, but its download endpoint returns HTTP 501 because no verified file-transfer implementation exists there.
 
-CI builds the Docker image and validates the Worker bundle without deploying. The deployment workflow runs only after it is manually dispatched or pushed to `main`, and still requires the configured GitHub and Google Cloud credentials. An authenticated health check is not a substitute for testing a real iPhone session and file handoff.
+CI builds the Docker image and validates the Worker bundle without deploying. The production deployment workflow is manual-only (`workflow_dispatch`) so merging prerequisite pull requests cannot unexpectedly deploy an incomplete release. It requires the configured GitHub and Google Cloud credentials. An authenticated health check is not a substitute for testing a real iPhone session and file handoff.
 
 ## Browser workspace refresh (v2.13.2)
 
