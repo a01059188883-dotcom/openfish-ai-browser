@@ -1,3 +1,9 @@
+## OpenFish v2.13.4 / browser engine 1.3.5 - 2026-11-19
+- Stream completed downloads as binary responses instead of buffering the entire file and Base64-encoding it.
+- Update the mobile client to receive download Blobs directly and retain explicit save confirmation.
+- Synchronize app, extension, admin, Worker, engine, health checks, deployment preflight, tests, and documentation to v2.13.4 / engine 1.3.5.
+- Download size checks remain post-completion; no hard in-progress disk quota is claimed.
+
 ## Browser engine 1.3.4 - 2026-11-19
 - Reap idle Playwright browser sessions on a periodic unref'ed timer, not only when another request arrives.
 - Prevent /close from terminating a browser context while an operation is in progress.
