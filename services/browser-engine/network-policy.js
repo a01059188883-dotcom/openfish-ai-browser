@@ -23,7 +23,7 @@ export function isPrivateIPv6(ip) {
     v.startsWith("fc") || v.startsWith("fd") ||
     /^fe[89ab]/.test(v) || v.startsWith("ff") ||
     v.startsWith("::ffff:") || v.startsWith("2001:db8:") ||
-    v.startsWith("2001:0000:") || v.startsWith("2001:2:") ||
+    /^2001:0(?::|$)/.test(v) || /^2001:(10|20)(?::|$)/.test(v) || v.startsWith("2001:2:") ||
     v.startsWith("2002:") || v.startsWith("64:ff9b:");
 }
 
