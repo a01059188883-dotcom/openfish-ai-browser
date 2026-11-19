@@ -303,10 +303,10 @@ export class OpenFishRelay {
         const active = pages[Number(await this.ctx.storage.get("cloudBrowserActiveTabIndex")) || 0] || pages[0];
         const current = active ? await active.url() : "";
         await browser.disconnect();
-        return jsonResponse({ ok: true, connected: true, currentUrl: current, provider: "Cloudflare Browser Run", version: VERSION, freeAllowance: "10 minutes/day on Workers Free" });
+        return jsonResponse({ ok: true, connected: true, currentUrl: current, provider: "Cloudflare Browser Run", version: VERSION });
       } catch {
         await this.ctx.storage.delete("cloudBrowserSessionId");
-        return jsonResponse({ ok: true, connected: false, provider: "Cloudflare Browser Run", version: VERSION, freeAllowance: "10 minutes/day on Workers Free" });
+        return jsonResponse({ ok: true, connected: false, provider: "Cloudflare Browser Run", version: VERSION });
       }
     }
     if (url.pathname === "/cloud/close") {
