@@ -156,11 +156,11 @@ export default {
 
 export class OpenFishRelay {
   constructor(ctx, env) {
-    this.ctx = ctx; this.env = env; this.pending = new Map(); this.maxPending = 32; this.requestTimeoutMs = 45000;
+    this.ctx = ctx; this.env = env; this.pending = new Map(); this.cloudLocks = new Map(); this.maxPending = 32; this.requestTimeoutMs = 45000;
   }
   async fetch(request) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/cloud/")) return this.handleCloudBrowser(request);
+    if (url.pathname.startsWith("/cloud/")) return this.withCloudSessionLock(request);
     if (url.pathname === "/connect") {
       if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") return new Response("WebSocket required", { status: 426 });
       for (const socket of this.ctx.getWebSockets()) {
@@ -191,6 +191,22 @@ export class OpenFishRelay {
       try { agent.send(JSON.stringify({ type: "request", requestId, ...payload })); }
       catch { clearTimeout(timer); this.pending.delete(requestId); resolve(json({ error: "Could not send request to local agent." }, 502)); }
     });
+  }
+
+  async withCloudSessionLock(request) {
+    const id = request.headers.get("x-openfish-session") || "";
+    if (!/^[a-zA-Z0-9_-]{8,80}$/.test(id)) return json({ error: "A valid X-OpenFish-Session header is required." }, 400);
+    const previous = this.cloudLocks.get(id) || Promise.resolve();
+    let release;
+    const current = new Promise(resolve => { release = resolve; });
+    const queued = previous.then(() => current);
+    this.cloudLocks.set(id, queued);
+    await previous;
+    try { return await this.handleCloudBrowser(request); }
+    finally {
+      release();
+      if (this.cloudLocks.get(id) === queued) this.cloudLocks.delete(id);
+    }
   }
 
   async handleCloudBrowser(request) {
