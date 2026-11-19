@@ -30,6 +30,8 @@ test("self-hosted engine requires a long private token and exposes authenticated
   assert.equal(ready, true, "engine should start: " + childError);
   const denied = await fetch(base + "/status");
   assert.equal(denied.status, 401);
+  const wrongToken = await fetch(base + "/health", { headers: { authorization: "Bearer " + "x".repeat(token.length) } });
+  assert.equal(wrongToken.status, 401);
   const missingSession = await fetch(base + "/status", { headers: { authorization: "Bearer " + token } });
   assert.equal(missingSession.status, 400);
   assert.match((await missingSession.json()).error, /X-OpenFish-Session/);
@@ -97,4 +99,10 @@ test("release deployment builds and verifies Cloud Run before deploying the Work
   assert.match(workflow, /workflow_dispatch:/);
   assert.doesNotMatch(workflow, /\n  push:/);
   assert.doesNotMatch(workflow, /secrets\.BROWSER_ENGINE_URL/);
+});
+
+test("engine bearer authentication uses constant-time token comparison", async () => {
+  const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
+  assert.match(server, /timingSafeEqual/);
+  assert.match(server, /supplied\.length === expected\.length && timingSafeEqual\(supplied, expected\)/);
 });
