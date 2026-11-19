@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.11.0**.
+Open-source, free-first browser automation starter. Version: **2.12.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -185,8 +185,13 @@ References:
 - https://github.com/browserless/browserless
 - https://github.com/lightpanda-io/browser
 
-## Browser network egress hardening (v2.11.0)
+## Browser network egress hardening (v2.12.0)
 
 The self-hosted Playwright engine now validates browser-context HTTP(S) requests, not only the initial navigation URL. Subresources and redirect hops are checked; service workers are disabled; page WebSocket connections are blocked. IPv4 and IPv6 private, loopback, link-local, metadata, multicast, documentation, benchmarking, and other special-purpose ranges are rejected. The Cloudflare Browser Run fallback applies the same URL checks to browser-context requests when the platform exposes the routing APIs, and viewing a page disconnects the Worker from the session without closing the session itself.
 
 **Important limitation:** hostname validation and the browser's later DNS resolution are separate operations. DNS rebinding cannot be fully prevented by application checks alone. A public deployment must also enforce outbound network rules that block private, loopback, link-local, metadata, and reserved destinations. This release does not claim a complete SSRF-proof network sandbox.
+
+
+## Browser workspace refresh (v2.12.0)
+
+The mobile browser workspace now has selectable Google, Bing and DuckDuckGo search, local browsing history, searchable bookmarks, page-text copy and a simplified reading view. Local history and bookmarks stay in the current device's browser storage; they are not synced to the cloud browser session. The cloud browser service remains a single-page session until server-side multi-tab endpoints are implemented and tested. This release does not add paid browser providers.
