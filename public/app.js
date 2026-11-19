@@ -53,9 +53,10 @@ async function downloadLink(url){
  catch(error){toast("下载失败："+error.message)}
 }
 async function loadDownloads(showEmpty=true){
+ const result=await api("/api/cloud-browser/downloads"),host=$("downloads");
  for(const objectUrl of downloadObjectUrls.values())URL.revokeObjectURL(objectUrl);
  downloadObjectUrls.clear();
- const result=await api("/api/cloud-browser/downloads"),host=$("downloads");host.replaceChildren();
+ host.replaceChildren();
  if(!result.downloads?.length){host.textContent=showEmpty?"当前会话没有下载记录":"下载已准备，请点按保存链接";return}
  result.downloads.forEach(item=>{
   const row=document.createElement("div");row.className="bookmark-row";
