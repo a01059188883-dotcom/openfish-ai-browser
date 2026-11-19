@@ -156,3 +156,15 @@ test("completed downloads rejected by either storage limit are deleted", async (
   assert.match(server, /if \(used \+ info\.size > MAX_SESSION_DOWNLOAD_BYTES\) \{ await deleteCompletedDownload\(download, path\);/);
   assert.doesNotMatch(server, /await download\.cancel\(\)/);
 });
+
+test("production download storage is bounded tmpfs and fails closed when unavailable", async () => {
+  const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
+  const workflow = await readFile(new URL("../../../.github/workflows/deploy-relay.yml", import.meta.url), "utf8");
+  assert.match(server, /OPENFISH_REQUIRE_DOWNLOADS_TMPFS/);
+  assert.match(server, /fsInfo\.type !== 0x01021994/);
+  assert.match(server, /capacityBytes > 64 \* 1024 \* 1024/);
+  assert.match(server, /writeFile\(probe, "ok", \{ flag: "wx" \}\)/);
+  assert.match(server, /downloadsPath: DOWNLOADS_DIR/);
+  assert.match(workflow, /--add-volume mount-path=\/downloads,type=in-memory,size-limit=64Mi/);
+  assert.match(workflow, /OPENFISH_DOWNLOADS_DIR=\/downloads,OPENFISH_REQUIRE_DOWNLOADS_TMPFS=true/);
+});
