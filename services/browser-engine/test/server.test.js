@@ -37,7 +37,7 @@ test("self-hosted engine requires a long private token and exposes authenticated
   assert.equal(allowed.status, 200);
   const health = await allowed.json();
   assert.equal(health.engine, "OpenFish Self-hosted Playwright");
-  assert.equal(health.version, "1.3.0");
+  assert.equal(health.version, "1.3.1");
 });
 
 test("self-hosted engine exposes real multi-tab management actions", async () => {
@@ -69,5 +69,5 @@ test("cloud download API is approval-gated and bounded per session", async () =>
   assert.match(server, /MAX_DOWNLOAD_BYTES = 15 \* 1024 \* 1024/);
   assert.match(server, /MAX_SESSION_DOWNLOAD_BYTES = 50 \* 1024 \* 1024/);
   assert.match(server, /session\.downloads\.set\(id, record\)/);
-  assert.match(server, /url\.pathname === "\/downloads\/remove"/);
+  assert.match(server, /url\.pathname === "\/downloads\/remove"/);\n  assert.match(server, /url\.pathname === "\/downloads\/file"/);\n  assert.match(server, /Explicit approval is required to retrieve a download/);
 });
