@@ -45,7 +45,11 @@ test("document and image analysis adapters are present", () => {
 
 test("agent requires explicit approval and includes bounded retries and progress", () => {
   assert.match(ui, /confirm\("确认批准执行此计划/);
-  assert.match(ui, /attempt<=2/);\n  assert.match(ui, /function validatePlan/);\n  assert.match(ui, /计划必须包含1到8个步骤/);\n  assert.match(ui, /ctx.current\?\.text/);\n  assert.match(ui, /host.replaceChildren\(\)/);
+  assert.match(ui, /attempt<=2/);
+  assert.match(ui, /function validatePlan/);
+  assert.match(ui, /计划必须包含1到8个步骤/);
+  assert.match(ui, /ctx.current\?\.text/);
+  assert.match(ui, /host.replaceChildren\(\)/);
   assert.match(ui, /进度：/);
 });
 
