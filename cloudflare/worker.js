@@ -121,7 +121,7 @@ export default {
         try { u = new URL(value); } catch { return null; }
         if (!["http:", "https:"].includes(u.protocol) || u.username || u.password) return null;
         const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-        if (!host || /^\\d{1,3}(\\.\\d{1,3}){3}$/.test(host) || host.includes(":") || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") ||
+        if (!host || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":") || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") ||
           /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host) ||
           /^172\.(1[6-9]|2\d|3[01])\./.test(host) || host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:")) return null;
         return u;
@@ -141,7 +141,21 @@ export default {
         if (!response?.ok) return json({ error: "Source returned HTTP " + (response?.status || 502) }, 502);
         const type = response.headers.get("content-type") || "";
         if (!/text\/html|text\/plain|application\/xhtml/i.test(type)) return json({ error: "Unsupported source content type: " + type.slice(0, 100) }, 415);
-        const html = (await response.text()).slice(0, 600000);
+        const length = Number(response.headers.get("content-length") || 0);
+        if (length > 600000) return json({ error: "Source page exceeds the 600 KB extraction limit." }, 413);
+        const reader = response.body?.getReader();
+        if (!reader) return json({ error: "Source page has no readable body." }, 502);
+        const chunks = []; let total = 0;
+        while (true) {
+          const part = await reader.read();
+          if (part.done) break;
+          total += part.value.byteLength;
+          if (total > 600000) { await reader.cancel(); return json({ error: "Source page exceeds the 600 KB extraction limit." }, 413); }
+          chunks.push(part.value);
+        }
+        const bytes = new Uint8Array(total); let offset = 0;
+        for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+        const html = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
         const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1]?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) || target.hostname;
         const text = html.replace(/<(script|style|noscript|svg)[^>]*>[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim().slice(0, 16000);
         return json({ url: response.url || target.href, title, text });
