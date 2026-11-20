@@ -43,7 +43,7 @@ test("task history redacts credentials and caps record count", async () => {
   process.env.OPENFISH_MAX_TASKS = "50";
   try {
     const store = await import("../src/task-store.js?cap");
-    const first = await store.createTask({ goal: "token=super-secret Bearer abcdefghijklmnop ofb_live_12345678901234567890" });
+    const first = await store.createTask({ goal: "api_key=super-secret Bearer abcdefghijklmnop ofb_live_12345678901234567890" });
     assert.match(first.goal, /REDACTED/);
     assert.doesNotMatch(first.goal, /super-secret|abcdefghijklmnop|ofb_live_/);
     for (let i = 0; i < 54; i++) await store.createTask({ goal: "Task " + i });
