@@ -1,4 +1,5 @@
 name: Deploy OpenFish Cloudflare Worker
+# Release gate: run the complete v2.14.2 test suite before publishing frontend assets.
 
 on:
   workflow_dispatch:
