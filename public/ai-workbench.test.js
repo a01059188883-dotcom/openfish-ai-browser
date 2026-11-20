@@ -2,11 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-const [ui, worker, index, pkg] = await Promise.all([
+const [ui, worker, index, pkg, engine] = await Promise.all([
   readFile(new URL("./ai-workbench.js", import.meta.url), "utf8"),
   readFile(new URL("../cloudflare/worker.js", import.meta.url), "utf8"),
   readFile(new URL("./index.html", import.meta.url), "utf8"),
-  readFile(new URL("../package.json", import.meta.url), "utf8")
+  readFile(new URL("../package.json", import.meta.url), "utf8"),
+  readFile(new URL("../services/browser-engine/server.js", import.meta.url), "utf8")
 ]);
 
 test("AI workbench exposes all ten requested capability areas", () => {
