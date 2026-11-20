@@ -433,6 +433,10 @@ export class OpenFishRelay {
           const context = page.context();
           page = await context.newPage();
           await page.setViewportSize({ width: 1280, height: 820 });
+          if (payload.url) {
+            const target = validateTarget(payload.url);
+            await page.goto(target, { waitUntil: "domcontentloaded", timeout: 25000 });
+          }
           await this.ctx.storage.put(storageKey("cloudBrowserActiveTabIndex"), context.pages().indexOf(page));
         } else if (action === "switchTab") {
           const pages = browser.contexts().flatMap(context => context.pages());
