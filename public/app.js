@@ -52,8 +52,20 @@ async function downloadLink(url){
  try{const result=await api("/api/cloud-browser/download",{url,approved:true});await loadDownloads(false);toast("下载已完成，请在下载列表中点按“准备保存”")}
  catch(error){toast("下载失败："+error.message)}
 }
+const MAX_FILE_BYTES=15*1024*1024,MAX_SESSION_BYTES=50*1024*1024;
+let quotaStatus=null;
+function formatQuota(bytes){return (Math.max(0,bytes)/1024/1024).toFixed(2)+" MB"}
+function renderQuota(downloads=[],status=quotaStatus){
+ if(status)quotaStatus=status;
+ const used=downloads.reduce((sum,item)=>sum+Math.max(0,Number(item.size)||0),0),remaining=Math.max(0,MAX_SESSION_BYTES-used);
+ $("quotaUsed").textContent=formatQuota(used);$("quotaRemaining").textContent=formatQuota(remaining);
+ $("quotaFiles").textContent=downloads.length+" 个（单文件上限 "+formatQuota(MAX_FILE_BYTES)+"）";
+ $("quotaSessions").textContent=Number.isFinite(status?.activeSessions)&&Number.isFinite(status?.maxSessions)?status.activeSessions+" / "+status.maxSessions+"（剩余 "+Math.max(0,status.maxSessions-status.activeSessions)+"）":"暂不可读取";
+ $("quotaBar").style.width=Math.min(100,used/MAX_SESSION_BYTES*100)+"%";
+}
 async function loadDownloads(showEmpty=true){
  const result=await api("/api/cloud-browser/downloads"),host=$("downloads");
+ renderQuota(result.downloads||[]);
  for(const objectUrl of downloadObjectUrls.values())URL.revokeObjectURL(objectUrl);
  downloadObjectUrls.clear();
  host.replaceChildren();
@@ -106,7 +118,8 @@ $("searchEngineSetting").addEventListener("change",()=>{$("searchEngine").value=
 $("exportData").addEventListener("click",()=>{const payload={schemaVersion:1,exportedAt:new Date().toISOString(),bookmarks,history:historyItems,readingList:readingItems};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="openfish-browser-backup.json";a.click();URL.revokeObjectURL(url);toast("本机浏览数据备份已导出")});
 $("importData").addEventListener("click",()=>$("importDataFile").click());
 $("importDataFile").addEventListener("change",async event=>{const file=event.target.files?.[0];if(!file)return;if(file.size>1024*1024){toast("备份文件不能超过 1 MB");event.target.value="";return}try{const data=JSON.parse(await file.text());if(!data||typeof data!=="object"||!Array.isArray(data.bookmarks)||!Array.isArray(data.history)||!Array.isArray(data.readingList))throw Error("备份文件格式不正确");if(!confirm("导入备份将替换当前手机上的收藏、历史和稍后阅读清单，是否继续？"))return;bookmarks=data.bookmarks.slice(0,200);historyItems=data.history.slice(0,100);readingItems=data.readingList.slice(0,200);save(BOOKMARK_KEY,bookmarks);save(HISTORY_KEY,historyItems);save(READING_KEY,readingItems);renderBookmarks();renderHistory();renderReading();toast("浏览数据已恢复")}catch(error){toast("导入失败："+error.message)}finally{event.target.value=""}});
-async function boot(){renderBookmarks();renderHistory();renderReading();try{const status=await api("/api/cloud-browser/status");setState(status.connected?"云端会话可恢复":"浏览器待机",status.provider||"云端浏览器");if(status.connected){const view=await api("/api/cloud-browser/view");if(view.screenshot){render(view);recordHistory({url:view.url,title:view.title});renderHistory()}}}catch(error){setState("需要连接");if(token)toast(error.message)}}
+async function boot(){renderBookmarks();renderHistory();renderReading();try{const status=await api("/api/cloud-browser/status");renderQuota([],status);setState(status.connected?"云端会话可恢复":"浏览器待机",status.provider||"云端浏览器");if(status.connected){await loadDownloads().catch(()=>{});const view=await api("/api/cloud-browser/view");if(view.screenshot){render(view);recordHistory({url:view.url,title:view.title});renderHistory()}}}catch(error){setState("需要连接");if(token)toast(error.message)}}
 $("refreshDownloads").addEventListener("click",()=>loadDownloads().catch(error=>toast(error.message)));
+$("refreshQuota").addEventListener("click",async()=>{try{const [downloads,status]=await Promise.all([api("/api/cloud-browser/downloads"),api("/api/cloud-browser/status")]);renderQuota(downloads.downloads||[],status);toast("额度信息已刷新")}catch(error){toast("额度刷新失败："+error.message)}});
 boot();
 })();
