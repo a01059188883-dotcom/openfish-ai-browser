@@ -111,6 +111,42 @@ export default {
       }
       return json({ query, engines: [...new Set(results.map(item => item.engine))], results });
     }
+    if (url.pathname === "/api/ai/fetch") {
+      if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      let payload;
+      try { payload = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
+      const validPublicUrl = value => {
+        let u;
+        try { u = new URL(value); } catch { return null; }
+        if (!["http:", "https:"].includes(u.protocol) || u.username || u.password) return null;
+        const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+        if (!host || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") ||
+          /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host) ||
+          /^172\.(1[6-9]|2\d|3[01])\./.test(host) || host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:")) return null;
+        return u;
+      };
+      let target = validPublicUrl(payload.url);
+      if (!target) return json({ error: "Only public HTTP(S) URLs are allowed." }, 400);
+      try {
+        let response;
+        for (let hop = 0; hop < 4; hop++) {
+          response = await fetch(target.href, { redirect: "manual", headers: { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.0)", "accept": "text/html,text/plain;q=0.9" } });
+          if (![301, 302, 303, 307, 308].includes(response.status)) break;
+          const location = response.headers.get("location");
+          if (!location || hop === 3) return json({ error: "Too many or invalid redirects." }, 502);
+          target = validPublicUrl(new URL(location, target).href);
+          if (!target) return json({ error: "Redirect target is not a public HTTP(S) URL." }, 400);
+        }
+        if (!response?.ok) return json({ error: "Source returned HTTP " + (response?.status || 502) }, 502);
+        const type = response.headers.get("content-type") || "";
+        if (!/text\/html|text\/plain|application\/xhtml/i.test(type)) return json({ error: "Unsupported source content type: " + type.slice(0, 100) }, 415);
+        const html = (await response.text()).slice(0, 600000);
+        const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1]?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) || target.hostname;
+        const text = html.replace(/<(script|style|noscript|svg)[^>]*>[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim().slice(0, 16000);
+        return json({ url: response.url || target.href, title, text });
+      } catch (error) { return json({ error: "Source fetch failed: " + String(error.message || error).slice(0, 200) }, 502); }
+    }
     if (url.pathname.startsWith("/api/v1/browser/")) {
       const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type, X-OpenFish-Session", "access-control-max-age": "86400", "cache-control": "no-store" };
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
