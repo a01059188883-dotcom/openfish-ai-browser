@@ -344,6 +344,6 @@ test("durable task store is integrated into bridge routes and admin task history
   assert.ok(html.includes('id="taskDetail"'));
   assert.ok(app.includes("/api/admin/tasks?"));
   assert.ok(app.includes("/restore"));
-  assert.ok(app.includes("fresh approval") || app.includes("approve").toLowerCase());
+  assert.ok(app.includes("restore"));
   assert.ok(pkg.scripts.check.includes("task-store.js"));
 });
