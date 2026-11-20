@@ -80,6 +80,29 @@ export default {
         }
       }), { headers: { "content-type": "application/vnd.oai.openapi+json;version=3.1", "cache-control": "public, max-age=300", "x-openfish-version": VERSION } });
     }
+    if (url.pathname === "/api/ai/search") {
+      if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      let payload;
+      try { payload = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
+      const query = String(payload.query || "").trim().slice(0, 300);
+      if (!query) return json({ error: "A search query is required." }, 400);
+      try {
+        const response = await fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), { headers: { "user-agent": "OpenFishAI-Browser/2.14.0", "accept": "text/html" } });
+        if (!response.ok) return json({ error: "Search provider HTTP " + response.status }, 502);
+        const html = (await response.text()).slice(0, 1500000), results = [];
+        const pattern = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+        let match;
+        while ((match = pattern.exec(html)) && results.length < 10) {
+          let href = match[1].replace(/&amp;/g, "&");
+          try { const parsed = new URL(href, "https://html.duckduckgo.com"); href = parsed.searchParams.get("uddg") || href; } catch {}
+          if (!/^https?:\/\//i.test(href)) continue;
+          const title = match[2].replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim().slice(0, 240);
+          if (title) results.push({ title, url: href });
+        }
+        return json({ query, provider: "DuckDuckGo", results });
+      } catch (error) { return json({ error: "Search failed: " + String(error.message || error).slice(0, 240) }, 502); }
+    }
     if (url.pathname.startsWith("/api/v1/browser/")) {
       const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type, X-OpenFish-Session", "access-control-max-age": "86400", "cache-control": "no-store" };
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
