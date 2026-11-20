@@ -1,4 +1,4 @@
-## OpenFish v2.13.4 / browser engine 1.3.5 - 2026-11-19
+## OpenFish v2.14.0 - 2026-11-20\n- Add a mobile AI workbench covering page and multi-tab context, model configuration, local Skills and Memory, writing, workspace snapshots, voice input/output, file analysis, and approved browser-agent plans.\n- Add authenticated DuckDuckGo and Bing search aggregation for research workflows.\n- Add PDF.js text extraction and image payload adapters for supported vision-capable models.\n- Synchronize the application, Worker, package, and static asset cache version to 2.14.0.\n- This release is an integration foundation; comprehensive feature verification and remaining recovery, persistence, and provider-compatibility work are pending.\n\n## OpenFish v2.13.4 / browser engine 1.3.5 - 2026-11-19
 - Stream completed downloads as binary responses instead of buffering the entire file and Base64-encoding it.
 - Update the mobile client to receive download Blobs directly and retain explicit save confirmation.
 - Synchronize app, extension, admin, Worker, engine, health checks, deployment preflight, tests, and documentation to v2.13.4 / engine 1.3.5.
