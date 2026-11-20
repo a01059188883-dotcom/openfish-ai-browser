@@ -12,8 +12,8 @@ function scrub(value, depth = 0) {
   if (depth > 8) return "[truncated]";
   if (typeof value === "string") {
     return value
-      .replace(/(Bearer\\s+)[A-Za-z0-9._~+/-]+=*/gi, "$1[REDACTED]")
-      .replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret)\\s*[:=]\\s*)["']?[^\\s,"'}]+/gi, "$1[REDACTED]")
+      .replace(/(Bearer\s+)[A-Za-z0-9._~+/-]+=*/gi, "$1[REDACTED]")
+      .replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|passwd|secret)\s*[:=]\s*)["']?[^\s,"'}]+/gi, "$1[REDACTED]")
       .replace(/ofb_live_[A-Za-z0-9_-]{12,}/g, "[REDACTED_API_KEY]")
       .slice(0, MAX_FIELD);
   }
