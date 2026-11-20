@@ -53,11 +53,13 @@ async function downloadLink(url){
  catch(error){toast("下载失败："+error.message)}
 }
 const MAX_FILE_BYTES=15*1024*1024,MAX_SESSION_BYTES=50*1024*1024;
+let quotaStatus=null;
 function formatQuota(bytes){return (Math.max(0,bytes)/1024/1024).toFixed(2)+" MB"}
-function renderQuota(downloads=[],status=null){
+function renderQuota(downloads=[],status=quotaStatus){
+ if(status)quotaStatus=status;
  const used=downloads.reduce((sum,item)=>sum+Math.max(0,Number(item.size)||0),0),remaining=Math.max(0,MAX_SESSION_BYTES-used);
  $("quotaUsed").textContent=formatQuota(used);$("quotaRemaining").textContent=formatQuota(remaining);
- $("quotaFiles").textContent=downloads.length+" 个（单文件上限 15 MB）";
+ $("quotaFiles").textContent=downloads.length+" 个（单文件上限 "+formatQuota(MAX_FILE_BYTES)+"）";
  $("quotaSessions").textContent=Number.isFinite(status?.activeSessions)&&Number.isFinite(status?.maxSessions)?status.activeSessions+" / "+status.maxSessions+"（剩余 "+Math.max(0,status.maxSessions-status.activeSessions)+"）":"暂不可读取";
  $("quotaBar").style.width=Math.min(100,used/MAX_SESSION_BYTES*100)+"%";
 }
