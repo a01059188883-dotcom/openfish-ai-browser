@@ -9,7 +9,14 @@ Open-source, free-first browser automation starter. Version: **2.14.0**.
 - **Local AI planner**: optional Ollama integration (default model `qwen2.5:3b`) creates constrained JSON plans.
 - **Safety defaults**: no credential collection; sensitive fields and potentially irreversible actions are blocked during plan execution.
 
-## AI workbench (2.14.0 foundation)\n- Adds a mobile-first AI workbench for page and multi-tab context, model-provider settings, local Skills and Memory, writing, approved browser task plans, workspace snapshots, voice I/O, research search, and file input.\n- Supports Ollama and OpenAI-compatible, Anthropic, and Gemini-style chat endpoints configured by the user. Model keys are stored in the local browser profile, not in the OpenFish relay.\n- Research search is proxied through the authenticated Worker and queries DuckDuckGo and Bing.\n- PDF extraction uses PDF.js; DOCX and XLS/XLSX extraction use Mammoth and SheetJS, loaded from public CDNs; image understanding is passed to compatible vision-capable models. Availability depends on network access, model capabilities, browser permissions, and provider CORS/API compatibility.\n- This is an integration foundation, not a claim that every AI-browser capability is production-verified. Cross-device memory sync, richer agent recovery, broad document formats, and full end-to-end validation remain follow-up work.\n\n## Requirements
+## AI workbench (2.14.0 foundation)
+- Adds a mobile-first AI workbench for page and multi-tab context, model-provider settings, local Skills and Memory, writing, approved browser task plans, workspace snapshots, voice I/O, research search, and file input.
+- Supports Ollama and OpenAI-compatible, Anthropic, and Gemini-style chat endpoints configured by the user. Model keys are stored in the local browser profile, not in the OpenFish relay.
+- Research search is proxied through the authenticated Worker and queries DuckDuckGo and Bing.
+- PDF extraction uses PDF.js; DOCX and XLS/XLSX extraction use Mammoth and SheetJS, loaded from public CDNs; image understanding is passed to compatible vision-capable models. Availability depends on network access, model capabilities, browser permissions, and provider CORS/API compatibility.
+- This is an integration foundation, not a claim that every AI-browser capability is production-verified. Cross-device memory sync, richer agent recovery, broad document formats, and full end-to-end validation remain follow-up work.
+
+## Requirements
 - Node.js 20+
 - Chrome / Chromium
 - Install dependencies with `npm install`
@@ -32,7 +39,13 @@ npm run start:mcp
 ```
 Configure your MCP host to launch `node packages/mcp-server/src/index.js` from this project directory using stdio.
 
-## Visual admin dashboard\nOpen `http://127.0.0.1:8787/admin` after starting the bridge to open the local control panel. It displays bridge uptime, API request/error counts, browser connection mode, recent API activity, and a task planner with explicit approval before execution. Dashboard telemetry is held in process memory and resets when the bridge restarts. The panel is served only by the local bridge; it is not a public cloud admin site.\n\n## Unified local runtime (v1.3.3)\nThe bridge is the single owner of the Playwright browser. Both the Chrome side panel and the stdio MCP server call the same local bridge API; MCP no longer launches a second browser process. Start `npm run start:bridge` before launching either client. The MCP server exposes `open_page`, `read_page`, `plan_task`, `execute_plan`, `click_element`, `fill_element`, `take_screenshot`, `list_interactive_elements`, and `get_accessibility_snapshot`.\n\n## Review and execution flow
+## Visual admin dashboard
+Open `http://127.0.0.1:8787/admin` after starting the bridge to open the local control panel. It displays bridge uptime, API request/error counts, browser connection mode, recent API activity, and a task planner with explicit approval before execution. Dashboard telemetry is held in process memory and resets when the bridge restarts. The panel is served only by the local bridge; it is not a public cloud admin site.
+
+## Unified local runtime (v1.3.3)
+The bridge is the single owner of the Playwright browser. Both the Chrome side panel and the stdio MCP server call the same local bridge API; MCP no longer launches a second browser process. Start `npm run start:bridge` before launching either client. The MCP server exposes `open_page`, `read_page`, `plan_task`, `execute_plan`, `click_element`, `fill_element`, `take_screenshot`, `list_interactive_elements`, and `get_accessibility_snapshot`.
+
+## Review and execution flow
 1. Ask the local AI planner to generate a plan for the current page.
 2. Review the complete plan in the Chrome side panel or MCP response.
 3. Explicitly approve the exact plan using the side-panel confirmation or the MCP `execute_plan` tool with `approved: true`.
