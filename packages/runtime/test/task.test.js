@@ -91,7 +91,7 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   const html = await readFile(resolve("packages/admin/index.html"), "utf8");
   const app = await readFile(resolve("packages/admin/app.js"), "utf8");
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "2.14.2");
+  assert.equal(pkg.version, "2.15.0");
   assert.ok(bridge.includes('req.url === "/api/admin/status"'));
   assert.ok(bridge.includes('req.url === "/api/admin/events"'));
   assert.ok(bridge.includes('["../../admin/index.html"'));
@@ -329,4 +329,21 @@ test("portable backup and command center are exposed with bounded import", async
   assert.ok(html.includes("Shift + T"));
   assert.ok(panel.includes('event.shiftKey&&key==="t"'));
   assert.ok(bridge.includes("/api/library/import"));
+});
+
+test("durable task store is integrated into bridge routes and admin task history", async () => {
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  const html = await readFile(resolve("packages/admin/index.html"), "utf8");
+  const app = await readFile(resolve("packages/admin/app.js"), "utf8");
+  const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
+  assert.ok(bridge.includes('"/api/admin/tasks"'));
+  assert.ok(bridge.includes('"/api/mcp/plan_task"'));
+  assert.ok(bridge.includes('"/api/mcp/execute_plan"'));
+  assert.ok(bridge.includes("restoreTask(id)"));
+  assert.ok(html.includes('id="taskSearch"'));
+  assert.ok(html.includes('id="taskDetail"'));
+  assert.ok(app.includes("/api/admin/tasks?"));
+  assert.ok(app.includes("/restore"));
+  assert.ok(app.includes("fresh approval") || app.includes("approve").toLowerCase());
+  assert.ok(pkg.scripts.check.includes("task-store.js"));
 });
