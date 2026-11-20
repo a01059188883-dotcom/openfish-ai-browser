@@ -1,7 +1,7 @@
 import mobileAdminHtml from "./mobile-admin.html";
 import { acquire, connect } from "@cloudflare/playwright";
 
-const VERSION = "2.13.5";
+const VERSION = "2.14.0";
 const MAX_BODY_BYTES = 512 * 1024;
 const guardedBrowserContexts = new WeakSet();
 const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/browser/sessions"]);
@@ -80,6 +80,73 @@ export default {
         }
       }), { headers: { "content-type": "application/vnd.oai.openapi+json;version=3.1", "cache-control": "public, max-age=300", "x-openfish-version": VERSION } });
     }
+    if (url.pathname === "/api/ai/search") {
+      if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      let payload;
+      try { payload = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
+      const query = String(payload.query || "").trim().slice(0, 300);
+      if (!query) return json({ error: "A search query is required." }, 400);
+      const headers = { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.0)", "accept": "text/html" };
+      const sources = await Promise.allSettled([
+        fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), { headers }),
+        fetch("https://www.bing.com/search?q=" + encodeURIComponent(query), { headers })
+      ]);
+      const results = [];
+      for (let sourceIndex = 0; sourceIndex < sources.length; sourceIndex++) {
+        const settled = sources[sourceIndex];
+        if (settled.status !== "fulfilled" || !settled.value.ok) continue;
+        const html = (await settled.value.text()).slice(0, 1500000);
+        const pattern = sourceIndex === 0
+          ? /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi
+          : /<li class="b_algo"[\s\S]*?<h2><a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+        let match, count = 0;
+        while ((match = pattern.exec(html)) && count < 8) {
+          let href = match[1].replace(/&amp;/g, "&");
+          try { const parsed = new URL(href, sourceIndex === 0 ? "https://html.duckduckgo.com" : "https://www.bing.com"); href = parsed.searchParams.get("uddg") || href; } catch {}
+          if (!/^https?:\/\//i.test(href)) continue;
+          const title = match[2].replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim().slice(0, 240);
+          if (title && !results.some(item => item.url === href)) { results.push({ title, url: href, engine: sourceIndex === 0 ? "DuckDuckGo" : "Bing" }); count++; }
+        }
+      }
+      return json({ query, engines: [...new Set(results.map(item => item.engine))], results });
+    }
+    if (url.pathname === "/api/ai/fetch") {
+      if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      let payload;
+      try { payload = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
+      const validPublicUrl = value => {
+        let u;
+        try { u = new URL(value); } catch { return null; }
+        if (!["http:", "https:"].includes(u.protocol) || u.username || u.password) return null;
+        const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+        if (!host || /^\\d{1,3}(\\.\\d{1,3}){3}$/.test(host) || host.includes(":") || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") ||
+          /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host) ||
+          /^172\.(1[6-9]|2\d|3[01])\./.test(host) || host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:")) return null;
+        return u;
+      };
+      let target = validPublicUrl(payload.url);
+      if (!target) return json({ error: "Only public HTTP(S) URLs are allowed." }, 400);
+      try {
+        let response;
+        for (let hop = 0; hop < 4; hop++) {
+          response = await fetch(target.href, { redirect: "manual", headers: { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.0)", "accept": "text/html,text/plain;q=0.9" } });
+          if (![301, 302, 303, 307, 308].includes(response.status)) break;
+          const location = response.headers.get("location");
+          if (!location || hop === 3) return json({ error: "Too many or invalid redirects." }, 502);
+          target = validPublicUrl(new URL(location, target).href);
+          if (!target) return json({ error: "Redirect target is not a public HTTP(S) URL." }, 400);
+        }
+        if (!response?.ok) return json({ error: "Source returned HTTP " + (response?.status || 502) }, 502);
+        const type = response.headers.get("content-type") || "";
+        if (!/text\/html|text\/plain|application\/xhtml/i.test(type)) return json({ error: "Unsupported source content type: " + type.slice(0, 100) }, 415);
+        const html = (await response.text()).slice(0, 600000);
+        const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1]?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) || target.hostname;
+        const text = html.replace(/<(script|style|noscript|svg)[^>]*>[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim().slice(0, 16000);
+        return json({ url: response.url || target.href, title, text });
+      } catch (error) { return json({ error: "Source fetch failed: " + String(error.message || error).slice(0, 200) }, 502); }
+    }
     if (url.pathname.startsWith("/api/v1/browser/")) {
       const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type, X-OpenFish-Session", "access-control-max-age": "86400", "cache-control": "no-store" };
       if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
@@ -111,7 +178,7 @@ export default {
       if (body.length > 16000) return json({ error: "Request too large." }, 413);
       return relayStub(env).fetch(new Request("https://relay.internal/cloud" + url.pathname.slice("/api/cloud-browser".length), { method: request.method, headers: { "content-type": "application/json", "x-openfish-session": request.headers.get("x-openfish-session") || "" }, body: body || undefined }));
     }
-    if (env.ASSETS && ["/app.css", "/app.js", "/favicon.ico", "/manifest.webmanifest"].includes(url.pathname)) return env.ASSETS.fetch(request);
+    if (env.ASSETS && ["/app.css", "/workspace.css", "/app.js", "/ai-workbench.js", "/favicon.ico", "/manifest.webmanifest"].includes(url.pathname)) return env.ASSETS.fetch(request);
     if (url.pathname === "/agent/connect") {
       if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") return json({ error: "WebSocket upgrade required." }, 426);
       if (!authorized(request, env)) return json({ error: "Unauthorized relay agent." }, 401);
