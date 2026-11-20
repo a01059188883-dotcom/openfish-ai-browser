@@ -1,6 +1,6 @@
 const $ = id => document.getElementById(id);
 const TEMPLATE_KEY = "openfish.taskTemplates.v1";
-let plan = null;
+let plan = null;\nlet currentTaskId = null;\nlet taskSearchTimer = null;
 let pollBusy = false;
 let latestEvents = [];
 
@@ -131,7 +131,7 @@ $("approve").addEventListener("click", async () => {
   $("makePlan").disabled = true;
   $("plan").textContent = "执行中…";
   try {
-    const result = await api("/api/execute", { plan: approvedPlan, approved: true });
+    const result = await api("/api/execute", { plan: approvedPlan, taskId: currentTaskId, approved: true });
     $("plan").textContent = JSON.stringify(result, null, 2);
   } catch (error) {
     $("plan").textContent = "执行失败：" + error.message;
@@ -150,7 +150,66 @@ $("refresh").addEventListener("click", refresh);
 $("refreshLog").addEventListener("click", refresh);
 $("eventFilter").addEventListener("input", () => renderEvents(latestEvents));
 
-async function loadToolCatalog() {
+
+function taskStatusLabel(status) {
+  return ({ planned: "待审核", approved: "已批准", running: "执行中", succeeded: "成功", stopped: "已停止", failed: "失败" })[status] || status || "未知";
+}
+async function loadTasks() {
+  const host = $("taskList");
+  if (!host) return;
+  try {
+    const params = new URLSearchParams({ q: $("taskSearch")?.value || "", status: $("taskStatus")?.value || "", limit: "100" });
+    const data = await api("/api/admin/tasks?" + params.toString());
+    const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    $("taskCount").textContent = tasks.length + " 条 / 最多 " + (data.maxTasks || 500) + " 条";
+    host.replaceChildren();
+    if (!tasks.length) { host.append(textNode("p", "没有匹配的任务记录。", "muted")); return; }
+    for (const task of tasks) {
+      const row = document.createElement("div");
+      row.className = "task-row";
+      const details = document.createElement("div");
+      details.className = "task-details";
+      details.append(textNode("b", task.goal), textNode("small", task.id + " · " + fmtTime(task.createdAt) + " · " + (task.source || "unknown")));
+      const state = textNode("span", taskStatusLabel(task.status), "task-status status-" + task.status);
+      const actions = document.createElement("div");
+      actions.className = "task-actions";
+      const view = textNode("button", "查看");
+      view.type = "button";
+      view.addEventListener("click", async () => {
+        try { const detail = await api("/api/admin/tasks/" + encodeURIComponent(task.id)); $("taskDetail").textContent = JSON.stringify(detail.task, null, 2); }
+        catch (error) { $("taskDetail").textContent = "读取失败：" + error.message; }
+      });
+      const restore = textNode("button", "恢复计划", "primary");
+      restore.type = "button";
+      restore.disabled = !task.hasPlan && !task.plan;
+      restore.addEventListener("click", async () => {
+        restore.disabled = true;
+        try {
+          const result = await api("/api/admin/tasks/" + encodeURIComponent(task.id) + "/restore", {});
+          plan = result.task.plan;
+          currentTaskId = result.task.id;
+          $("goal").value = result.task.goal;
+          $("plan").textContent = JSON.stringify(result.task, null, 2);
+          $("plan").className = "plan";
+          $("approve").disabled = !plan?.steps?.length;
+          $("taskDetail").textContent = JSON.stringify(result.task, null, 2);
+          await loadTasks();
+          $("goal").scrollIntoView({ behavior: "smooth", block: "center" });
+        } catch (error) { window.alert("恢复失败：" + error.message); restore.disabled = false; }
+      });
+      actions.append(view, restore);
+      row.append(details, state, actions);
+      host.append(row);
+    }
+  } catch (error) { host.replaceChildren(textNode("p", "读取任务历史失败：" + error.message, "muted")); }
+}
+$("refreshTasks")?.addEventListener("click", loadTasks);
+$("taskStatus")?.addEventListener("change", loadTasks);
+$("taskSearch")?.addEventListener("input", () => {
+  window.clearTimeout(taskSearchTimer);
+  taskSearchTimer = window.setTimeout(loadTasks, 220);
+});
+\nasync function loadToolCatalog() {
   const host = $("toolCatalog");
   const count = $("toolCount");
   if (!host || !count) return;
