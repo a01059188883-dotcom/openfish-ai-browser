@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.14.2**.
+Open-source, free-first browser automation starter. Version: **2.15.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -9,7 +9,7 @@ Open-source, free-first browser automation starter. Version: **2.14.2**.
 - **Local AI planner**: optional Ollama integration (default model `qwen2.5:3b`) creates constrained JSON plans.
 - **Safety defaults**: no credential collection; sensitive fields and potentially irreversible actions are blocked during plan execution.
 
-## AI workbench (2.14.2 hardening)
+## AI workbench (2.15.0 hardening)
 - Integrates page and multi-tab context, model-provider settings, local Skills and Memory, writing, approved browser task plans, workspace snapshots, voice I/O, research search, and file input.
 - Supports Ollama and OpenAI-compatible, Anthropic, and Gemini-style chat endpoints configured by the user. API keys and local Memory/Skills are stored in the browser's local profile; they are not synced between devices.
 - Research uses authenticated Worker endpoints to query DuckDuckGo and Bing, then fetches public web pages for source cross-checking. Public-source fetching is restricted to HTTP(S) hostnames, rejects IP-literal/local targets, and revalidates redirects.
