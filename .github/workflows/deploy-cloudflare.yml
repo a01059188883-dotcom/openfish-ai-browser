@@ -51,3 +51,14 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Smoke test deployed AI workbench assets
+        run: |
+          set -euo pipefail
+          base="https://openfish-ai-browser-relay.a01059188883.workers.dev"
+          curl --retry 5 --retry-delay 2 -fsS "$base/?v=2.14.0" -o /tmp/openfish-index.html
+          grep -Fq 'ai-workbench.js?v=2.14.0' /tmp/openfish-index.html
+          curl --retry 5 --retry-delay 2 -fsS "$base/ai-workbench.js?v=2.14.0" -o /tmp/openfish-ai-workbench.js
+          grep -Fq 'function validatePlan' /tmp/openfish-ai-workbench.js
+          grep -Fq 'function renderWorkspaces' /tmp/openfish-ai-workbench.js
+          echo "Production frontend and AI workbench assets are reachable and match v2.14.0."
