@@ -309,6 +309,28 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (req.method === "POST" && req.url === "/api/mcp/plan_task") {
+      const body = await readBody(req);
+      const page = await getPageContext();
+      const plan = await createPlan(body.goal, page);
+      const task = await createTask({ goal: body.goal, plan, page: { title: page.title, url: page.url }, source: "mcp-http" });
+      return send(res, 200, { status: "plan_ready_for_review", ...plan, taskId: task.id, warning: "No action has been executed." });
+    }
+    if (req.method === "POST" && req.url === "/api/mcp/execute_plan") {
+      const body = await readBody(req);
+      if (body.approved !== true) return send(res, 403, { error: "Explicit approval of the exact plan is required." });
+      const task = body.taskId ? await getTask(body.taskId) : await createTask({ goal: body.goal || "MCP approved browser plan", plan: body.plan, source: "mcp-http" });
+      await updateTask(task.id, { status: "approved", plan: body.plan, message: "Explicit approval received" });
+      await updateTask(task.id, { status: "running", message: "Execution started" });
+      try {
+        const result = await executePlan(body.plan, { approved: true });
+        await updateTask(task.id, { status: result.status === "completed" ? "succeeded" : "stopped", result, message: result.status });
+        return send(res, 200, { ...result, taskId: task.id });
+      } catch (error) {
+        await updateTask(task.id, { status: "failed", error: error.message, message: "Execution failed" });
+        throw error;
+      }
+    }
     if (req.method === "GET" && req.url === "/api/mcp/list_workspaces") return send(res, 200, { workspaces: await getSavedWorkspaces() });
     if (req.method === "POST" && req.url === "/api/mcp/save_workspace") { const body = await readBody(req); return send(res, 201, await saveCurrentWorkspace(body.name)); }
     if (req.method === "POST" && req.url === "/api/mcp/restore_workspace") { const body = await readBody(req); return send(res, 200, await restoreSavedWorkspace(body.id, body.approved)); }
