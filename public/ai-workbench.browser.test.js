@@ -34,6 +34,7 @@ test("AI workbench mobile browser smoke test: tabs, page context, writing and sa
     assert.equal(await page.locator("[data-pane]").count(), 10);
     await page.locator("#of-context").click();
     await page.waitForFunction(() => document.querySelector("#of-chat").textContent.includes("OpenFish 页面内容测试文本"));
+    await page.locator('[data-tab="write"]').click();
     await page.locator("#of-write-page").click();
     await page.waitForFunction(() => document.querySelector("#of-write").value.includes("OpenFish 页面内容测试文本"));
     await page.locator('[data-tab="memory"]').click();
