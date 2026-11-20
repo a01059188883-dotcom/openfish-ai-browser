@@ -209,6 +209,10 @@ async function handle(req, res) {
       if (action === "newTab") {
         session.page = await session.context.newPage();
         session.page.setDefaultNavigationTimeout(NAV_TIMEOUT);
+        if (payload.url) {
+          const target = await validateTarget(payload.url);
+          await session.page.goto(target, { waitUntil: "domcontentloaded", timeout: NAV_TIMEOUT });
+        }
       } else if (action === "switchTab") {
         const index = Number(payload.index), openPages = session.context.pages();
         if (!Number.isInteger(index) || index < 0 || index >= openPages.length) throw new Error("标签页编号无效");
