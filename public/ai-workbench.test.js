@@ -43,6 +43,10 @@ test("document and image analysis adapters are present", () => {
 test("agent requires explicit approval, validates plans and includes bounded retries", () => {
   assert.ok(ui.includes('confirm("确认批准执行此计划'));
   assert.ok(ui.includes("function validatePlan(value)"));
+  assert.ok(ui.includes("validatePlan(plan)"));
+  assert.ok(ui.includes("validatePlan(next)"));
+  assert.ok(ui.includes('$("of-goal").addEventListener("input"'));
+  assert.ok(ui.includes("计划校验失败："));
   assert.ok(ui.includes("AGENT_ACTIONS.has(step.action)"));
   assert.ok(ui.includes("attempt<=2"));
   assert.ok(ui.includes("进度："));
