@@ -39,13 +39,13 @@ test("self-hosted engine requires a long private token and exposes authenticated
   assert.equal(allowed.status, 200);
   const health = await allowed.json();
   assert.equal(health.engine, "OpenFish Self-hosted Playwright");
-  assert.equal(health.version, "1.3.5");
+  assert.equal(health.version, "1.3.6");
 });
 
 test("self-hosted engine exposes real multi-tab management actions", async () => {
   const server = await readFile(new URL("../server.js", import.meta.url), "utf8");
   assert.match(server, /url\.pathname === "\/tabs"/);
-  assert.match(server, /action === "newTab"/);
+  assert.match(server, /action === "newTab"/);\n  assert.match(server, /if \(payload.url\)/);
   assert.match(server, /action === "switchTab"/);
   assert.match(server, /action === "closeTab"/);
   assert.match(server, /tabs: await listTabs\(session\)/);
