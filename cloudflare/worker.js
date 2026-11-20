@@ -89,8 +89,8 @@ export default {
       if (!query) return json({ error: "A search query is required." }, 400);
       const headers = { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.1)", "accept": "text/html" };
       const sources = await Promise.allSettled([
-        fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), { headers }),
-        fetch("https://www.bing.com/search?q=" + encodeURIComponent(query), { headers })
+        fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), { headers, signal: AbortSignal.timeout(12000) }),
+        fetch("https://www.bing.com/search?q=" + encodeURIComponent(query), { headers, signal: AbortSignal.timeout(12000) })
       ]);
       const results = [];
       for (let sourceIndex = 0; sourceIndex < sources.length; sourceIndex++) {
@@ -121,7 +121,7 @@ export default {
         try { u = new URL(value); } catch { return null; }
         if (!["http:", "https:"].includes(u.protocol) || u.username || u.password) return null;
         const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-        if (!host || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.includes(":") || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") ||
+        if (!host || !host.includes(".") || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.includes(":") || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".test") || host.endsWith(".example") || host.endsWith(".invalid") || host.endsWith(".onion") ||
           /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host) ||
           /^172\.(1[6-9]|2\d|3[01])\./.test(host) || host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:")) return null;
         return u;
@@ -131,7 +131,7 @@ export default {
       try {
         let response;
         for (let hop = 0; hop < 4; hop++) {
-          response = await fetch(target.href, { redirect: "manual", headers: { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.1)", "accept": "text/html,text/plain;q=0.9" } });
+          response = await fetch(target.href, { redirect: "manual", signal: AbortSignal.timeout(12000), headers: { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.1)", "accept": "text/html,text/plain;q=0.9" } });
           if (![301, 302, 303, 307, 308].includes(response.status)) break;
           const location = response.headers.get("location");
           if (!location || hop === 3) return json({ error: "Too many or invalid redirects." }, 502);
