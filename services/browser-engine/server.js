@@ -130,7 +130,7 @@ async function readBody(req) {
 async function handle(req, res) {
   if (!hasValidToken(req)) return send(res, 401, { error: "Unauthorized" });
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-  if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.3.6", activeSessions: sessions.size, maxSessions: MAX_SESSIONS, downloadStorage });
+  if (url.pathname === "/health" && req.method === "GET") return send(res, 200, { ok: true, engine: "OpenFish Self-hosted Playwright", version: "1.3.5", activeSessions: sessions.size, maxSessions: MAX_SESSIONS, downloadStorage });
   const id = sessionId(req);
   if (!id) return send(res, 400, { error: "A valid X-OpenFish-Session header is required." });
   if (url.pathname === "/close" && req.method === "POST") {

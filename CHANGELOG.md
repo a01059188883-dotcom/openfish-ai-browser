@@ -1,4 +1,19 @@
-## OpenFish v2.14.0 - 2026-11-20\n- Add a mobile AI workbench covering page and multi-tab context, model configuration, local Skills and Memory, writing, workspace snapshots, voice input/output, file analysis, and approved browser-agent plans.\n- Add authenticated DuckDuckGo and Bing search aggregation for research workflows.\n- Add PDF.js text extraction and image payload adapters for supported vision-capable models.\n- Synchronize the application, Worker, package, and static asset cache version to 2.14.0.\n- This release is an integration foundation; comprehensive feature verification and remaining recovery, persistence, and provider-compatibility work are pending.\n\n## OpenFish v2.13.4 / browser engine 1.3.5 - 2026-11-19
+## OpenFish v2.14.1 - 2026-11-20
+- Fix the AI writing page action to read the current page from the actual multi-tab context shape.
+- Validate every AI Agent plan and recovery plan against an explicit safe action allowlist; reject malformed URLs, unsupported actions, invalid tab indices, and excessive scroll distances.
+- Make opening a new tab navigate to its approved URL in the self-hosted browser engine.
+- Harden public research URL filtering against IPv4 and IPv6 literal targets and revalidate redirects.
+- Improve small-screen AI workbench sizing, horizontal navigation, voice recognition error reporting, and voice answer commands.
+- Add Playwright mobile browser smoke tests covering page context, writing, memory, workspace rendering, XSS-safe workspace names, and horizontal overflow.
+- Synchronize frontend, Worker, package, admin, extension, MCP, Bridge, and test versions to 2.14.1.
+- Cloud Run redeployment and physical iPhone acceptance remain pending; provider APIs and device voice permissions still require real-device checks.
+
+## OpenFish v2.14.0 - 2026-11-20
+- Add the first integrated AI workbench foundation across page context, research, agent plans, Skills, Memory, writing, model configuration, files, workspace snapshots, and voice.
+- Add authenticated search and public source extraction endpoints; add PDF, DOCX, XLS/XLSX and image adapters.
+- This foundation requires provider configuration and end-to-end verification; Memory and Skills are local to the browser profile.
+
+## OpenFish v2.13.4 / browser engine 1.3.5 - 2026-11-19
 - Stream completed downloads as binary responses instead of buffering the entire file and Base64-encoding it.
 - Update the mobile client to receive download Blobs directly and retain explicit save confirmation.
 - Synchronize app, extension, admin, Worker, engine, health checks, deployment preflight, tests, and documentation to v2.13.4 / engine 1.3.5.
