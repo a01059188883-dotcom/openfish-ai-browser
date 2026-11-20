@@ -52,7 +52,7 @@ async function persist() {
 }
 function publicTask(task, includeDetails = false) {
   const { plan, result, error, ...summary } = task;
-  return includeDetails ? { ...summary, plan, result, error } : summary;
+  return includeDetails ? { ...summary, plan, result, error } : { ...summary, hasPlan: Boolean(plan) };
 }
 export async function createTask({ goal, plan = null, source = "admin", page = null, status = "planned" }) {
   const cleanGoal = String(goal || "").trim();
