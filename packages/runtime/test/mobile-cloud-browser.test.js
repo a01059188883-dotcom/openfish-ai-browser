@@ -3,6 +3,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+test("Cloudflare multi-tab Agent opens a new tab directly at its validated URL", async () => {
+  const worker = await readFile(resolve("cloudflare/worker.js"), "utf8");
+  assert.ok(worker.includes("if (payload.url)"));
+  assert.ok(worker.includes("const target = validateTarget(payload.url)"));
+  assert.ok(worker.includes("await page.goto(target, { waitUntil: \"domcontentloaded\", timeout: 25000 })"));
+});
+
 test("mobile frontend is served by the Worker and uses authenticated cloud browser routes", async () => {
   const worker = await readFile(resolve("cloudflare/worker.js"), "utf8");
   const config = await readFile(resolve("cloudflare/wrangler.toml"), "utf8");
