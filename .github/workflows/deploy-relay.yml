@@ -4,9 +4,12 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    paths:
+      - "services/browser-engine/**"
+      - ".github/workflows/deploy-relay.yml"
 
 concurrency:
-  group: openfish-production-deploy
+  group: openfish-cloudrun-engine-deploy
   cancel-in-progress: false
 
 permissions:
