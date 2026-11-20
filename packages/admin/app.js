@@ -95,6 +95,7 @@ async function refresh() {
 }
 function invalidatePlan() {
   plan = null;
+  currentTaskId = null;
   $("approve").disabled = true;
   $("plan").textContent = "任务已修改，请重新生成计划并审核。";
   $("plan").className = "plan empty";
@@ -113,6 +114,7 @@ $("makePlan").addEventListener("click", async () => {
     const result = await api("/api/plan", { goal });
     if (!Array.isArray(result.steps) || !result.steps.length) throw new Error("AI 未返回可执行步骤，请调整任务描述。");
     plan = result;
+    currentTaskId = result.taskId || null;
     $("plan").textContent = JSON.stringify(result, null, 2);
     $("approve").disabled = false;
   } catch (error) {
@@ -133,8 +135,10 @@ $("approve").addEventListener("click", async () => {
   try {
     const result = await api("/api/execute", { plan: approvedPlan, taskId: currentTaskId, approved: true });
     $("plan").textContent = JSON.stringify(result, null, 2);
+    await loadTasks();
   } catch (error) {
     $("plan").textContent = "执行失败：" + error.message;
+    await loadTasks();
   } finally {
     plan = null;
     $("makePlan").disabled = false;
