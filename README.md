@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.14.1**.
+Open-source, free-first browser automation starter. Version: **2.14.2**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -9,14 +9,14 @@ Open-source, free-first browser automation starter. Version: **2.14.1**.
 - **Local AI planner**: optional Ollama integration (default model `qwen2.5:3b`) creates constrained JSON plans.
 - **Safety defaults**: no credential collection; sensitive fields and potentially irreversible actions are blocked during plan execution.
 
-## AI workbench (2.14.1 hardening)
+## AI workbench (2.14.2 hardening)
 - Integrates page and multi-tab context, model-provider settings, local Skills and Memory, writing, approved browser task plans, workspace snapshots, voice I/O, research search, and file input.
 - Supports Ollama and OpenAI-compatible, Anthropic, and Gemini-style chat endpoints configured by the user. API keys and local Memory/Skills are stored in the browser's local profile; they are not synced between devices.
 - Research uses authenticated Worker endpoints to query DuckDuckGo and Bing, then fetches public web pages for source cross-checking. Public-source fetching is restricted to HTTP(S) hostnames, rejects IP-literal/local targets, and revalidates redirects.
 - PDF.js, Mammoth (DOCX), and SheetJS (XLS/XLSX) are loaded from public CDNs; image understanding is passed to compatible vision-capable models. Scanned PDFs need OCR, which is not yet included.
 - Browser Agent plans are limited to approved navigation, tab switching, history, and scrolling actions. Each plan requires explicit user approval; failed steps are retried once and may produce a separate recovery plan for review.
 - Cloud model use may incur provider charges. Local model use requires the browser device to reach the Ollama host; a phone's `127.0.0.1` refers to the phone itself. Direct provider calls can be limited by provider CORS policies.
-- This is an integration release, not a claim that every capability is fully production-verified. Cross-device Memory sync, scanned-document OCR, broader file formats, and real-device end-to-end acceptance remain follow-up work.
+- This is an integration release, not a claim that every capability is fully production-verified. Cross-device Memory sync, scanned-document OCR, broader file formats, and real-device end-to-end acceptance remain follow-up work. Agent plans are revalidated at generation, recovery, and execution time; editing the goal invalidates prior approval.
 
 ## Requirements
 - Node.js 20+
