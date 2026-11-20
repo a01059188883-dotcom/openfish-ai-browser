@@ -1,6 +1,8 @@
 const $ = id => document.getElementById(id);
 const TEMPLATE_KEY = "openfish.taskTemplates.v1";
-let plan = null;\nlet currentTaskId = null;\nlet taskSearchTimer = null;
+let plan = null;
+let currentTaskId = null;
+let taskSearchTimer = null;
 let pollBusy = false;
 let latestEvents = [];
 
@@ -214,7 +216,8 @@ $("taskSearch")?.addEventListener("input", () => {
   window.clearTimeout(taskSearchTimer);
   taskSearchTimer = window.setTimeout(loadTasks, 220);
 });
-\nasync function loadToolCatalog() {
+
+async function loadToolCatalog() {
   const host = $("toolCatalog");
   const count = $("toolCount");
   if (!host || !count) return;
