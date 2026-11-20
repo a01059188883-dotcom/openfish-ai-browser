@@ -7,3 +7,6 @@
 
 /* Reading list and portable browser data */
 .backup-actions{display:flex;gap:8px;flex-wrap:wrap;grid-column:1/-1}.backup-actions button{border:1px solid var(--line);background:#1b2b40;color:var(--text);padding:9px 12px;border-radius:8px;font-size:12px}.settings-grid .backup-actions+p{margin-top:2px}
+
+/* Live quota summary at the bottom of the workspace */
+.quota-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:0 14px 12px}.quota-item{background:#0c1626;border:1px solid var(--line);border-radius:10px;padding:11px;min-width:0}.quota-item span,.quota-item b{display:block}.quota-item span{font-size:11px;color:var(--muted)}.quota-item b{font-size:15px;margin-top:5px;overflow-wrap:anywhere}.quota-track{height:7px;margin:0 14px 14px;border-radius:10px;background:#26364a;overflow:hidden}.quota-track span{display:block;height:100%;width:0;background:#35b99a;transition:width .2s}.quota-method{padding:0 14px 14px}.quota-method b{font-size:12px;color:var(--accent)}.quota-method p{font-size:11px;line-height:1.65;color:var(--muted);margin:6px 0 0}@media(min-width:700px){.quota-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
