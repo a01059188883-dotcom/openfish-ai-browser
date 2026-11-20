@@ -4,8 +4,9 @@ import { dirname, resolve } from "node:path";
 
 const STORE = resolve(process.env.OPENFISH_DATA_DIR || ".openfish", "tasks.json");
 const MAX_TASKS = Math.max(50, Math.min(2000, Number(process.env.OPENFISH_MAX_TASKS || 500)));
-const MAX_FIELD = 12000;
+const MAX_FIELD = 6000;
 let records;
+let loading;
 let writeQueue = Promise.resolve();
 
 function scrub(value, depth = 0) {
@@ -21,7 +22,7 @@ function scrub(value, depth = 0) {
   if (value && typeof value === "object") {
     const out = {};
     for (const [key, item] of Object.entries(value).slice(0, 100)) {
-      if (/^(authorization|cookie|set-cookie|apiKey|accessToken|refreshToken)$/i.test(key)) out[key] = "[REDACTED]";
+      if (/^(authorization|cookie|set-cookie|.*(?:api[_-]?key|access[_-]?token|refresh[_-]?token|password|secret).*)$/i.test(key)) out[key] = "[REDACTED]";
       else out[key] = scrub(item, depth + 1);
     }
     return out;
@@ -31,18 +32,22 @@ function scrub(value, depth = 0) {
 }
 async function load() {
   if (records) return records;
-  try {
-    const parsed = JSON.parse(await readFile(STORE, "utf8"));
-    records = Array.isArray(parsed) ? parsed.filter(row => row && typeof row.id === "string").slice(-MAX_TASKS) : [];
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-    records = [];
-  }
-  return records;
+  if (loading) return loading;
+  loading = (async () => {
+    try {
+      const parsed = JSON.parse(await readFile(STORE, "utf8"));
+      return Array.isArray(parsed) ? parsed.filter(row => row && typeof row.id === "string").slice(-MAX_TASKS) : [];
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      return [];
+    }
+  })();
+  try { records = await loading; return records; }
+  finally { loading = null; }
 }
 async function persist() {
   const snapshot = JSON.stringify(records.slice(-MAX_TASKS), null, 2);
-  writeQueue = writeQueue.then(async () => {
+  writeQueue = writeQueue.catch(() => {}).then(async () => {
     await mkdir(dirname(STORE), { recursive: true, mode: 0o700 });
     const temp = `${STORE}.${process.pid}.tmp`;
     await writeFile(temp, snapshot, { mode: 0o600 });
