@@ -55,3 +55,21 @@ test("workbench asset is included in the production page and app version is sync
   assert.match(worker, /const VERSION = "2\.14\.0"/);
   assert.match(pkg, /"version": "2\.14\.0"/);
 });
+
+test("agent validates a safe action allowlist and the writing panel uses the current page", () => {
+  assert.match(ui, /function validatePlan\(value\)/);
+  assert.match(ui, /AGENT_ACTIONS\.has\(step\.action\)/);
+  assert.match(ui, /ctx\.current\?\.text/);
+  assert.match(ui, /if \(payload\.url\)/);
+});
+
+test("research source fetch rejects IP-literal targets", () => {
+  assert.ok(worker.includes("!host || /^\\\\d{1,3}(?:\\\\.\\\\d{1,3}){3}$/.test(host)"));
+  assert.match(worker, /target = validPublicUrl\(new URL\(location, target\)\.href\)/);
+});
+
+test("mobile AI workbench has touch-sized controls and horizontal tab scrolling", () => {
+  assert.match(ui, /min-height:42px/);
+  assert.match(ui, /overflow-x:auto/);
+  assert.match(ui, /max-width:600px/);
+});
