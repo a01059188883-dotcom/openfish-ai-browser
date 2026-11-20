@@ -1,6 +1,8 @@
 const API = "http://127.0.0.1:8787";
 const $ = id => document.getElementById(id);
 let currentPlan = null;
+  currentTaskId = null;
+let currentTaskId = null;
 let libraryTab = "bookmarks";
 let libraryItems = [];
 async function request(path, body = {}, method = "POST") {
@@ -50,7 +52,7 @@ $("run").addEventListener("click", async () => {
   const goal = $("goal").value.trim(); if (!goal) return $("result").textContent = "请先输入任务。";
   $("run").disabled = true;
   $("result").textContent = "正在调用本地 AI 生成计划…";
-  try { const [tab] = await chrome.tabs.query({active:true,currentWindow:true}); const data = await request("/api/plan",{goal,url:tab?.url?.startsWith("http") ? tab.url : undefined}); currentPlan = data; $("result").textContent = JSON.stringify(data,null,2); $("execute").hidden = !Array.isArray(data.steps) || data.steps.length === 0; $("execute").disabled = $("execute").hidden; }
+  try { const [tab] = await chrome.tabs.query({active:true,currentWindow:true}); const data = await request("/api/plan",{goal,url:tab?.url?.startsWith("http") ? tab.url : undefined}); currentPlan = data; currentTaskId = data.taskId || null; $("result").textContent = JSON.stringify(data,null,2); $("execute").hidden = !Array.isArray(data.steps) || data.steps.length === 0; $("execute").disabled = $("execute").hidden; }
   catch(e) { currentPlan = null; $("execute").hidden = true; $("result").textContent = e.message; }
   finally { $("run").disabled = false; }
 });
@@ -169,7 +171,7 @@ $("execute").addEventListener("click", async () => {
   $("execute").disabled = true;
   $("run").disabled = true;
   try {
-    const data = await request("/api/execute", { plan: approvedPlan, approved: true });
+    const data = await request("/api/execute", { plan: approvedPlan, taskId: currentTaskId, approved: true });
     $("result").textContent = JSON.stringify(data, null, 2);
   } catch (e) { $("result").textContent = e.message; }
   finally { currentPlan = null; $("execute").hidden = true; $("execute").disabled = true; $("run").disabled = false; }
