@@ -123,6 +123,7 @@ $("makePlan").addEventListener("click", async () => {
   } finally {
     $("makePlan").disabled = false;
     refresh();
+    loadTasks();
   }
 });
 $("approve").addEventListener("click", async () => {
