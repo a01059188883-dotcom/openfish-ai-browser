@@ -37,10 +37,49 @@ function validatePlan(value){
  return value;
 }
 $("of-plan").onclick=async()=>{try{const s=await ask("将目标转为JSON计划，只允许navigate(url)、clickLink(url)、newTab(url)、switchTab(index)、back、forward、reload、scroll(deltaY)，最多8步，禁止登录、提交、付款、发送、删除。只输出JSON {steps:[{action,url,deltaY}]}。目标："+$("of-goal").value,await context());const tick=String.fromCharCode(96).repeat(3);const cleaned=s.replace(new RegExp("^"+tick+"(?:json)?|"+tick+"$","gm"),"");plan=validatePlan(JSON.parse(cleaned));$("of-agent").textContent=JSON.stringify(plan,null,2);$("of-run").disabled=false}catch(e){$("of-agent").textContent=e.message}};
-$("of-run").onclick=async()=>{if(!plan||!confirm("确认批准执行此计划？"))return;const total=plan.steps.length;$("of-agent").textContent="任务已获批准，共 "+total+" 步。";for(let i=0;i<total;i++){const s=plan.steps[i],path=s.action==="navigate"?"/api/cloud-browser/navigate":"/api/cloud-browser/action",body=s.action==="navigate"?{url:s.url}:s.action==="clickLink"?{action:"clickLink",url:s.url}:s.action==="newTab"?{action:"newTab",url:s.url}:s.action==="switchTab"?{action:"switchTab",index:s.index}:{action:["back","forward","reload"].includes(s.action)?s.action:"scroll",deltaY:s.deltaY||500};let done=false,lastError="";for(let attempt=1;attempt<=2&&!done;attempt++){try{$("of-agent").textContent+="\n执行 "+(i+1)+"/"+total+"（尝试 "+attempt+"）："+s.action;const r=await fetch(path,{method:"POST",headers:{...headers(),"content-type":"application/json"},body:JSON.stringify(body)}),d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||"步骤执行失败");done=true;$("of-agent").textContent+="\n完成："+s.action}catch(e){lastError=e.message}}if(!done){$("of-agent").textContent+="\n步骤失败，已自动重试一次后停止："+lastError+"。请检查页面状态后重新生成计划。";try{ctx=await context();const recovery=await ask("自动恢复建议：第"+(i+1)+"步执行失败，错误："+lastError+"。结合当前页面状态，重新规划剩余任务。仅允许navigate(url)、clickLink(url)、newTab(url)、switchTab(index)、back、forward、reload、scroll(deltaY)，最多8步；禁止登录、提交、付款、发消息、删除。只输出JSON {sfunction renderWorkspaces(){const a=read("openfish.ai.workspaces.v1",[]),host=$("of-workspace-list");host.replaceChildren();if(!a.length){host.textContent="尚无已保存的任务组";return}a.forEach(item=>{const row=document.createElement("p"),label=document.createElement("span"),button=document.createElement("button");label.textContent=(item.name||"未命名任务组")+" · "+new Date(item.at).toLocaleString()+" ";button.textContent="打开";button.onclick=()=>{$("of-work-result").textContent=JSON.stringify(item.context,null,2)};row.append(label,button);host.append(row)})}reak}$("of-agent").textContent+="\n进度："+(i+1)+"/"+total+"（"+Math.round((i+1)/total*100)+"%）"}if(plan&&$("of-agent").textContent.includes("进度："+total+"/"+total))$("of-agent").textContent+="\n任务完成。";};
-$("of-workspace").onclick=async()=>{try{ctx=await context();$("of-work-result").textContent=await ask("比较所有打开标签页的主题、关键数据、相同点、差异、冲突和下一步建议。未读取到的内容必须标注，不要猜测。",ctx)}catch(e){$("of-work-result").textContent=e.message}};
-function renderWorkspaces(){const a=read("openfish.ai.workspaces.v1",[]);$("of-workspace-list").innerHTML=a.map((x,i)=>"<p>"+(x.name||"未命名任务组")+" · "+new Date(x.at).toLocaleString()+" <button data-workspace="+i+">打开</button></p>").join("")||"尚无已保存任务组";$("of-workspace-list").querySelectorAll("button").forEach(b=>b.onclick=()=>{$("of-work-result").textContent=JSON.stringify(a[+b.dataset.workspace].context,null,2)})}
-$("of-save-workspace").onclick=()=>{if(!ctx)return;const a=read("openfish.ai.workspaces.v1",[]);a.unshift({name:$("of-workspace-name").value.trim()||"我的任务组",at:new Date().toISOString(),context:ctx});localStorage.setItem("openfish.ai.workspaces.v1",JSON.stringify(a));renderWorkspaces();$("of-work-result").textContent="任务组快照已保存"};
+$("of-run").onclick=async()=>{
+ try{
+  plan=validatePlan(plan);
+  if(!confirm("确认批准执行此计划？"))return;
+  const total=plan.steps.length;
+  $("of-run").disabled=true;
+  $("of-agent").textContent="任务已获批准，共 "+total+" 步。";
+  for(let i=0;i<total;i++){
+   const s=plan.steps[i];
+   const path=s.action==="navigate"?"/api/cloud-browser/navigate":"/api/cloud-browser/action";
+   const body=s.action==="navigate"?{url:s.url}:s.action==="clickLink"?{action:"clickLink",url:s.url}:s.action==="newTab"?{action:"newTab",url:s.url}:s.action==="switchTab"?{action:"switchTab",index:s.index}:{action:["back","forward","reload"].includes(s.action)?s.action:"scroll",deltaY:s.deltaY||500};
+   let done=false,lastError="";
+   for(let attempt=1;attempt<=2&&!done;attempt++){
+    try{
+     $("of-agent").textContent+="\n执行 "+(i+1)+"/"+total+"（尝试 "+attempt+"）："+s.action;
+     const response=await fetch(path,{method:"POST",headers:{...headers(),"content-type":"application/json"},body:JSON.stringify(body)});
+     const result=await response.json().catch(()=>({}));
+     if(!response.ok)throw Error(result.error||"步骤执行失败");
+     done=true;
+    }catch(error){lastError=error.message}
+   }
+   if(!done){
+    $("of-agent").textContent+="\n步骤失败，重试后停止："+lastError;
+    try{
+     ctx=await context();
+     const recovery=await ask("第"+(i+1)+"步执行失败，错误："+lastError+"。请根据当前页面重新规划剩余任务，仍然只允许安全浏览操作，最多8步。只输出JSON {steps:[{action,url,deltaY,index}]}。",ctx);
+     const tick=String.fromCharCode(96).repeat(3);
+     const next=validatePlan(JSON.parse(recovery.replace(new RegExp("^"+tick+"(?:json)?|"+tick+"$","gm"),"")));
+     plan=next;
+     $("of-agent").textContent+="\n已生成新的恢复计划（未执行），请审阅后再次批准：\n"+JSON.stringify(plan,null,2);
+     $("of-run").disabled=false;
+    }catch(recoveryError){$("of-agent").textContent+="\n恢复规划失败："+recoveryError.message}
+    return;
+   }
+   $("of-agent").textContent+="\n进度："+(i+1)+"/"+total+"（"+Math.round((i+1)/total*100)+"%）";
+  }
+  $("of-agent").textContent+="\n任务完成。";
+ }catch(error){$("of-agent").textContent=error.message}
+ finally{if(plan&&plan.steps?.length)$("of-run").disabled=false}
+};
+$("of-workspace").onclick=async()=>{try{ctx=await context();$("of-work-result").textContent=await ask("比较所有打开标签页的主题、关键数据、相同点、差异、冲突和下一步建议。未读取到的内容必须标注，不要猜测。",ctx)}catch(error){$("of-work-result").textContent=error.message}};
+function renderWorkspaces(){const items=read("openfish.ai.workspaces.v1",[]),host=$("of-workspace-list");host.replaceChildren();if(!items.length){host.textContent="尚无已保存的任务组";return}items.forEach(item=>{const row=document.createElement("p"),label=document.createElement("span"),button=document.createElement("button");label.textContent=(item.name||"未命名任务组")+" · "+new Date(item.at).toLocaleString()+" ";button.textContent="打开";button.onclick=()=>{$("of-work-result").textContent=JSON.stringify(item.context,null,2)};row.append(label,button);host.append(row)})}
+$("of-save-workspace").onclick=()=>{if(!ctx)return;const items=read("openfish.ai.workspaces.v1",[]);items.unshift({name:$("of-workspace-name").value.trim()||"我的任务组",at:new Date().toISOString(),context:ctx});localStorage.setItem("openfish.ai.workspaces.v1",JSON.stringify(items));renderWorkspaces();$("of-work-result").textContent="任务组快照已保存"};
 $("of-search").onclick=async()=>{try{const r=await fetch("/api/ai/search",{method:"POST",headers:{...headers(),"content-type":"application/json"},body:JSON.stringify({query:$("of-query").value})}),d=await r.json();if(!r.ok)throw Error(d.error||"搜索失败");if(!d.results?.length)throw Error("搜索源没有返回结果");const pages=await Promise.allSettled(d.results.slice(0,6).map(x=>fetch("/api/ai/fetch",{method:"POST",headers:{...headers(),"content-type":"application/json"},body:JSON.stringify({url:x.url})}).then(async r=>{const v=await r.json();if(!r.ok)throw Error(v.error||"抓取失败");return {title:v.title,url:v.url,text:v.text.slice(0,6500),engine:x.engine}})));const evidence=pages.filter(x=>x.status==="fulfilled").map(x=>x.value);$("of-research").textContent=await ask("请根据多个独立搜索引擎结果和已抓取网页正文，交叉核对共同事实、标注冲突和不确定性。每项事实附真实来源URL；不得引用未提供的来源。\n搜索结果："+JSON.stringify(d.results)+"\n网页正文："+JSON.stringify(evidence))+"\n\n来源链接：\n"+d.results.map(x=>x.engine+" · "+x.title+"\n"+x.url).join("\n\n")}catch(e){$("of-research").textContent="搜索不可用："+e.message}};
 $("of-read-files").onclick=async()=>{try{const files=[...$("of-files").files],parts=[];let image=null;for(const f of files){if(f.size>10000000)throw Error(f.name+" 超过10MB");if(/\.(txt|md|csv|json)$/i.test(f.name)||f.type.startsWith("text/"))parts.push(f.name+"\n"+(await f.text()).slice(0,15000));else if(/\.pdf$/i.test(f.name)){const pdfjs=await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs");pdfjs.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";const doc=await pdfjs.getDocument({data:await f.arrayBuffer()}).promise;let text="";for(let n=1;n<=Math.min(doc.numPages,40);n++){const page=await doc.getPage(n),data=await page.getTextContent();text+=data.items.map(x=>x.str).join(" ")+"\n"}parts.push("PDF "+f.name+"（"+doc.numPages+"页，最多提取40页）\n"+text.slice(0,30000))}else if(/\.docx$/i.test(f.name)){const mammoth=await import("https://cdn.jsdelivr.net/npm/mammoth@1.9.0/+esm");const result=await mammoth.extractRawText({arrayBuffer:await f.arrayBuffer()});parts.push("DOCX "+f.name+"\n"+result.value.slice(0,30000))}else if(/\.(xlsx|xls)$/i.test(f.name)){const XLSX=await import("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm");const book=XLSX.read(await f.arrayBuffer(),{type:"array"});for(const name of book.SheetNames.slice(0,8)){parts.push("工作表 "+name+"\n"+XLSX.utils.sheet_to_csv(book.Sheets[name]).slice(0,12000))}}else if(f.type.startsWith("image/")){image=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(f)})}}$("of-file-result").textContent=await ask("分析文件，图片请视觉识别，PDF请提取结构和重点：\n"+parts.join("\n\n"),null,image)}catch(e){$("of-file-result").textContent="文件分析失败："+e.message}};
 let rec=null;$("of-voice-start").onclick=()=>{const S=window.SpeechRecognition||window.webkitSpeechRecognition;if(!S){$("of-voice-result").textContent="设备不支持语音识别";return}rec=new S();rec.lang="zh-CN";rec.continuous=true;rec.onresult=e=>{let t="";for(let i=e.resultIndex;i<e.results.length;i++)t+=e.results[i][0].transcript;$("of-prompt").value=t;$("of-voice-result").textContent=t;if(/^读取页面/.test(t))$("of-context").click();else if(/^规划任务/.test(t)){$("of-goal").value=t.replace(/^规划任务[：:]?/,"").trim();$("of-plan").click()}else if(/^发送[：:]?/.test(t)){$("of-prompt").value=t.replace(/^发送[：:]?/,"").trim();$("of-ask").click()}};rec.start()};$("of-voice-stop").onclick=()=>rec?.stop();$("of-voice-speak").onclick=()=>{if("speechSynthesis"in window)speechSynthesis.speak(new SpeechSynthesisUtterance($("of-chat").textContent))};
