@@ -2,6 +2,7 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { getPage, getBrowserStatus, runWithBrowserSession, createBrowserSession, listBrowserSessions, closeBrowserSession, hasBrowserSession, listBrowserTabs, createBrowserTab, switchBrowserTab, closeBrowserTab, getPageDiagnostics, clearPageDiagnostics, listRecentlyClosedTabs, duplicateBrowserTab, reopenClosedBrowserTab, saveCurrentWorkspace, getSavedWorkspaces, restoreSavedWorkspace, clearSessionData } from "./browser.js";
 import { runTask, getPageContext } from "./task.js";
+import { createTask, updateTask, getTask, listTasks, restoreTask } from "./task-store.js";
 import { createPlan } from "./ai-planner.js";
 import { executePlan } from "./executor.js";
 import { validateHttpUrl } from "./safety.js";
@@ -91,12 +92,24 @@ async function invokeTool(name, args = {}) {
     const page = await getPage(); return { title: await page.title().catch(() => ""), url: page.url(), text: (await page.locator("body").innerText().catch(() => "")).slice(0,20000) };
   }
   if (name === "plan_task") {
-    const plan = await createPlan(a.goal, await getPageContext());
-    return { status: "plan_ready_for_review", ...plan, warning: "No action has been executed." };
+    const page = await getPageContext();
+    const plan = await createPlan(a.goal, page);
+    const task = await createTask({ goal: a.goal, plan, page: { title: page.title, url: page.url }, source: "mcp" });
+    return { status: "plan_ready_for_review", ...plan, taskId: task.id, warning: "No action has been executed." };
   }
   if (name === "execute_plan") {
     if (a.approved !== true) throw Object.assign(new Error("Explicit approval of the exact plan is required."), { statusCode: 403 });
-    return executePlan(a.plan, { approved: true });
+    const task = a.taskId ? await getTask(a.taskId) : await createTask({ goal: a.goal || "MCP approved browser plan", plan: a.plan, source: "mcp" });
+    await updateTask(task.id, { status: "approved", plan: a.plan, message: "Explicit approval received" });
+    await updateTask(task.id, { status: "running", message: "Execution started" });
+    try {
+      const result = await executePlan(a.plan, { approved: true });
+      await updateTask(task.id, { status: result.status === "completed" ? "succeeded" : "stopped", result, message: result.status });
+      return { ...result, taskId: task.id };
+    } catch (error) {
+      await updateTask(task.id, { status: "failed", error: error.message, message: "Execution failed" });
+      throw error;
+    }
   }
   if (name === "click_element" || name === "fill_element") {
     if (a.approved !== true) throw Object.assign(new Error("Explicit approval is required."), { statusCode: 403 });
@@ -266,6 +279,35 @@ const server = http.createServer(async (req, res) => {
       });
     }
     if (req.method === "GET" && req.url === "/api/admin/events") return send(res, 200, { events: metrics.events });
+    if (req.method === "GET" && res.reqPath === "/api/admin/tasks") {
+      const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
+      return send(res, 200, { tasks: await listTasks({ query: url.searchParams.get("q") || "", status: url.searchParams.get("status") || "", limit: url.searchParams.get("limit") || 100 }), maxTasks: Number(process.env.OPENFISH_MAX_TASKS || 500) });
+    }
+    if (req.method === "GET" && res.reqPath.startsWith("/api/admin/tasks/")) {
+      const id = decodeURIComponent(res.reqPath.slice("/api/admin/tasks/".length));
+      return send(res, 200, { task: await getTask(id) });
+    }
+    if (req.method === "POST" && res.reqPath.startsWith("/api/admin/tasks/") && res.reqPath.endsWith("/restore")) {
+      const id = decodeURIComponent(res.reqPath.slice("/api/admin/tasks/".length, -"/restore".length));
+      return send(res, 201, { task: await restoreTask(id), warning: "Restored plan requires fresh explicit approval." });
+    }
+    if (req.method === "POST" && res.reqPath.startsWith("/api/admin/tasks/") && res.reqPath.endsWith("/execute")) {
+      const id = decodeURIComponent(res.reqPath.slice("/api/admin/tasks/".length, -"/execute".length));
+      const body = await readBody(req);
+      if (body.approved !== true) return send(res, 403, { error: "Explicit approval of this saved plan is required." });
+      const task = await getTask(id);
+      if (!task.plan || !Array.isArray(task.plan.steps)) return send(res, 409, { error: "Saved task has no executable plan." });
+      await updateTask(id, { status: "approved", message: "Explicit approval received" });
+      await updateTask(id, { status: "running", message: "Execution started" });
+      try {
+        const result = await executePlan(task.plan, { approved: true });
+        const saved = await updateTask(id, { status: result.status === "completed" ? "succeeded" : "stopped", result, message: result.status });
+        return send(res, 200, { task: saved, result });
+      } catch (error) {
+        await updateTask(id, { status: "failed", error: error.message, message: "Execution failed" });
+        throw error;
+      }
+    }
 
     if (req.method === "GET" && req.url === "/api/mcp/list_workspaces") return send(res, 200, { workspaces: await getSavedWorkspaces() });
     if (req.method === "POST" && req.url === "/api/mcp/save_workspace") { const body = await readBody(req); return send(res, 201, await saveCurrentWorkspace(body.name)); }
@@ -315,13 +357,25 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/api/mcp/plan_task") {
       const body = await readBody(req);
       if (!String(body.goal || "").trim()) return send(res, 400, { error: "Task description is required." });
-      const plan = await createPlan(body.goal, await getPageContext());
-      return send(res, 200, { status: "plan_ready_for_review", ...plan, warning: "Review every step. No action has been executed." });
+      const page = await getPageContext();
+      const plan = await createPlan(body.goal, page);
+      const task = await createTask({ goal: body.goal, plan, page: { title: page.title, url: page.url }, source: "admin" });
+      return send(res, 200, { status: "plan_ready_for_review", ...plan, taskId: task.id, warning: "Review every step. No action has been executed." });
     }
     if (req.method === "POST" && req.url === "/api/mcp/execute_plan") {
       const body = await readBody(req);
       if (body.approved !== true) return send(res, 403, { error: "Explicit approval of the exact plan is required." });
-      return send(res, 200, await executePlan(body.plan, { approved: true }));
+      const task = body.taskId ? await getTask(body.taskId) : await createTask({ goal: body.goal || "Approved browser plan", plan: body.plan, source: "admin" });
+      await updateTask(task.id, { status: "approved", plan: body.plan, message: "Explicit approval received" });
+      await updateTask(task.id, { status: "running", message: "Execution started" });
+      try {
+        const result = await executePlan(body.plan, { approved: true });
+        await updateTask(task.id, { status: result.status === "completed" ? "succeeded" : "stopped", result, message: result.status });
+        return send(res, 200, { ...result, taskId: task.id });
+      } catch (error) {
+        await updateTask(task.id, { status: "failed", error: error.message, message: "Execution failed" });
+        throw error;
+      }
     }
     if (req.method === "POST" && req.url === "/api/mcp/click_element") {
       const body = await readBody(req);
