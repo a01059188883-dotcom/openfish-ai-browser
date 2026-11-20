@@ -1,3 +1,4 @@
+// OpenFish v2.14.0: AI research source limits and public-IP validation hardening.
 import mobileAdminHtml from "./mobile-admin.html";
 import { acquire, connect } from "@cloudflare/playwright";
 
