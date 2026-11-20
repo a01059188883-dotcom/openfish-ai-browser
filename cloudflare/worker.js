@@ -1,9 +1,7 @@
-// Release check: 2.14.0 research extraction is bounded and rejects IP-literal destinations.
-// OpenFish v2.14.0: AI research source limits and public-IP validation hardening.
 import mobileAdminHtml from "./mobile-admin.html";
 import { acquire, connect } from "@cloudflare/playwright";
 
-const VERSION = "2.14.0";
+const VERSION = "2.14.1";
 const MAX_BODY_BYTES = 512 * 1024;
 const guardedBrowserContexts = new WeakSet();
 const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/browser/sessions"]);
@@ -89,10 +87,10 @@ export default {
       try { payload = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
       const query = String(payload.query || "").trim().slice(0, 300);
       if (!query) return json({ error: "A search query is required." }, 400);
-      const headers = { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.0)", "accept": "text/html" };
+      const headers = { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.1)", "accept": "text/html" };
       const sources = await Promise.allSettled([
-        fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), { headers }),
-        fetch("https://www.bing.com/search?q=" + encodeURIComponent(query), { headers })
+        fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), { headers, signal: AbortSignal.timeout(12000) }),
+        fetch("https://www.bing.com/search?q=" + encodeURIComponent(query), { headers, signal: AbortSignal.timeout(12000) })
       ]);
       const results = [];
       for (let sourceIndex = 0; sourceIndex < sources.length; sourceIndex++) {
@@ -123,7 +121,7 @@ export default {
         try { u = new URL(value); } catch { return null; }
         if (!["http:", "https:"].includes(u.protocol) || u.username || u.password) return null;
         const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-        if (!host || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":") || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") ||
+        if (!host || !host.includes(".") || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.includes(":") || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".test") || host.endsWith(".example") || host.endsWith(".invalid") || host.endsWith(".onion") ||
           /^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host) ||
           /^172\.(1[6-9]|2\d|3[01])\./.test(host) || host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:")) return null;
         return u;
@@ -133,7 +131,7 @@ export default {
       try {
         let response;
         for (let hop = 0; hop < 4; hop++) {
-          response = await fetch(target.href, { redirect: "manual", headers: { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.0)", "accept": "text/html,text/plain;q=0.9" } });
+          response = await fetch(target.href, { redirect: "manual", signal: AbortSignal.timeout(12000), headers: { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.1)", "accept": "text/html,text/plain;q=0.9" } });
           if (![301, 302, 303, 307, 308].includes(response.status)) break;
           const location = response.headers.get("location");
           if (!location || hop === 3) return json({ error: "Too many or invalid redirects." }, 502);
@@ -143,21 +141,7 @@ export default {
         if (!response?.ok) return json({ error: "Source returned HTTP " + (response?.status || 502) }, 502);
         const type = response.headers.get("content-type") || "";
         if (!/text\/html|text\/plain|application\/xhtml/i.test(type)) return json({ error: "Unsupported source content type: " + type.slice(0, 100) }, 415);
-        const length = Number(response.headers.get("content-length") || 0);
-        if (length > 600000) return json({ error: "Source page exceeds the 600 KB extraction limit." }, 413);
-        const reader = response.body?.getReader();
-        if (!reader) return json({ error: "Source page has no readable body." }, 502);
-        const chunks = []; let total = 0;
-        while (true) {
-          const part = await reader.read();
-          if (part.done) break;
-          total += part.value.byteLength;
-          if (total > 600000) { await reader.cancel(); return json({ error: "Source page exceeds the 600 KB extraction limit." }, 413); }
-          chunks.push(part.value);
-        }
-        const bytes = new Uint8Array(total); let offset = 0;
-        for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-        const html = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+        const html = (await response.text()).slice(0, 600000);
         const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1]?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300) || target.hostname;
         const text = html.replace(/<(script|style|noscript|svg)[^>]*>[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim().slice(0, 16000);
         return json({ url: response.url || target.href, title, text });
@@ -449,6 +433,10 @@ export class OpenFishRelay {
           const context = page.context();
           page = await context.newPage();
           await page.setViewportSize({ width: 1280, height: 820 });
+          if (payload.url) {
+            const target = validateTarget(payload.url);
+            await page.goto(target, { waitUntil: "domcontentloaded", timeout: 25000 });
+          }
           await this.ctx.storage.put(storageKey("cloudBrowserActiveTabIndex"), context.pages().indexOf(page));
         } else if (action === "switchTab") {
           const pages = browser.contexts().flatMap(context => context.pages());

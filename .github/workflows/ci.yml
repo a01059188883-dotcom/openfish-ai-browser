@@ -12,6 +12,8 @@ jobs:
           node-version: 20
       - run: npm install --no-audit --no-fund
       - run: npm run check
+      - name: Install Playwright Chromium for mobile UI smoke tests
+        run: npx playwright install --with-deps chromium
       - run: npm test
       - name: Build self-hosted Chromium engine image
         run: docker build --pull -f services/browser-engine/Dockerfile -t openfish-browser-engine:ci services/browser-engine
