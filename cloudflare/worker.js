@@ -87,21 +87,29 @@ export default {
       try { payload = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
       const query = String(payload.query || "").trim().slice(0, 300);
       if (!query) return json({ error: "A search query is required." }, 400);
-      try {
-        const response = await fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), { headers: { "user-agent": "OpenFishAI-Browser/2.14.0", "accept": "text/html" } });
-        if (!response.ok) return json({ error: "Search provider HTTP " + response.status }, 502);
-        const html = (await response.text()).slice(0, 1500000), results = [];
-        const pattern = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-        let match;
-        while ((match = pattern.exec(html)) && results.length < 10) {
+      const headers = { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.0)", "accept": "text/html" };
+      const sources = await Promise.allSettled([
+        fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), { headers }),
+        fetch("https://www.bing.com/search?q=" + encodeURIComponent(query), { headers })
+      ]);
+      const results = [];
+      for (let sourceIndex = 0; sourceIndex < sources.length; sourceIndex++) {
+        const settled = sources[sourceIndex];
+        if (settled.status !== "fulfilled" || !settled.value.ok) continue;
+        const html = (await settled.value.text()).slice(0, 1500000);
+        const pattern = sourceIndex === 0
+          ? /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi
+          : /<li class="b_algo"[\s\S]*?<h2><a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+        let match, count = 0;
+        while ((match = pattern.exec(html)) && count < 8) {
           let href = match[1].replace(/&amp;/g, "&");
-          try { const parsed = new URL(href, "https://html.duckduckgo.com"); href = parsed.searchParams.get("uddg") || href; } catch {}
+          try { const parsed = new URL(href, sourceIndex === 0 ? "https://html.duckduckgo.com" : "https://www.bing.com"); href = parsed.searchParams.get("uddg") || href; } catch {}
           if (!/^https?:\/\//i.test(href)) continue;
-          const title = match[2].replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim().slice(0, 240);
-          if (title) results.push({ title, url: href });
+          const title = match[2].replace(/<[^>]*>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim().slice(0, 240);
+          if (title && !results.some(item => item.url === href)) { results.push({ title, url: href, engine: sourceIndex === 0 ? "DuckDuckGo" : "Bing" }); count++; }
         }
-        return json({ query, provider: "DuckDuckGo", results });
-      } catch (error) { return json({ error: "Search failed: " + String(error.message || error).slice(0, 240) }, 502); }
+      }
+      return json({ query, engines: [...new Set(results.map(item => item.engine))], results });
     }
     if (url.pathname.startsWith("/api/v1/browser/")) {
       const cors = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS", "access-control-allow-headers": "Authorization, Content-Type, X-OpenFish-Session", "access-control-max-age": "86400", "cache-control": "no-store" };
