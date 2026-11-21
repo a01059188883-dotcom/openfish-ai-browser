@@ -3,7 +3,8 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
 const STORE = resolve(process.env.OPENFISH_DATA_DIR || ".openfish", "tasks.json");
-const MAX_TASKS = Math.max(50, Math.min(2000, Number(process.env.OPENFISH_MAX_TASKS || 500)));
+const requestedMaxTasks = Number(process.env.OPENFISH_MAX_TASKS || 500);
+const MAX_TASKS = Number.isFinite(requestedMaxTasks) ? Math.max(50, Math.min(2000, Math.floor(requestedMaxTasks))) : 500;
 const MAX_FIELD = 6000;
 let records;
 let loading;
