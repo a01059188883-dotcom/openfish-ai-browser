@@ -21,7 +21,7 @@ let extensionVersion = null;
 async function getOllamaStatus() {
   if (ollamaCache && Date.now() - ollamaCache.checkedAtMs < 15000) return ollamaCache.value;
   try {
-    const response = await fetch(`${OLLAMA_URL.replace(/\\/$/, "")}/api/tags`, { signal: AbortSignal.timeout(2500) });
+    const response = await fetch(`${OLLAMA_URL.replace(/\/$/, "")}/api/tags`, { signal: AbortSignal.timeout(2500) });
     if (!response.ok) throw new Error(`Ollama HTTP ${response.status}`);
     const payload = await response.json();
     const models = Array.isArray(payload.models) ? payload.models.map(item => item.name).filter(Boolean) : [];
