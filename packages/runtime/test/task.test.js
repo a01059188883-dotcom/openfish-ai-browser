@@ -370,3 +370,11 @@ test("local bridge requires an explicitly pinned Chrome extension origin", async
   assert.ok(bridge.includes('origin.startsWith("chrome-extension://") && Boolean(allowedOrigin) && origin === allowedOrigin'));
   assert.ok(bridge.includes("if (origin && !localOrigins.has(origin) && !isExtensionOrigin)"));
 });
+
+test("mobile admin preserves task IDs and displays Ollama and extension connectivity", async () => {
+  const mobile = await readFile(resolve("cloudflare/mobile-admin.html"), "utf8");
+  assert.ok(mobile.includes("currentTaskId=d.taskId||null"));
+  assert.ok(mobile.includes("taskId:currentTaskId"));
+  assert.ok(mobile.includes("s.ollama?.reachable"));
+  assert.ok(mobile.includes("s.extension?.connected"));
+});
