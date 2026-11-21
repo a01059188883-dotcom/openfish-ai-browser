@@ -350,6 +350,26 @@ $("copyIntegrationConfig")?.addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(integrationConfigText()); $("copyIntegrationConfig").textContent = "已复制"; }
   catch (error) { window.alert("复制配置失败：" + error.message); }
 });
+function relayCurlCommand() {
+  const base = $("relayWorkerUrl")?.value.trim().replace(/\/$/, "") || "";
+  const token = $("relayAccessToken")?.value.trim() || "";
+  if (!/^https:\/\//i.test(base)) throw new Error("Worker 地址必须使用 HTTPS。");
+  if (!token) throw new Error("请先填写 Relay Token。");
+  return \`curl "\${base}/api/v1/browser/status" \\
+  -H "Authorization: Bearer \${token}"\`;
+}
+$("copyRelayCurl")?.addEventListener("click", async () => {
+  try {
+    const command = relayCurlCommand();
+    $("relayConfigPreview").textContent = command;
+    await navigator.clipboard.writeText(command);
+    $("copyRelayCurl").textContent = "已复制";
+  } catch (error) { $("relayConfigPreview").textContent = error.message; }
+});
+["relayWorkerUrl", "relayAccessToken"].forEach(id => $(id)?.addEventListener("input", () => {
+  try { $("relayConfigPreview").textContent = relayCurlCommand(); }
+  catch (error) { $("relayConfigPreview").textContent = error.message; }
+}));
 $("copyRestExample")?.addEventListener("click", async () => {
   try {
     const key = $("integrationApiKey").value.trim();
