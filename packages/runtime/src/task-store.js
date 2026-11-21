@@ -37,14 +37,11 @@ async function load() {
   loading = (async () => {
     try {
       const parsed = JSON.parse(await readFile(STORE, "utf8"));
-      return Array.isArray(parsed) ? parsed.filter(row => row && typeof row.id === "string").slice(-MAX_TASKS) : [];
+      records = Array.isArray(parsed) ? parsed.filter(row => row && typeof row.id === "string").slice(-MAX_TASKS) : [];
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
-      return [];
+      records = [];
     }
-  })();
-  try {
-    records = await loading;
     let recovered = false;
     for (const task of records) {
       if (task.status === "running") {
@@ -59,7 +56,9 @@ async function load() {
     }
     if (recovered) await persist();
     return records;
-  } finally { loading = null; }
+  })();
+  try { return await loading; }
+  finally { loading = null; }
 }
 async function persist() {
   const snapshot = JSON.stringify(records.slice(-MAX_TASKS), null, 2);
