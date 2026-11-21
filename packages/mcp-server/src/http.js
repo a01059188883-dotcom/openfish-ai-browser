@@ -88,7 +88,8 @@ function createMcpServer(token, sessionId, clientMeta) {
       action: z.enum(["navigate", "click", "fill", "inspect"]), url: z.string().optional(),
       selector: z.string().optional(), value: z.string().optional(), reason: z.string().optional()
     }).passthrough()).max(8) }),
-    approved: z.literal(true).describe("Only true after explicit user approval of this exact plan.")
+    approved: z.literal(true).describe("Only true after explicit user approval of this exact plan."),
+    taskId: z.string().uuid().optional()
   }, args => call("execute_plan", args, true));
   server.tool("click_element", "Click a unique visible button-like target after explicit approval.", {
     selector: z.string().min(1).max(500), approved: z.literal(true)
