@@ -43,8 +43,23 @@ async function load() {
       return [];
     }
   })();
-  try { records = await loading; return records; }
-  finally { loading = null; }
+  try {
+    records = await loading;
+    let recovered = false;
+    for (const task of records) {
+      if (task.status === "running") {
+        const now = new Date().toISOString();
+        task.status = "failed";
+        task.error = "Task interrupted by service restart.";
+        task.updatedAt = now;
+        task.finishedAt = now;
+        task.events = [...(task.events || []), { at: now, status: "failed", message: "Recovered as failed after service restart" }].slice(-30);
+        recovered = true;
+      }
+    }
+    if (recovered) await persist();
+    return records;
+  } finally { loading = null; }
 }
 async function persist() {
   const snapshot = JSON.stringify(records.slice(-MAX_TASKS), null, 2);
