@@ -18,11 +18,16 @@ test("task history persists across module reloads, supports search and requires 
     await store.updateTask(created.id, { status: "approved", message: "User approved" });
     await store.updateTask(created.id, { status: "running" });
     await store.updateTask(created.id, { status: "succeeded", result: { status: "completed" } });
+    const interrupted = await store.createTask({ goal: "Task interrupted by restart", plan: { steps: [{ action: "inspect" }] } });
+    await store.updateTask(interrupted.id, { status: "running" });
     const reloaded = await import("../src/task-store.js?second");
     const restored = await reloaded.getTask(created.id);
     assert.equal(restored.status, "succeeded");
     assert.equal(restored.result.status, "completed");
     assert.equal((await reloaded.listTasks({ query: "public page" })).length, 1);
+    const recovered = await reloaded.getTask(interrupted.id);
+    assert.equal(recovered.status, "failed");
+    assert.match(recovered.error, /service restart/);
     const copy = await reloaded.restoreTask(created.id);
     assert.equal(copy.status, "planned");
     assert.equal(copy.restoredFrom, created.id);
