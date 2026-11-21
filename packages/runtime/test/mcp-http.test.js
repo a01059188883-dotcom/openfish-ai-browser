@@ -125,3 +125,14 @@ test("HTTP MCP execute_plan accepts the durable task ID returned by plan_task", 
   assert.ok(httpMcp.includes("taskId: z.string().uuid().optional()"));
   assert.ok(httpMcp.includes('call("execute_plan", args, true)'));
 });
+
+
+test("mobile admin remembers relay token only when the device opt-in is enabled", async () => {
+  const html = await readFile(resolve("cloudflare/mobile-admin.html"), "utf8");
+  assert.ok(html.includes('id="rememberToken"'));
+  assert.ok(html.includes('localStorage.getItem(tokenKey)'));
+  assert.ok(html.includes('localStorage.setItem(tokenKey,value)'));
+  assert.ok(html.includes('localStorage.removeItem(tokenKey)'));
+  assert.ok(html.includes('sessionStorage.removeItem(tokenKey)'));
+  assert.ok(html.includes('断开并清除'));
+});
