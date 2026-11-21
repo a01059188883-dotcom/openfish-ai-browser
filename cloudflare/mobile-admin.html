@@ -54,7 +54,8 @@ async function loadTaskHistory(){
     }
   }catch(e){host.replaceChildren(safe("p","读取任务历史失败："+e.message))}
 }
-\nasync function loadEvents(){const d=await api("/api/admin/events");const host=$("events");host.replaceChildren();for(const e of (d.events||[]).slice(0,20)){const row=document.createElement("div");row.className="item";row.append(safe("b",e.path),safe("small",new Date(e.time).toLocaleString()+" · HTTP "+e.status));host.append(row)}if(!host.children.length)host.append(safe("p","暂无活动记录"))}
+
+async function loadEvents(){const d=await api("/api/admin/events");const host=$("events");host.replaceChildren();for(const e of (d.events||[]).slice(0,20)){const row=document.createElement("div");row.className="item";row.append(safe("b",e.path),safe("small",new Date(e.time).toLocaleString()+" · HTTP "+e.status));host.append(row)}if(!host.children.length)host.append(safe("p","暂无活动记录"))}
 $("connect").addEventListener("click",()=>{sessionStorage.setItem(tokenKey,$("token").value.trim());sessionStorage.setItem("openfish.relay.token",$("token").value.trim());refresh()});
 $("disconnect").addEventListener("click",()=>{sessionStorage.removeItem(tokenKey);sessionStorage.removeItem("openfish.relay.token");$("token").value="";$("connection").textContent="未连接";message("已断开并清除 Token")});
 $("refresh").addEventListener("click",refresh);$("cloudRefresh").addEventListener("click",refreshCloud);$("cloudClose").addEventListener("click",async()=>{if(!confirm("确定结束云端浏览器会话？"))return;try{await api("/api/cloud-browser/close",{});await refreshCloud();message("云端浏览器会话已结束","good")}catch(e){message(e.message,"bad")}});$("reloadSessions").addEventListener("click",()=>loadSessions().catch(e=>message(e.message,"bad")));$("reloadTasks").addEventListener("click",loadTaskHistory);$("searchTasks").addEventListener("click",loadTaskHistory);$("reloadEvents").addEventListener("click",()=>loadEvents().catch(e=>message(e.message,"bad")));
