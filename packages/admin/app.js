@@ -355,8 +355,7 @@ function relayCurlCommand() {
   const token = $("relayAccessToken")?.value.trim() || "";
   if (!/^https:\/\//i.test(base)) throw new Error("Worker 地址必须使用 HTTPS。");
   if (!token) throw new Error("请先填写 Relay Token。");
-  return \`curl "\${base}/api/v1/browser/status" \\
-  -H "Authorization: Bearer \${token}"\`;
+  return "curl \"" + base + "/api/v1/browser/status\" \\\n  -H \"Authorization: Bearer " + token + "\"";
 }
 $("copyRelayCurl")?.addEventListener("click", async () => {
   try {
