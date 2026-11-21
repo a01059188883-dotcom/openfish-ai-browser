@@ -390,4 +390,7 @@ test("mobile relay exposes only the authenticated task list, detail and restore 
   assert.ok(mobile.includes('id="taskSearch"'));
   assert.ok(mobile.includes('id="taskHistory"'));
   assert.ok(mobile.includes('"/api/admin/tasks/"+encodeURIComponent(task.id)+"/restore"'));
+  const inlineScript = mobile.match(/<script>([\\s\\S]*)<\\/script>/)?.[1];
+  assert.ok(inlineScript);
+  assert.doesNotThrow(() => new Function(inlineScript));
 });
