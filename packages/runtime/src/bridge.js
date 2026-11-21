@@ -13,6 +13,27 @@ import { addBookmark, listBookmarks, removeBookmark, listHistory, clearHistory, 
 
 const PORT = Number(process.env.PORT || 8787);
 const VERSION = "2.15.0";
+const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
+const MODEL = process.env.OPENFISH_MODEL || "qwen2.5:3b";
+let ollamaCache = null;
+let extensionLastSeenAt = null;
+let extensionVersion = null;
+async function getOllamaStatus() {
+  if (ollamaCache && Date.now() - ollamaCache.checkedAtMs < 15000) return ollamaCache.value;
+  try {
+    const response = await fetch(`${OLLAMA_URL.replace(/\\/$/, "")}/api/tags`, { signal: AbortSignal.timeout(2500) });
+    if (!response.ok) throw new Error(`Ollama HTTP ${response.status}`);
+    const payload = await response.json();
+    const models = Array.isArray(payload.models) ? payload.models.map(item => item.name).filter(Boolean) : [];
+    const value = { reachable: true, model: MODEL, modelInstalled: models.some(name => name === MODEL || name.startsWith(MODEL + ":")), installedModels: models.slice(0, 30), checkedAt: new Date().toISOString() };
+    ollamaCache = { checkedAtMs: Date.now(), value };
+    return value;
+  } catch (error) {
+    const value = { reachable: false, model: MODEL, modelInstalled: false, installedModels: [], error: String(error.message || error).slice(0, 180), checkedAt: new Date().toISOString() };
+    ollamaCache = { checkedAtMs: Date.now(), value };
+    return value;
+  }
+}
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 const startedAt = Date.now();
 const metrics = { requests: 0, errors: 0, events: [] };
@@ -265,6 +286,13 @@ const server = http.createServer(async (req, res) => {
       if (!rate.allowed) { res.setHeader("retry-after", String(rate.retryAfterSeconds)); return send(res, 429, { error: "API key rate limit exceeded.", code: "RATE_LIMITED", retryAfterSeconds: rate.retryAfterSeconds }); }
       return send(res, 200, { tool: name, result: await invokeTool(name, body) });
     }
+    if (req.method === "POST" && res.reqPath === "/api/extension/heartbeat") {
+      if (!res.reqOrigin?.startsWith("chrome-extension://")) return send(res, 403, { error: "Chrome extension origin is required." });
+      const body = await readBody(req);
+      extensionLastSeenAt = new Date().toISOString();
+      extensionVersion = String(body.version || "").slice(0, 32) || null;
+      return send(res, 200, { ok: true, version: VERSION, extensionVersion, lastSeenAt: extensionLastSeenAt });
+    }
     if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, name: "OpenFish AI Browser", version: VERSION });
     if (req.method === "GET" && req.url === "/api/admin/status") {
       const browser = getBrowserStatus();
@@ -274,7 +302,9 @@ const server = http.createServer(async (req, res) => {
         uptimeText: uptime < 60 ? `${uptime}s` : uptime < 3600 ? `${Math.floor(uptime / 60)}m ${uptime % 60}s` : `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
         requests: metrics.requests, errors: metrics.errors, maxBrowserSessions: getBrowserStatus().maxSessions,
         clientCount: (await listClients()).length,
-        model: process.env.OPENFISH_MODEL || "qwen2.5:3b",
+        model: MODEL,
+        ollama: await getOllamaStatus(),
+        extension: { connected: Boolean(extensionLastSeenAt && Date.now() - Date.parse(extensionLastSeenAt) < 45000), version: extensionVersion, lastSeenAt: extensionLastSeenAt },
         browser, port: PORT
       });
     }
