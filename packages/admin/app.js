@@ -331,7 +331,7 @@ function integrationConfigText() {
   const url = $("integrationMcpUrl")?.value.trim() || "";
   const sessionId = $("integrationSession")?.value.trim() || "default";
   if (!key) throw new Error("请先粘贴 OpenFish API 密钥。");
-  if (!/^https?:\\/\\//i.test(url) || !url.endsWith("/mcp")) throw new Error("MCP 地址必须是 http(s) URL，并以 /mcp 结尾。");
+  if (!/^https?:\/\//i.test(url) || !url.endsWith("/mcp")) throw new Error("MCP 地址必须是 http(s) URL，并以 /mcp 结尾。");
   if (sessionId !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) throw new Error("浏览器会话 ID 格式不正确。");
   const headers = { Authorization: "Bearer " + key, "X-OpenFish-Client": $("integrationClient").value, "X-OpenFish-Platform": $("integrationClient").value };
   if (sessionId !== "default") headers["X-OpenFish-Session"] = sessionId;
@@ -353,9 +353,9 @@ $("copyIntegrationConfig")?.addEventListener("click", async () => {
 $("copyRestExample")?.addEventListener("click", async () => {
   try {
     const key = $("integrationApiKey").value.trim();
-    const base = $("integrationMcpUrl").value.trim().replace(/\\/mcp$/, "").replace(/:8788$/, ":8787");
+    const base = $("integrationMcpUrl").value.trim().replace(/\/mcp$/, "").replace(/:8788$/, ":8787");
     if (!key) throw new Error("请先粘贴 OpenFish API 密钥。");
-    if (!/^https?:\\/\\//i.test(base)) throw new Error("请填写有效的服务地址。");
+    if (!/^https?:\/\//i.test(base)) throw new Error("请填写有效的服务地址。");
     const command = `curl -X POST "${base}/api/v1/tools/read_page" \\\n  -H "Authorization: Bearer ${key}" \\\n  -H "Content-Type: application/json" \\\n  -H "X-OpenFish-Client: rest-client" \\\n  -d '{}'`;
     await navigator.clipboard.writeText(command);
     $("copyRestExample").textContent = "已复制";
