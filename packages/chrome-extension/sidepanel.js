@@ -1,7 +1,6 @@
 const API = "http://127.0.0.1:8787";
 const $ = id => document.getElementById(id);
 let currentPlan = null;
-  currentTaskId = null;
 let currentTaskId = null;
 let libraryTab = "bookmarks";
 let libraryItems = [];
@@ -42,6 +41,7 @@ $("inspect").addEventListener("click", async () => {
 });
 $("goal").addEventListener("input", () => {
   currentPlan = null;
+  currentTaskId = null;
   $("execute").hidden = true;
   $("execute").disabled = true;
 });
@@ -53,7 +53,7 @@ $("run").addEventListener("click", async () => {
   $("run").disabled = true;
   $("result").textContent = "正在调用本地 AI 生成计划…";
   try { const [tab] = await chrome.tabs.query({active:true,currentWindow:true}); const data = await request("/api/plan",{goal,url:tab?.url?.startsWith("http") ? tab.url : undefined}); currentPlan = data; currentTaskId = data.taskId || null; $("result").textContent = JSON.stringify(data,null,2); $("execute").hidden = !Array.isArray(data.steps) || data.steps.length === 0; $("execute").disabled = $("execute").hidden; }
-  catch(e) { currentPlan = null; $("execute").hidden = true; $("result").textContent = e.message; }
+  catch(e) { currentPlan = null; currentTaskId = null; $("execute").hidden = true; $("result").textContent = e.message; }
   finally { $("run").disabled = false; }
 });
 async function browserAction(action) {
@@ -174,5 +174,5 @@ $("execute").addEventListener("click", async () => {
     const data = await request("/api/execute", { plan: approvedPlan, taskId: currentTaskId, approved: true });
     $("result").textContent = JSON.stringify(data, null, 2);
   } catch (e) { $("result").textContent = e.message; }
-  finally { currentPlan = null; $("execute").hidden = true; $("execute").disabled = true; $("run").disabled = false; }
+  finally { currentPlan = null; currentTaskId = null; $("execute").hidden = true; $("execute").disabled = true; $("run").disabled = false; }
 });
