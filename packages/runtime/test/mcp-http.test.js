@@ -119,3 +119,9 @@ test("GitHub Actions relay deployment requires all Cloudflare secrets and instal
   assert.ok(workflow.includes("npm run check"));
   assert.ok(workflow.includes("npm test"));
 });
+
+test("HTTP MCP execute_plan accepts the durable task ID returned by plan_task", async () => {
+  const httpMcp = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
+  assert.ok(httpMcp.includes("taskId: z.string().uuid().optional()"));
+  assert.ok(httpMcp.includes('call("execute_plan", args, true)'));
+});
