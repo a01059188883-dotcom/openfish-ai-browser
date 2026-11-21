@@ -2,15 +2,9 @@ name: Deploy OpenFish Cloudflare Worker
 # Release gate: run the complete v2.15.0 test suite before publishing frontend assets.
 
 on:
+  # Production release is deliberately manual. Merging a PR must never deploy
+  # before real-device acceptance and explicit release approval.
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "cloudflare/**"
-      - "public/**"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/deploy-cloudflare.yml"
 
 concurrency:
   group: openfish-production-deploy
