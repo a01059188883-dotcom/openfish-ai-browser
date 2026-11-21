@@ -7,11 +7,11 @@ const BRIDGE_URL = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").
 const MCP_URL = (process.env.OPENFISH_MCP_URL || "http://127.0.0.1:8788/mcp").replace(/\/$/, "");
 const CLIENT_ID = process.env.OPENFISH_CLIENT_ID || "openfish-local-agent";
 const MAX_BODY_BYTES = 512 * 1024;
-const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/browser/sessions"]);
+const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/tasks", "/api/browser/sessions"]);
 const ALLOWED_PATH = path => path === "/mcp" || path === "/health" ||
   path === "/.well-known/openfish-tools.json" || path === "/api/v1/tools" ||
   path.startsWith("/api/v1/tools/") || path.startsWith("/api/v1/adapters/") || path === "/api/v1/openapi.json" ||
-  ADMIN_PATHS.has(path) || /^\/api\/browser\/sessions\/[A-Za-z0-9_-]+\/close$/.test(path) ||
+  ADMIN_PATHS.has(path) || /^\/api\/admin\/tasks\/[A-Za-z0-9-]+(?:\/restore)?$/.test(path) || /^\/api\/browser\/sessions\/[A-Za-z0-9_-]+\/close$/.test(path) ||
   path === "/api/plan" || path === "/api/execute";
 
 function validateConfig() {
