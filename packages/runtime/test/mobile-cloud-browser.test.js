@@ -74,6 +74,7 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(app.includes("function renderTabs"));
   assert.ok(admin.includes('id="cloudStatus"'));
   assert.ok(admin.includes('id="cloudClose"'));
-  assert.ok(admin.includes('localStorage.setItem("openfish.relay.token"'));\n  assert.ok(admin.includes('sessionStorage.setItem(tokenKey,value)'));
+  assert.ok(admin.includes('localStorage.setItem("openfish.relay.token"'));
+  assert.ok(admin.includes('sessionStorage.setItem(tokenKey,value)'));
   assert.ok(admin.includes('api("/api/cloud-browser/status")'));
 });
