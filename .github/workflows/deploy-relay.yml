@@ -1,12 +1,8 @@
 name: Deploy OpenFish Relay
 
 on:
+  # Production Cloud Run + Worker release is manual-only; PR merges never deploy.
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "services/browser-engine/**"
-      - ".github/workflows/deploy-relay.yml"
 
 concurrency:
   group: openfish-cloudrun-engine-deploy

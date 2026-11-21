@@ -1,6 +1,8 @@
 const $ = id => document.getElementById(id);
 const TEMPLATE_KEY = "openfish.taskTemplates.v1";
 let plan = null;
+let currentTaskId = null;
+let taskSearchTimer = null;
 let pollBusy = false;
 let latestEvents = [];
 
@@ -78,9 +80,13 @@ async function refresh() {
     $("bridgeHealth").className = "status-good";
     $("browserHealth").textContent = status.browser?.connected ? "已连接" : "待启动";
     $("model").textContent = status.model || "未配置";
+    $("ollamaHealth").textContent = status.ollama?.reachable ? (status.ollama.modelInstalled ? "已连接 · 模型就绪" : "已连接 · 缺少模型") : "不可达";
+    $("ollamaHealth").className = status.ollama?.reachable && status.ollama.modelInstalled ? "status-good" : "status-bad";
+    $("extensionHealth").textContent = status.extension?.connected ? "已连接 · " + (status.extension.version || "版本未知") : "未检测到连接";
+    $("extensionHealth").className = status.extension?.connected ? "status-good" : "muted";
     if ($("clientCount")) $("clientCount").textContent = status.clientCount ?? 0;
     $("mode").textContent = status.browser?.remote ? "远程" : "本地";
-    $("version").textContent = status.version || "2.14.2";
+    $("version").textContent = status.version || "2.15.0";
     latestEvents = Array.isArray(activity.events) ? activity.events : [];
     renderEvents(latestEvents);
     drawBars(latestEvents);
@@ -95,6 +101,7 @@ async function refresh() {
 }
 function invalidatePlan() {
   plan = null;
+  currentTaskId = null;
   $("approve").disabled = true;
   $("plan").textContent = "任务已修改，请重新生成计划并审核。";
   $("plan").className = "plan empty";
@@ -113,6 +120,7 @@ $("makePlan").addEventListener("click", async () => {
     const result = await api("/api/plan", { goal });
     if (!Array.isArray(result.steps) || !result.steps.length) throw new Error("AI 未返回可执行步骤，请调整任务描述。");
     plan = result;
+    currentTaskId = result.taskId || null;
     $("plan").textContent = JSON.stringify(result, null, 2);
     $("approve").disabled = false;
   } catch (error) {
@@ -121,6 +129,7 @@ $("makePlan").addEventListener("click", async () => {
   } finally {
     $("makePlan").disabled = false;
     refresh();
+    loadTasks();
   }
 });
 $("approve").addEventListener("click", async () => {
@@ -131,10 +140,12 @@ $("approve").addEventListener("click", async () => {
   $("makePlan").disabled = true;
   $("plan").textContent = "执行中…";
   try {
-    const result = await api("/api/execute", { plan: approvedPlan, approved: true });
+    const result = await api("/api/execute", { plan: approvedPlan, taskId: currentTaskId, approved: true });
     $("plan").textContent = JSON.stringify(result, null, 2);
+    await loadTasks();
   } catch (error) {
     $("plan").textContent = "执行失败：" + error.message;
+    await loadTasks();
   } finally {
     plan = null;
     $("makePlan").disabled = false;
@@ -149,6 +160,77 @@ $("clear").addEventListener("click", () => {
 $("refresh").addEventListener("click", refresh);
 $("refreshLog").addEventListener("click", refresh);
 $("eventFilter").addEventListener("input", () => renderEvents(latestEvents));
+
+
+function taskStatusLabel(status) {
+  return ({ planned: "待审核", approved: "已批准", running: "执行中", succeeded: "成功", stopped: "已停止", failed: "失败" })[status] || status || "未知";
+}
+$("testOllama")?.addEventListener("click", async () => {
+  const button = $("testOllama");
+  button.disabled = true;
+  button.textContent = "正在测试模型…";
+  $("ollamaTestResult").textContent = "正在向本地 Ollama 发送最小测试提示…";
+  try {
+    const result = await api("/api/admin/ollama-test", {});
+    $("ollamaTestResult").textContent = result.model + " · " + result.durationMs + " ms · " + result.response;
+  } catch (error) { $("ollamaTestResult").textContent = "模型测试失败：" + error.message; }
+  finally { button.disabled = false; button.textContent = "测试模型实际响应"; }
+});
+async function loadTasks() {
+  const host = $("taskList");
+  if (!host) return;
+  try {
+    const params = new URLSearchParams({ q: $("taskSearch")?.value || "", status: $("taskStatus")?.value || "", limit: "100" });
+    const data = await api("/api/admin/tasks?" + params.toString());
+    const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    $("taskCount").textContent = tasks.length + " 条 / 最多 " + (data.maxTasks || 500) + " 条";
+    host.replaceChildren();
+    if (!tasks.length) { host.append(textNode("p", "没有匹配的任务记录。", "muted")); return; }
+    for (const task of tasks) {
+      const row = document.createElement("div");
+      row.className = "task-row";
+      const details = document.createElement("div");
+      details.className = "task-details";
+      details.append(textNode("b", task.goal), textNode("small", task.id + " · " + fmtTime(task.createdAt) + " · " + (task.source || "unknown")));
+      const state = textNode("span", taskStatusLabel(task.status), "task-status status-" + task.status);
+      const actions = document.createElement("div");
+      actions.className = "task-actions";
+      const view = textNode("button", "查看");
+      view.type = "button";
+      view.addEventListener("click", async () => {
+        try { const detail = await api("/api/admin/tasks/" + encodeURIComponent(task.id)); $("taskDetail").textContent = JSON.stringify(detail.task, null, 2); }
+        catch (error) { $("taskDetail").textContent = "读取失败：" + error.message; }
+      });
+      const restore = textNode("button", "恢复计划", "primary");
+      restore.type = "button";
+      restore.disabled = !task.hasPlan && !task.plan;
+      restore.addEventListener("click", async () => {
+        restore.disabled = true;
+        try {
+          const result = await api("/api/admin/tasks/" + encodeURIComponent(task.id) + "/restore", {});
+          plan = result.task.plan;
+          currentTaskId = result.task.id;
+          $("goal").value = result.task.goal;
+          $("plan").textContent = JSON.stringify(result.task, null, 2);
+          $("plan").className = "plan";
+          $("approve").disabled = !plan?.steps?.length;
+          $("taskDetail").textContent = JSON.stringify(result.task, null, 2);
+          await loadTasks();
+          $("goal").scrollIntoView({ behavior: "smooth", block: "center" });
+        } catch (error) { window.alert("恢复失败：" + error.message); restore.disabled = false; }
+      });
+      actions.append(view, restore);
+      row.append(details, state, actions);
+      host.append(row);
+    }
+  } catch (error) { host.replaceChildren(textNode("p", "读取任务历史失败：" + error.message, "muted")); }
+}
+$("refreshTasks")?.addEventListener("click", loadTasks);
+$("taskStatus")?.addEventListener("change", loadTasks);
+$("taskSearch")?.addEventListener("input", () => {
+  window.clearTimeout(taskSearchTimer);
+  taskSearchTimer = window.setTimeout(loadTasks, 220);
+});
 
 async function loadToolCatalog() {
   const host = $("toolCatalog");

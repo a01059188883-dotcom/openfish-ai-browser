@@ -73,9 +73,9 @@ test("mobile AI workbench has touch-sized controls and horizontal tab scrolling"
   for (const feature of ["min-height:42px", "overflow-x:auto", "max-width:600px"]) assert.ok(ui.includes(feature));
 });
 
-test("workbench asset and app version are synchronized to 2.14.2", () => {
-  assert.ok(index.includes("ai-workbench.js?v=2.14.2"));
-  assert.ok(index.includes("OpenFish AI Browser · v2.14.2"));
-  assert.ok(worker.includes('const VERSION = "2.14.2"'));
-  assert.ok(pkg.includes('"version": "2.14.2"'));
+test("workbench asset and app version are synchronized to 2.15.0", () => {
+  assert.ok(index.includes("ai-workbench.js?v=2.15.0"));
+  assert.ok(index.includes("OpenFish AI Browser · v2.15.0"));
+  assert.ok(worker.includes('const VERSION = "2.15.0"'));
+  assert.ok(pkg.includes('"version": "2.15.0"'));
 });
