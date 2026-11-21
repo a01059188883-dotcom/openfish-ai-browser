@@ -347,3 +347,20 @@ test("durable task store is integrated into bridge routes and admin task history
   assert.ok(app.includes("restore"));
   assert.ok(pkg.scripts.check.includes("task-store.js"));
 });
+
+test("Ollama and Chrome extension connectivity diagnostics are wired into the local admin panel", async () => {
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  const panel = await readFile(resolve("packages/chrome-extension/sidepanel.js"), "utf8");
+  const html = await readFile(resolve("packages/admin/index.html"), "utf8");
+  const app = await readFile(resolve("packages/admin/app.js"), "utf8");
+  assert.ok(bridge.includes("async function getOllamaStatus()"));
+  assert.ok(bridge.includes('res.reqOrigin?.startsWith("chrome-extension://")'));
+  assert.ok(bridge.includes('res.reqPath === "/api/extension/heartbeat"'));
+  assert.ok(bridge.includes("AbortSignal.timeout(2500)"));
+  assert.ok(panel.includes("/api/extension/heartbeat"));
+  assert.ok(panel.includes("window.setInterval(health, 15000)"));
+  assert.ok(html.includes('id="ollamaHealth"'));
+  assert.ok(html.includes('id="extensionHealth"'));
+  assert.ok(app.includes("status.ollama?.reachable"));
+  assert.ok(app.includes("status.extension?.connected"));
+});
