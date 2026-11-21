@@ -99,8 +99,7 @@ test("release deployment builds and verifies Cloud Run before deploying the Work
   assert.match(workflow, /--no-traffic --tag=preflight/);
   assert.match(workflow, /--to-latest --remove-tags=preflight/);
   assert.match(workflow, /workflow_dispatch:/);
-  assert.ok(workflow.includes("  push:"));
-  assert.ok(workflow.includes("  push:"));
+  assert.doesNotMatch(workflow, /^\s+push:/m, "production deployment must not run automatically on main pushes");
 });
 
 test("engine bearer authentication uses constant-time token comparison", async () => {
