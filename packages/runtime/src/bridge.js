@@ -204,7 +204,7 @@ const server = http.createServer(async (req, res) => {
   if (!ALLOWED_HOSTS.has(host)) return send(res, 403, { error: "Unexpected Host header." });
   const allowedOrigin = process.env.ALLOWED_EXTENSION_ORIGIN || "";
   const localOrigins = new Set([`http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`]);
-  const isExtensionOrigin = origin.startsWith("chrome-extension://") && (!allowedOrigin || origin === allowedOrigin);
+  const isExtensionOrigin = origin.startsWith("chrome-extension://") && Boolean(allowedOrigin) && origin === allowedOrigin;
   if (origin && !localOrigins.has(origin) && !isExtensionOrigin) {
     return send(res, 403, { error: "Origin not allowed. Set ALLOWED_EXTENSION_ORIGIN to your extension ID origin." });
   }
