@@ -40,7 +40,7 @@ test("browser sessions use separate contexts and unknown session IDs are rejecte
 test("release metadata includes HTTP MCP entry point", async () => {
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
   const httpMcp = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
-  assert.equal(pkg.version, "2.15.1");
+  assert.equal(pkg.version, "2.16.0");
   assert.equal(pkg.scripts["start:mcp:http"], "node packages/mcp-server/src/http.js");
   assert.ok(pkg.scripts.check.includes("node --check packages/mcp-server/src/http.js"));
   assert.ok(httpMcp.includes(`const VERSION = "${pkg.version}"`));
@@ -62,7 +62,7 @@ test("AI client registry persists client metadata and enforces per-key rate limi
   assert.ok(httpMcp.includes('clientId: String(req.headers["x-openfish-client"] || "mcp-http")'));
   assert.ok(admin.includes('api("/api/admin/clients")'));
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "2.15.1");
+  assert.equal(pkg.version, "2.16.0");
   assert.ok(pkg.scripts.check.includes("packages/runtime/src/client-registry.js"));
 });
 
@@ -85,7 +85,7 @@ test("Cloudflare relay is authenticated, allowlisted, bounded, and outbound-only
   assert.ok(agent.includes('http://127.0.0.1:8787'));
   assert.ok(agent.includes('AbortSignal.timeout(40000)'));
   assert.ok(!agent.includes('new URL(message.destination'));
-  assert.equal(pkg.version, "2.15.1");
+  assert.equal(pkg.version, "2.16.0");
   assert.equal(pkg.scripts["start:relay-agent"], "node --env-file=.env packages/runtime/src/relay-agent.js");
   assert.ok(pkg.scripts.check.includes("node --check cloudflare/worker.js"));
 });
@@ -135,4 +135,23 @@ test("mobile admin remembers relay token only when the device opt-in is enabled"
   assert.ok(html.includes('localStorage.removeItem(tokenKey)'));
   assert.ok(html.includes('sessionStorage.removeItem(tokenKey)'));
   assert.ok(html.includes('断开并清除'));
+});
+
+
+test("AI integration center generates MCP configuration and keeps API key scopes separate", async () => {
+  const html = await readFile(resolve("packages/admin/index.html"), "utf8");
+  const app = await readFile(resolve("packages/admin/app.js"), "utf8");
+  const keys = await readFile(resolve("packages/runtime/src/api-keys.js"), "utf8");
+  const httpMcp = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
+  assert.ok(html.includes('id="integrationClient"'));
+  assert.ok(html.includes('id="integrationMcpUrl"'));
+  assert.ok(html.includes('id="integrationApiKey"'));
+  assert.ok(html.includes('id="copyIntegrationConfig"'));
+  assert.ok(app.includes('mcpServers: { "openfish-browser"'));
+  assert.ok(app.includes('Authorization: "Bearer " + key'));
+  assert.ok(app.includes('X-OpenFish-Session'));
+  assert.ok(app.includes('/api/v1/tools/read_page'));
+  assert.ok(keys.includes('const SCOPES = new Set(["browser:read", "browser:write"])'));
+  assert.ok(httpMcp.includes('const VERSION = "2.16.0"'));
+  assert.ok(httpMcp.includes('Authorization: Bearer API_KEY'));
 });
