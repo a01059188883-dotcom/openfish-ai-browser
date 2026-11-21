@@ -378,3 +378,16 @@ test("mobile admin preserves task IDs and displays Ollama and extension connecti
   assert.ok(mobile.includes("s.ollama?.reachable"));
   assert.ok(mobile.includes("s.extension?.connected"));
 });
+
+test("mobile relay exposes only the authenticated task list, detail and restore routes", async () => {
+  const worker = await readFile(resolve("cloudflare/worker.js"), "utf8");
+  const agent = await readFile(resolve("packages/runtime/src/relay-agent.js"), "utf8");
+  const mobile = await readFile(resolve("cloudflare/mobile-admin.html"), "utf8");
+  for (const source of [worker, agent]) {
+    assert.ok(source.includes('"/api/admin/tasks"'));
+    assert.ok(source.includes('/api\\/admin\\/tasks\\/[A-Za-z0-9-]+'));
+  }
+  assert.ok(mobile.includes('id="taskSearch"'));
+  assert.ok(mobile.includes('id="taskHistory"'));
+  assert.ok(mobile.includes('"/api/admin/tasks/"+encodeURIComponent(task.id)+"/restore"'));
+});
