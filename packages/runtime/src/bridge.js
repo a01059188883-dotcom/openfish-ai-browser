@@ -18,6 +18,16 @@ const MODEL = process.env.OPENFISH_MODEL || "qwen2.5:3b";
 let ollamaCache = null;
 let extensionLastSeenAt = null;
 let extensionVersion = null;
+async function testOllamaModel() {
+  const base = OLLAMA_URL.endsWith("/") ? OLLAMA_URL.slice(0, -1) : OLLAMA_URL;
+  const started = Date.now();
+  const response = await fetch(`${base}/api/generate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: MODEL, prompt: "Reply with exactly: OK", stream: false, options: { num_predict: 8 } }), signal: AbortSignal.timeout(12000) });
+  if (!response.ok) throw new Error(`Ollama HTTP ${response.status}`);
+  const data = await response.json();
+  const answer = String(data.response || "").trim();
+  if (!answer) throw new Error("Ollama returned an empty model response.");
+  return { ok: true, model: MODEL, response: answer.slice(0, 160), durationMs: Date.now() - started };
+}
 async function getOllamaStatus() {
   if (ollamaCache && Date.now() - ollamaCache.checkedAtMs < 15000) return ollamaCache.value;
   try {
@@ -285,6 +295,10 @@ const server = http.createServer(async (req, res) => {
       res.reqRateHeaders = { "x-ratelimit-limit": String(rate.limit), "x-ratelimit-remaining": String(rate.remaining), "x-ratelimit-reset": rate.resetAt };
       if (!rate.allowed) { res.setHeader("retry-after", String(rate.retryAfterSeconds)); return send(res, 429, { error: "API key rate limit exceeded.", code: "RATE_LIMITED", retryAfterSeconds: rate.retryAfterSeconds }); }
       return send(res, 200, { tool: name, result: await invokeTool(name, body) });
+    }
+    if (req.method === "POST" && res.reqPath === "/api/admin/ollama-test") {
+      try { return send(res, 200, await testOllamaModel()); }
+      catch (error) { return send(res, 503, { ok: false, model: MODEL, error: String(error.message || error).slice(0, 240) }); }
     }
     if (req.method === "POST" && res.reqPath === "/api/extension/heartbeat") {
       if (!res.reqOrigin?.startsWith("chrome-extension://")) return send(res, 403, { error: "Chrome extension origin is required." });
