@@ -434,7 +434,9 @@ $("createKey")?.addEventListener("click", async () => {
       await navigator.clipboard.writeText(result.key);
       copy.textContent = "已复制";
     });
-    notice.append(copy);\n    $("integrationApiKey").value = result.key;\n    refreshIntegrationConfig();
+    notice.append(copy);
+    $("integrationApiKey").value = result.key;
+    refreshIntegrationConfig();
     $("keyName").value = "";
     await loadApiKeys();
   } catch (error) {
