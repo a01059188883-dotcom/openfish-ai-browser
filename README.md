@@ -53,7 +53,7 @@ The side panel invalidates old plans when the task text changes, disables execut
 Set `BROWSER_WS_ENDPOINT` to a Chromium Playwright-compatible WebSocket endpoint and run the bridge/MCP server in a trusted server environment. A free local setup is included; a permanently available cloud browser needs compute hosting and may not remain free.
 
 ## Deployment readiness
-This is a local-first developer tool, not yet a hardened multi-user SaaS. Before public hosting, add authentication, per-user browser isolation, SSRF/private-network protections, rate limits, a durable task queue, observability, and deployment secret management. Set `ALLOWED_EXTENSION_ORIGIN=chrome-extension://YOUR_EXTENSION_ID` in `.env` to pin the local bridge to your extension ID; leave it blank only during initial unpacked-extension setup.
+This is a local-first developer tool, not yet a hardened multi-user SaaS. Before public hosting, add authentication, per-user browser isolation, SSRF/private-network protections, rate limits, a durable task queue, observability, and deployment secret management. Set `ALLOWED_EXTENSION_ORIGIN=chrome-extension://YOUR_EXTENSION_ID` in `.env` to pin the local bridge to your exact extension ID. Extension-origin requests are denied until this value is set; do not leave it blank for normal use.
 
 ## Safety
 - Never paste passwords, recovery codes, payment details, or API keys into task prompts.
