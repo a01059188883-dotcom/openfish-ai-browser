@@ -385,7 +385,7 @@ test("mobile relay exposes only the authenticated task list, detail and restore 
   const mobile = await readFile(resolve("cloudflare/mobile-admin.html"), "utf8");
   for (const source of [worker, agent]) {
     assert.ok(source.includes('"/api/admin/tasks"'));
-    assert.ok(source.includes('/api\\/admin\\/tasks\\/[A-Za-z0-9-]+'));
+    assert.ok(source.includes("A-Za-z0-9-]+(?:\\\\/restore)?$"));
   }
   assert.ok(mobile.includes('id="taskSearch"'));
   assert.ok(mobile.includes('id="taskHistory"'));
