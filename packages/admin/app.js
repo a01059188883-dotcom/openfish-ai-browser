@@ -86,7 +86,7 @@ async function refresh() {
     $("extensionHealth").className = status.extension?.connected ? "status-good" : "muted";
     if ($("clientCount")) $("clientCount").textContent = status.clientCount ?? 0;
     $("mode").textContent = status.browser?.remote ? "远程" : "本地";
-    $("version").textContent = status.version || "2.15.0";
+    $("version").textContent = status.version || "2.16.0";
     latestEvents = Array.isArray(activity.events) ? activity.events : [];
     renderEvents(latestEvents);
     drawBars(latestEvents);
@@ -326,6 +326,41 @@ document.querySelectorAll("[data-copy]").forEach(button => button.addEventListen
   }
 }));
 
+function integrationConfigText() {
+  const key = $("integrationApiKey")?.value.trim() || "";
+  const url = $("integrationMcpUrl")?.value.trim() || "";
+  const sessionId = $("integrationSession")?.value.trim() || "default";
+  if (!key) throw new Error("请先粘贴 OpenFish API 密钥。");
+  if (!/^https?:\\/\\//i.test(url) || !url.endsWith("/mcp")) throw new Error("MCP 地址必须是 http(s) URL，并以 /mcp 结尾。");
+  if (sessionId !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) throw new Error("浏览器会话 ID 格式不正确。");
+  const headers = { Authorization: "Bearer " + key, "X-OpenFish-Client": $("integrationClient").value, "X-OpenFish-Platform": $("integrationClient").value };
+  if (sessionId !== "default") headers["X-OpenFish-Session"] = sessionId;
+  const config = { mcpServers: { "openfish-browser": { url, headers } } };
+  return JSON.stringify(config, null, 2);
+}
+function refreshIntegrationConfig() {
+  const output = $("integrationConfig");
+  if (!output) return;
+  try { output.textContent = integrationConfigText(); }
+  catch (error) { output.textContent = error.message; }
+}
+$("generateIntegration")?.addEventListener("click", refreshIntegrationConfig);
+["integrationClient", "integrationMcpUrl", "integrationApiKey", "integrationSession"].forEach(id => $(id)?.addEventListener("input", refreshIntegrationConfig));
+$("copyIntegrationConfig")?.addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(integrationConfigText()); $("copyIntegrationConfig").textContent = "已复制"; }
+  catch (error) { window.alert("复制配置失败：" + error.message); }
+});
+$("copyRestExample")?.addEventListener("click", async () => {
+  try {
+    const key = $("integrationApiKey").value.trim();
+    const base = $("integrationMcpUrl").value.trim().replace(/\\/mcp$/, "").replace(/:8788$/, ":8787");
+    if (!key) throw new Error("请先粘贴 OpenFish API 密钥。");
+    if (!/^https?:\\/\\//i.test(base)) throw new Error("请填写有效的服务地址。");
+    const command = `curl -X POST "${base}/api/v1/tools/read_page" \\\n  -H "Authorization: Bearer ${key}" \\\n  -H "Content-Type: application/json" \\\n  -H "X-OpenFish-Client: rest-client" \\\n  -d '{}'`;
+    await navigator.clipboard.writeText(command);
+    $("copyRestExample").textContent = "已复制";
+  } catch (error) { window.alert("生成 REST 示例失败：" + error.message); }
+});
 async function loadApiKeys() {
   const host = $("keyList");
   if (!host) return;
@@ -380,7 +415,7 @@ $("createKey")?.addEventListener("click", async () => {
       await navigator.clipboard.writeText(result.key);
       copy.textContent = "已复制";
     });
-    notice.append(copy);
+    notice.append(copy);\n    $("integrationApiKey").value = result.key;\n    refreshIntegrationConfig();
     $("keyName").value = "";
     await loadApiKeys();
   } catch (error) {
