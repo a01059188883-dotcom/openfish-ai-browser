@@ -400,7 +400,7 @@ test("Ollama model can be tested with a real bounded generation request", async 
   const html = await readFile(resolve("packages/admin/index.html"), "utf8");
   const app = await readFile(resolve("packages/admin/app.js"), "utf8");
   assert.ok(bridge.includes('res.reqPath === "/api/admin/ollama-test"'));
-  assert.ok(bridge.includes('"/api/generate"'));
+  assert.ok(bridge.includes("/api/generate"));
   assert.ok(bridge.includes("AbortSignal.timeout(12000)"));
   assert.ok(html.includes('id="testOllama"'));
   assert.ok(app.includes('api("/api/admin/ollama-test", {})'));
