@@ -80,6 +80,10 @@ async function refresh() {
     $("bridgeHealth").className = "status-good";
     $("browserHealth").textContent = status.browser?.connected ? "已连接" : "待启动";
     $("model").textContent = status.model || "未配置";
+    $("ollamaHealth").textContent = status.ollama?.reachable ? (status.ollama.modelInstalled ? "已连接 · 模型就绪" : "已连接 · 缺少模型") : "不可达";
+    $("ollamaHealth").className = status.ollama?.reachable && status.ollama.modelInstalled ? "status-good" : "status-bad";
+    $("extensionHealth").textContent = status.extension?.connected ? "已连接 · " + (status.extension.version || "版本未知") : "未检测到连接";
+    $("extensionHealth").className = status.extension?.connected ? "status-good" : "muted";
     if ($("clientCount")) $("clientCount").textContent = status.clientCount ?? 0;
     $("mode").textContent = status.browser?.remote ? "远程" : "本地";
     $("version").textContent = status.version || "2.15.0";
