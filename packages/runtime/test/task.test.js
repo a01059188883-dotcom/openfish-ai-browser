@@ -364,3 +364,9 @@ test("Ollama and Chrome extension connectivity diagnostics are wired into the lo
   assert.ok(app.includes("status.ollama?.reachable"));
   assert.ok(app.includes("status.extension?.connected"));
 });
+
+test("local bridge requires an explicitly pinned Chrome extension origin", async () => {
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  assert.ok(bridge.includes('origin.startsWith("chrome-extension://") && Boolean(allowedOrigin) && origin === allowedOrigin'));
+  assert.ok(bridge.includes("if (origin && !localOrigins.has(origin) && !isExtensionOrigin)"));
+});
