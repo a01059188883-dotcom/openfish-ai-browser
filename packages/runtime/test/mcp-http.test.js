@@ -146,11 +146,16 @@ test("AI integration center generates MCP configuration and keeps API key scopes
   assert.ok(html.includes('id="integrationClient"'));
   assert.ok(html.includes('id="integrationMcpUrl"'));
   assert.ok(html.includes('id="integrationApiKey"'));
-  assert.ok(html.includes('id="copyIntegrationConfig"'));\n  assert.ok(html.includes('id="relayWorkerUrl"'));\n  assert.ok(html.includes('id="relayAccessToken"'));\n  assert.ok(html.includes('id="copyRelayCurl"'));
+  assert.ok(html.includes('id="copyIntegrationConfig"'));
+  assert.ok(html.includes('id="relayWorkerUrl"'));
+  assert.ok(html.includes('id="relayAccessToken"'));
+  assert.ok(html.includes('id="copyRelayCurl"'));
   assert.ok(app.includes('mcpServers: { "openfish-browser"'));
   assert.ok(app.includes('Authorization: "Bearer " + key'));
   assert.ok(app.includes('X-OpenFish-Session'));
-  assert.ok(app.includes('/api/v1/tools/read_page'));\n  assert.ok(app.includes('/api/v1/browser/status'));\n  assert.ok(app.includes('Worker 地址必须使用 HTTPS'));
+  assert.ok(app.includes('/api/v1/tools/read_page'));
+  assert.ok(app.includes('/api/v1/browser/status'));
+  assert.ok(app.includes('Worker 地址必须使用 HTTPS'));
   assert.ok(keys.includes('const SCOPES = new Set(["browser:read", "browser:write"])'));
   assert.ok(httpMcp.includes('const VERSION = "2.16.0"'));
   assert.ok(httpMcp.includes('Authorization: Bearer API_KEY'));
