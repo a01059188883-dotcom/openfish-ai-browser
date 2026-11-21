@@ -11,8 +11,12 @@ async function request(path, body = {}, method = "POST") {
   return data;
 }
 async function health() {
-  try { const r = await fetch(API + "/health"); if (!r.ok) throw new Error(); $("status").textContent = "本地服务已连接"; }
-  catch { $("status").textContent = "本地服务未启动"; }
+  try {
+    const r = await fetch(API + "/health");
+    if (!r.ok) throw new Error();
+    await request("/api/extension/heartbeat", { version: chrome.runtime.getManifest().version, extensionId: chrome.runtime.id });
+    $("status").textContent = "本地服务已连接";
+  } catch { $("status").textContent = "本地服务未连接，正在重试"; }
 }
 
 $("captureScreenshot").addEventListener("click", async () => {
@@ -157,6 +161,7 @@ function openCommandPalette(){$("commandPalette").hidden=false;$("commandSearch"
 $("openCommandPalette").addEventListener("click",openCommandPalette);$("closeCommandPalette").addEventListener("click",()=>$("commandPalette").hidden=true);$("commandSearch").addEventListener("input",renderCommandResults);
 document.addEventListener("keydown",event=>{const mod=event.ctrlKey||event.metaKey;const key=event.key.toLowerCase();if(mod&&key==="k"){event.preventDefault();openCommandPalette();}else if(event.key==="Escape"&&!$("commandPalette").hidden){$("commandPalette").hidden=true;}else if(mod&&event.shiftKey&&key==="t"){event.preventDefault();$("restoreClosedTab").click();}else if(mod&&key==="l"&&document.activeElement?.tagName!=="INPUT"&&document.activeElement?.tagName!=="TEXTAREA"){event.preventDefault();$("newTabUrl").focus();}else if(mod&&event.shiftKey&&key==="s"){event.preventDefault();$("workspaceName").focus();}});
 health();
+window.setInterval(health, 15000);
 refreshTabs();
 refreshLibrary();
 refreshWorkspaces();
