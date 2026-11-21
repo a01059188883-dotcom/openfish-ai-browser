@@ -165,6 +165,17 @@ $("eventFilter").addEventListener("input", () => renderEvents(latestEvents));
 function taskStatusLabel(status) {
   return ({ planned: "待审核", approved: "已批准", running: "执行中", succeeded: "成功", stopped: "已停止", failed: "失败" })[status] || status || "未知";
 }
+$("testOllama")?.addEventListener("click", async () => {
+  const button = $("testOllama");
+  button.disabled = true;
+  button.textContent = "正在测试模型…";
+  $("ollamaTestResult").textContent = "正在向本地 Ollama 发送最小测试提示…";
+  try {
+    const result = await api("/api/admin/ollama-test", {});
+    $("ollamaTestResult").textContent = result.model + " · " + result.durationMs + " ms · " + result.response;
+  } catch (error) { $("ollamaTestResult").textContent = "模型测试失败：" + error.message; }
+  finally { button.disabled = false; button.textContent = "测试模型实际响应"; }
+});
 async function loadTasks() {
   const host = $("taskList");
   if (!host) return;
