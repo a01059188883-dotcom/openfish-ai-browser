@@ -86,7 +86,7 @@ async function refresh() {
     $("extensionHealth").className = status.extension?.connected ? "status-good" : "muted";
     if ($("clientCount")) $("clientCount").textContent = status.clientCount ?? 0;
     $("mode").textContent = status.browser?.remote ? "远程" : "本地";
-    $("version").textContent = status.version || "2.16.1";
+    $("version").textContent = status.version || "2.17.0";
     latestEvents = Array.isArray(activity.events) ? activity.events : [];
     renderEvents(latestEvents);
     drawBars(latestEvents);
