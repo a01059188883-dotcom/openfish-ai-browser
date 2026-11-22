@@ -95,7 +95,10 @@ export default {
           ...env,
           OPENFISH_RELAY_TOKEN: credentials.OPENFISH_RELAY_TOKEN || env.OPENFISH_RELAY_TOKEN,
           BROWSER_ENGINE_TOKEN: credentials.BROWSER_ENGINE_TOKEN || env.BROWSER_ENGINE_TOKEN,
-          BROWSER_ENGINE_URL: credentials.BROWSER_ENGINE_URL || env.BROWSER_ENGINE_URL
+          BROWSER_ENGINE_URL: credentials.BROWSER_ENGINE_URL || env.BROWSER_ENGINE_URL,
+          OPENAI_API_KEY: credentials.OPENAI_API_KEY || "",
+          ANTHROPIC_API_KEY: credentials.ANTHROPIC_API_KEY || "",
+          GEMINI_API_KEY: credentials.GEMINI_API_KEY || ""
         };
         if (!request.headers.get("authorization") && env.OPENFISH_RELAY_TOKEN) {
           const headers = new Headers(request.headers);
@@ -129,6 +132,44 @@ export default {
           "/api/v1/browser/close": { post: { summary: "Close the active browser session", responses: { "200": { description: "Session closed" } } } }
         }
       }), { headers: { "content-type": "application/vnd.oai.openapi+json;version=3.1", "cache-control": "public, max-age=300", "x-openfish-version": VERSION } });
+    }
+    if (url.pathname === "/api/ai/chat") {
+      if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+      if (!sessionCheck.ok) return json({ error: "Cloud login required." }, 401);
+      let input;
+      try { input = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
+      const provider = String(input.provider || "");
+      const model = String(input.model || "").trim().slice(0, 160);
+      const payload = input.payload;
+      if (!model || !payload || typeof payload !== "object" || Array.isArray(payload)) return json({ error: "A model and request payload are required." }, 400);
+      let endpoint, headers = { "content-type": "application/json" }, apiKey;
+      if (provider === "openai") {
+        apiKey = env.OPENAI_API_KEY; endpoint = "https://api.openai.com/v1/chat/completions";
+        if (apiKey) headers.authorization = "Bearer " + apiKey;
+      } else if (provider === "anthropic") {
+        apiKey = env.ANTHROPIC_API_KEY; endpoint = "https://api.anthropic.com/v1/messages";
+        if (apiKey) { headers["x-api-key"] = apiKey; headers["anthropic-version"] = "2023-06-01"; }
+      } else if (provider === "gemini") {
+        apiKey = env.GEMINI_API_KEY; endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent";
+        if (apiKey) headers["x-goog-api-key"] = apiKey;
+      } else return json({ error: "Unsupported cloud model provider." }, 400);
+      if (!apiKey) return json({ error: provider.toUpperCase() + " API Key is not configured in /admin." }, 503);
+      const serialized = JSON.stringify(payload);
+      if (serialized.length > 450000) return json({ error: "Model request exceeds 450 KB." }, 413);
+      try {
+        const upstream = await fetch(endpoint, { method: "POST", headers, body: serialized, signal: AbortSignal.timeout(60000) });
+        const raw = await upstream.text();
+        if (raw.length > 480000) return json({ error: "Model response exceeds relay limit." }, 502);
+        let data;
+        try { data = JSON.parse(raw); } catch { return json({ error: "Model provider returned invalid JSON." }, 502); }
+        if (!upstream.ok) {
+          const detail = data.error?.message || data.error?.status || "Provider request failed.";
+          return json({ error: String(detail).slice(0, 500) }, upstream.status >= 400 && upstream.status < 500 ? upstream.status : 502);
+        }
+        return json(data);
+      } catch (error) {
+        return json({ error: "Model provider request failed: " + String(error?.message || error).slice(0, 180) }, 502);
+      }
     }
     if (url.pathname === "/api/ai/search") {
       if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
