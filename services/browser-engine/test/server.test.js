@@ -100,7 +100,8 @@ test("release deployment builds and verifies Cloud Run before deploying the Work
   assert.match(workflow, /--no-traffic --tag=preflight/);
   assert.match(workflow, /--to-latest --remove-tags=preflight/);
   assert.match(workflow, /workflow_dispatch:/);
-  assert.doesNotMatch(workflow, /^\s+push:/m, "production deployment must not run automatically on main pushes");
+  assert.match(workflow, /branches: \[main\]/);
+  assert.ok(workflow.includes(".release/openfish-v2.25.0"), "only the dedicated v2.25.0 release marker triggers deployment");
 });
 
 test("engine bearer authentication uses constant-time token comparison", async () => {
