@@ -91,12 +91,14 @@ test("Cloudflare relay is authenticated, allowlisted, bounded, and outbound-only
 });
 
 
-test("GitHub Actions relay deployment requires all Cloudflare secrets and installs Worker secret", async () => {
+test("GitHub Actions deploys cloud login bootstrap and vault secrets without Worker bearer-token copies", async () => {
   const workflow = await readFile(resolve(".github/workflows/deploy-relay.yml"), "utf8");
   assert.ok(workflow.includes("workflow_dispatch"));
   assert.ok(workflow.includes("secrets.CLOUDFLARE_API_TOKEN"));
   assert.ok(workflow.includes("secrets.CLOUDFLARE_ACCOUNT_ID"));
-  assert.ok(workflow.includes("secrets.OPENFISH_RELAY_TOKEN"));
+  assert.ok(workflow.includes("secrets.OPENFISH_BOOTSTRAP_SECRET"));
+  assert.ok(workflow.includes("secrets.OPENFISH_VAULT_KEY"));
+  assert.equal(workflow.includes("secrets.OPENFISH_RELAY_TOKEN"), false);
   assert.ok(workflow.includes("secrets.GCP_WORKLOAD_IDENTITY_PROVIDER"));
   assert.ok(workflow.includes("secrets.GCP_SERVICE_ACCOUNT"));
   assert.ok(workflow.includes("google-github-actions/auth@v2"));
@@ -112,10 +114,11 @@ test("GitHub Actions relay deployment requires all Cloudflare secrets and instal
   assert.ok(workflow.indexOf('h.version!=="1.3.6"') < workflow.indexOf("gcloud run services update-traffic"));
   assert.ok(workflow.includes("h.version!==\"1.3.6\""));
   assert.ok(workflow.includes("secrets.BROWSER_ENGINE_TOKEN"));
-  assert.ok(workflow.includes("wrangler@4 secret put BROWSER_ENGINE_URL"));
-  assert.ok(workflow.includes("wrangler@4 secret put BROWSER_ENGINE_TOKEN"));
+  assert.equal(workflow.includes("wrangler@4 secret put BROWSER_ENGINE_URL"), false);
+  assert.equal(workflow.includes("wrangler@4 secret put BROWSER_ENGINE_TOKEN"), false);
   assert.ok(workflow.includes("wrangler@4 deploy"));
-  assert.ok(workflow.includes("wrangler@4 secret put OPENFISH_RELAY_TOKEN"));
+  assert.ok(workflow.includes("wrangler@4 secret put OPENFISH_BOOTSTRAP_SECRET"));
+  assert.ok(workflow.includes("wrangler@4 secret put OPENFISH_VAULT_KEY"));
   assert.ok(workflow.includes("npm run check"));
   assert.ok(workflow.includes("npm test"));
 });
