@@ -202,6 +202,14 @@ export async function handleAuthVaultRoute(request, ctx, env) {
     return json({ ok: true, secrets });
   }
 
+  if (path === "/auth/relay-verify" && request.method === "POST") {
+    const supplied = /^Bearer\\s+(.+)$/i.exec(request.headers.get("authorization") || "")?.[1] || "";
+    if (!validSecret(supplied)) return json({ ok: false }, 401);
+    const expected = (await readVault(ctx, env)).OPENFISH_RELAY_TOKEN || "";
+    const valid = validSecret(expected) && constantTimeEqual(encoder.encode(supplied), encoder.encode(expected));
+    return json({ ok: valid }, valid ? 200 : 401);
+  }
+
   if (path === "/auth/vault" && request.method === "GET") {
     const found = await sessionRecord(ctx, request);
     if (!found || found.record.role !== "owner") return json({ error: "Unauthorized." }, 401);
