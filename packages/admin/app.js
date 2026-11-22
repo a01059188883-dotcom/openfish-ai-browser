@@ -78,6 +78,8 @@ async function refresh() {
     $("browserMode").textContent = status.browser?.remote ? "远程 Chromium" : "本地 Chromium";
     $("bridgeHealth").textContent = "正常";
     $("bridgeHealth").className = "status-good";
+    if ($("localAuthHealth")) { $("localAuthHealth").textContent = status.localNoAuth ? "已启用 · 仅回环地址" : "已关闭 · 需要 API Key"; $("localAuthHealth").className = status.localNoAuth ? "status-good" : "muted"; }
+    if ($("runtimeHealth")) $("runtimeHealth").textContent = (status.runtime?.platform || "未知平台") + " · Node " + (status.runtime?.node || "未知");
     $("browserHealth").textContent = status.browser?.connected ? "已连接" : "待启动";
     $("model").textContent = status.model || "未配置";
     $("ollamaHealth").textContent = status.ollama?.reachable ? (status.ollama.modelInstalled ? "已连接 · 模型就绪" : "已连接 · 缺少模型") : "不可达";
@@ -86,7 +88,7 @@ async function refresh() {
     $("extensionHealth").className = status.extension?.connected ? "status-good" : "muted";
     if ($("clientCount")) $("clientCount").textContent = status.clientCount ?? 0;
     $("mode").textContent = status.browser?.remote ? "远程" : "本地";
-    $("version").textContent = status.version || "2.17.0";
+    $("version").textContent = status.version || "2.22.0";
     latestEvents = Array.isArray(activity.events) ? activity.events : [];
     renderEvents(latestEvents);
     drawBars(latestEvents);
