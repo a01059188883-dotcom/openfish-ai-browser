@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.18.0**.
+Open-source, free-first browser automation starter. Version: **2.19.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -9,13 +9,13 @@ Open-source, free-first browser automation starter. Version: **2.18.0**.
 - **Local AI planner**: optional Ollama integration (default model `qwen2.5:3b`) creates constrained JSON plans.
 - **Safety defaults**: no credential collection; sensitive fields and potentially irreversible actions are blocked during plan execution.
 
-## AI workbench (2.17.0 integration center)
+## AI workbench (2.19.0 integration center)
 - Integrates page and multi-tab context, model-provider settings, local Skills and Memory, writing, approved browser task plans, workspace snapshots, voice I/O, research search, and file input.
-- Supports Ollama and OpenAI-compatible, Anthropic, and Gemini-style chat endpoints configured by the user. API keys and local Memory/Skills are stored in the browser's local profile; they are not synced between devices.
+- Supports local Ollama plus cloud OpenAI, Anthropic, and Gemini providers. Cloud provider API keys are stored in the authenticated server-side encrypted vault; local Memory/Skills remain in the browser profile and are not synced between devices.
 - Research uses authenticated Worker endpoints to query DuckDuckGo and Bing, then fetches public web pages for source cross-checking. Public-source fetching is restricted to HTTP(S) hostnames, rejects IP-literal/local targets, and revalidates redirects.
 - PDF.js, Mammoth (DOCX), and SheetJS (XLS/XLSX) are loaded from public CDNs; image understanding is passed to compatible vision-capable models. Scanned PDFs need OCR, which is not yet included.
 - Browser Agent plans are limited to approved navigation, tab switching, history, and scrolling actions. Each plan requires explicit user approval; failed steps are retried once and may produce a separate recovery plan for review.
-- Cloud model use may incur provider charges. Local model use requires the browser device to reach the Ollama host; a phone's `127.0.0.1` refers to the phone itself. Direct provider calls can be limited by provider CORS policies.
+- Cloud model use may incur provider charges. Local model use requires the browser device to reach the Ollama host; a phone's `127.0.0.1` refers to the phone itself. Cloud model calls are proxied through authenticated same-origin Worker endpoints; provider keys are never returned to browser JavaScript.
 - This is an integration release, not a claim that every capability is fully production-verified. Cross-device Memory sync, scanned-document OCR, broader file formats, and real-device end-to-end acceptance remain follow-up work. Agent plans are revalidated at generation, recovery, and execution time; editing the goal invalidates prior approval.
 
 ## Requirements
@@ -52,7 +52,7 @@ The side panel invalidates old plans when the task text changes, disables execut
 ## Cloud browser
 Set `BROWSER_WS_ENDPOINT` to a Chromium Playwright-compatible WebSocket endpoint and run the bridge/MCP server in a trusted server environment. A free local setup is included; a permanently available cloud browser needs compute hosting and may not remain free.
 
-## Cloud login and encrypted secret vault (v2.17.0)
+## Cloud login and encrypted secret vault (v2.19.0)
 
 The Cloudflare mobile admin at `/admin` now uses a server-side owner account instead of asking the browser to retain a Relay Token.
 
@@ -62,10 +62,10 @@ Run these commands from the repository root. Generate each value independently; 
 
 ```bash
 openssl rand -base64 48
-npx wrangler secret put OPENFISH_BOOTSTRAP_SECRET --config cloudflare/wrangler.toml --config cloudflare/wrangler.toml
+npx wrangler secret put OPENFISH_BOOTSTRAP_SECRET --config cloudflare/wrangler.toml
 # Paste the first generated value when prompted.
 openssl rand -base64 48
-npx wrangler secret put OPENFISH_VAULT_KEY --config cloudflare/wrangler.toml --config cloudflare/wrangler.toml
+npx wrangler secret put OPENFISH_VAULT_KEY --config cloudflare/wrangler.toml
 # Paste the second generated value when prompted.
 ```
 
@@ -323,3 +323,10 @@ For REST, send `POST http://127.0.0.1:8787/api/v1/tools/read_page` with `Authori
 ## Encrypted cloud AI provider vault (v2.18.0)
 
 The cloud administrator at `/admin` can store OpenAI, Anthropic, and Gemini API keys in the same AES-256-GCM encrypted Durable Object vault as the Relay and Browser Engine credentials. The AI Workbench sends model requests to the authenticated same-origin `POST /api/ai/chat` endpoint; the Worker injects the provider key server-side and forwards only to fixed official provider endpoints. Provider keys are never returned to browser JavaScript or written to browser localStorage. The OpenAI, Anthropic, and Gemini options require a cloud login and a matching key configured in `/admin`. The Ollama option remains a direct local/LAN connection and does not use the cloud proxy. Custom cloud provider endpoints are intentionally not supported by this proxy to avoid turning it into an SSRF-capable arbitrary URL forwarder. Existing API keys previously stored in the browser's AI Workbench configuration are removed from that configuration on next load; re-enter them in the cloud admin vault.
+
+
+### Account and vault hardening (v2.19.0)
+
+The mobile cloud admin includes an account-security panel to change the owner password. Password changes require the current password, enforce the 14-character minimum, rotate the password salt/hash, revoke every existing session, and issue a fresh session only to the device that completed the change. Reauthentication failures are throttled per session. The vault panel also supports explicitly deleting individual stored credentials; deletion takes effect immediately and disables the associated integration until a new value is saved.
+
+The owner password cannot currently be reset by email or a public recovery link. Keep the password in a trusted password manager. If it is lost, use the documented account recovery procedure maintained by the deployment operator; do not expose bootstrap or vault secrets in chat or issue trackers. The vault encryption key remains separate from the account password and must be backed up independently.
