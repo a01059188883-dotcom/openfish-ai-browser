@@ -52,7 +52,7 @@ async function runChild() {
   });
   activeChild = child;
   let spawnError = null;
-  const exitPromise = new Promise(resolve => child.once("exit", (code, signal) => resolve({ code, signal })));
+  const exitPromise = new Promise(resolve => child.once("close", (code, signal) => resolve({ code, signal })));
   child.once("error", error => { spawnError = error; });
   let ready = false;
   for (let attempt = 0; attempt < 60 && child.exitCode === null && !spawnError && !stopping; attempt++) {
@@ -80,7 +80,7 @@ async function runChild() {
 console.log("OpenFish 本地守护进程已启动；异常退出时将有限次数自动恢复。");
 while (!stopping) {
   const result = await runChild();
-  if (stopping) break;
+  if (stopping || (result.code === 0 && !result.signal)) break;
   const reason = result.spawnError?.message || (result.signal ? "signal " + result.signal : "exit code " + result.code);
   const policy = canRestart(restartTimes);
   if (!policy.allowed) {
