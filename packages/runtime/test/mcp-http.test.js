@@ -150,7 +150,9 @@ test("AI integration center generates MCP configuration and keeps API key scopes
   assert.ok(html.includes('id="relayWorkerUrl"'));
   assert.ok(html.includes('id="relayAccessToken"'));
   assert.ok(html.includes('id="copyRelayCurl"'));
-  assert.ok(app.includes('mcpServers: { "openfish-browser"'));\n  assert.ok(app.includes('servers: { "openfish-browser": { type: "http"'));\n  assert.ok(html.includes('value="vscode"'));
+  assert.ok(app.includes('mcpServers: { "openfish-browser"'));
+  assert.ok(app.includes('servers: { "openfish-browser": { type: "http"'));
+  assert.ok(html.includes('value="vscode"'));
   assert.ok(app.includes('Authorization: "Bearer " + key'));
   assert.ok(app.includes('X-OpenFish-Session'));
   assert.ok(app.includes('/api/v1/tools/read_page'));
