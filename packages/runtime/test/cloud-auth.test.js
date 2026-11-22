@@ -129,10 +129,12 @@ test("cloud auth enforces login throttling and keeps raw vault credentials off p
 
 test("cloud browser frontend uses the HttpOnly login session, not a client-side Relay Token", async () => {
   const publicApp = await readFile(new URL("../../../public/app.js", import.meta.url), "utf8");
+  const workbench = await readFile(new URL("../../../public/ai-workbench.js", import.meta.url), "utf8");
   const mobileAdmin = await readFile(new URL("../../../cloudflare/mobile-admin.html", import.meta.url), "utf8");
   assert.match(publicApp, /credentials:\\s*["']same-origin["']/);
   assert.doesNotMatch(publicApp, /Authorization|TOKEN_KEY|请输入 Cloudflare Relay Token/);
+  assert.doesNotMatch(workbench, /Authorization:\s*["']Bearer/);
   assert.doesNotMatch(mobileAdmin, /localStorage\\.setItem\\(["']openfish\\.relay\\.token/);
   assert.doesNotMatch(mobileAdmin, /authorization["']?\\s*:/i);
-  assert.match(mobileAdmin, /__Host-openfish_session|api\\/auth\\/login/);
+  assert.match(mobileAdmin, /api\/auth\/login/);
 });
