@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.22.0**.
+Open-source, free-first browser automation starter. Version: **2.23.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -9,7 +9,7 @@ Open-source, free-first browser automation starter. Version: **2.22.0**.
 - **Local AI planner**: optional Ollama integration (default model `qwen2.5:3b`) creates constrained JSON plans.
 - **Safety defaults**: no credential collection; sensitive fields and potentially irreversible actions are blocked during plan execution.
 
-## AI workbench (2.22.0 integration center)
+## AI workbench (2.23.0 integration center)
 - Integrates page and multi-tab context, model-provider settings, local Skills and Memory, writing, approved browser task plans, workspace snapshots, voice I/O, research search, and file input.
 - Supports local Ollama plus cloud OpenAI, Anthropic, and Gemini providers. Cloud provider API keys are stored in the authenticated server-side encrypted vault; local Memory/Skills remain in the browser profile and are not synced between devices.
 - Research uses authenticated Worker endpoints to query DuckDuckGo and Bing, then fetches public web pages for source cross-checking. Public-source fetching is restricted to HTTP(S) hostnames, rejects IP-literal/local targets, and revalidates redirects.
@@ -71,7 +71,7 @@ The side panel invalidates old plans when the task text changes, disables execut
 ## Cloud browser
 Set `BROWSER_WS_ENDPOINT` to a Chromium Playwright-compatible WebSocket endpoint and run the bridge/MCP server in a trusted server environment. A free local setup is included; a permanently available cloud browser needs compute hosting and may not remain free.
 
-## Cloud login and encrypted secret vault (v2.22.0)
+## Cloud login and encrypted secret vault (v2.23.0)
 
 The Cloudflare mobile admin at `/admin` now uses a server-side owner account instead of asking the browser to retain a Relay Token.
 
@@ -348,7 +348,7 @@ For local no-token REST, send `POST http://127.0.0.1:8787/api/v1/tools/read_page
 The cloud administrator at `/admin` can store OpenAI, Anthropic, and Gemini API keys in the same AES-256-GCM encrypted Durable Object vault as the Relay and Browser Engine credentials. The AI Workbench sends model requests to the authenticated same-origin `POST /api/ai/chat` endpoint; the Worker injects the provider key server-side and forwards only to fixed official provider endpoints. Provider keys are never returned to browser JavaScript or written to browser localStorage. The OpenAI, Anthropic, and Gemini options require a cloud login and a matching key configured in `/admin`. The Ollama option remains a direct local/LAN connection and does not use the cloud proxy. Custom cloud provider endpoints are intentionally not supported by this proxy to avoid turning it into an SSRF-capable arbitrary URL forwarder. Existing API keys previously stored in the browser's AI Workbench configuration are removed from that configuration on next load; re-enter them in the cloud admin vault.
 
 
-### Account and vault hardening (v2.22.0)
+### Account and vault hardening (v2.23.0)
 
 The mobile cloud admin includes an account-security panel to change the owner password. Password changes require the current password, enforce the 14-character minimum, rotate the password salt/hash, revoke every existing session, and issue a fresh session only to the device that completed the change. Reauthentication failures are throttled per session. The vault panel also supports explicitly deleting individual stored credentials; deletion takes effect immediately and disables the associated integration until a new value is saved.
 
