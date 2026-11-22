@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { Script } from "node:vm";
 import { handleAuthVaultRoute } from "../../../cloudflare/auth-vault.js";
 
 function makeContext() {
@@ -131,6 +132,10 @@ test("cloud browser frontends use HttpOnly login cookies, not a client-side Rela
   const publicApp = await readFile(new URL("../../../public/app.js", import.meta.url), "utf8");
   const workbench = await readFile(new URL("../../../public/ai-workbench.js", import.meta.url), "utf8");
   const mobileAdmin = await readFile(new URL("../../../cloudflare/mobile-admin.html", import.meta.url), "utf8");
+  const scriptStart = mobileAdmin.indexOf("<script>") + "<script>".length;
+  const scriptEnd = mobileAdmin.indexOf("</script>", scriptStart);
+  assert.ok(scriptStart >= "<script>".length && scriptEnd > scriptStart);
+  new Script(mobileAdmin.slice(scriptStart, scriptEnd));
   assert.ok(publicApp.includes('credentials:"same-origin"'));
   assert.equal(publicApp.includes("Authorization"), false);
   assert.equal(publicApp.includes("请输入 Cloudflare Relay Token"), false);
