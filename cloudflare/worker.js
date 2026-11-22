@@ -2,7 +2,7 @@ import mobileAdminHtml from "./mobile-admin.html";
 import { handleAuthVaultRoute } from "./auth-vault.js";
 import { acquire, connect } from "@cloudflare/playwright";
 
-const VERSION = "2.19.0";
+const VERSION = "2.20.0";
 const MAX_BODY_BYTES = 512 * 1024;
 const guardedBrowserContexts = new WeakSet();
 const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/admin/tasks", "/api/browser/sessions"]);
