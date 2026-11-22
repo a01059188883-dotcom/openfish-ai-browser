@@ -111,6 +111,36 @@ test("cloud admin bootstrap, secure login, encrypted vault, and logout", async (
   assert.equal((await afterLogout.json()).authenticated, false);
 });
 
+test("password change verifies current password and revokes all existing sessions", async () => {
+  const ctx = makeContext();
+  const oldPassword = "original-owner-password-long-enough";
+  const bootstrap = await handleAuthVaultRoute(request("/auth/bootstrap", {
+    method: "POST", body: { bootstrapSecret: env.OPENFISH_BOOTSTRAP_SECRET, username: "owner", password: oldPassword }
+  }), ctx, env);
+  assert.equal(bootstrap.status, 201);
+  const login1 = await handleAuthVaultRoute(request("/auth/login", { method: "POST", body: { username: "owner", password: oldPassword } }), ctx, env);
+  const cookie1 = login1.headers.get("set-cookie").split(";")[0];
+  const login2 = await handleAuthVaultRoute(request("/auth/login", { method: "POST", body: { username: "owner", password: oldPassword } }), ctx, env);
+  const cookie2 = login2.headers.get("set-cookie").split(";")[0];
+  const denied = await handleAuthVaultRoute(request("/auth/password", {
+    method: "PUT", cookie: cookie1, body: { currentPassword: "wrong-current-password", newPassword: "replacement-password-long-enough" }
+  }), ctx, env);
+  assert.equal(denied.status, 401);
+  const changed = await handleAuthVaultRoute(request("/auth/password", {
+    method: "PUT", cookie: cookie1, body: { currentPassword: oldPassword, newPassword: "replacement-password-long-enough" }
+  }), ctx, env);
+  assert.equal(changed.status, 200);
+  const newCookie = changed.headers.get("set-cookie").split(";")[0];
+  assert.match(changed.headers.get("set-cookie"), /HttpOnly/);
+  assert.equal((await (await handleAuthVaultRoute(request("/auth/me", { cookie: cookie1 }), ctx, env)).json()).authenticated, false);
+  assert.equal((await (await handleAuthVaultRoute(request("/auth/me", { cookie: cookie2 }), ctx, env)).json()).authenticated, false);
+  assert.equal((await (await handleAuthVaultRoute(request("/auth/me", { cookie: newCookie }), ctx, env)).json()).authenticated, true);
+  const oldLogin = await handleAuthVaultRoute(request("/auth/login", { method: "POST", body: { username: "owner", password: oldPassword } }), ctx, env);
+  assert.equal(oldLogin.status, 401);
+  const newLogin = await handleAuthVaultRoute(request("/auth/login", { method: "POST", body: { username: "owner", password: "replacement-password-long-enough" } }), ctx, env);
+  assert.equal(newLogin.status, 200);
+});
+
 test("cloud auth rejects cross-origin state changes and invalid vault settings", async () => {
   const ctx = makeContext();
   const csrf = await handleAuthVaultRoute(request("/auth/bootstrap", {
@@ -142,6 +172,7 @@ test("cloud auth enforces login throttling and keeps raw vault credentials off p
   const allowlistLine = worker.split("\n").find(line => line.includes("const publicAuthPaths"));
   assert.ok(allowlistLine);
   assert.ok(allowlistLine.includes("/api/auth/vault"));
+  assert.ok(allowlistLine.includes("/api/auth/password"));
   assert.equal(allowlistLine.includes("/api/auth/credentials"), false);
   assert.equal(allowlistLine.includes("/api/auth/relay-verify"), false);
   assert.ok(worker.includes("if (!publicAuthPaths.has(url.pathname)) return json"));
@@ -162,6 +193,8 @@ test("cloud browser frontends use HttpOnly login cookies, not a client-side Rela
   assert.equal(mobileAdmin.includes('localStorage.setItem("openfish.relay.token"'), false);
   assert.equal(mobileAdmin.includes('authorization:'), false);
   assert.ok(mobileAdmin.includes("/api/auth/login"));
+  assert.ok(mobileAdmin.includes("/api/auth/password"));
+  assert.ok(mobileAdmin.includes("修改密码并退出其他设备"));
   assert.ok(mobileAdmin.includes("OPENAI_API_KEY"));
   assert.ok(mobileAdmin.includes("ANTHROPIC_API_KEY"));
   assert.ok(mobileAdmin.includes("GEMINI_API_KEY"));
