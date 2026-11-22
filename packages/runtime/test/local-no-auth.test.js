@@ -32,8 +32,10 @@ async function startBridge(t, localNoAuth) {
   child.stderr.on("data", chunk => { logs += chunk; });
   t.after(async () => {
     if (child.exitCode === null) {
-      child.kill("SIGTERM");
-      await new Promise(resolve => child.once("exit", resolve));
+      await new Promise(resolve => {
+        child.once("exit", resolve);
+        child.kill("SIGTERM");
+      });
     }
     await rm(dataDir, { recursive: true, force: true });
   });
