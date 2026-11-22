@@ -82,7 +82,7 @@ npx wrangler deploy --config cloudflare/wrangler.toml
 Then open `https://YOUR_WORKER_HOST/admin`:
 
 1. Under **首次初始化管理员账号**, enter the one-time bootstrap secret, choose a username and a unique password of at least 14 characters, then create the owner account.
-2. Remove `OPENFISH_BOOTSTRAP_SECRET` after successful initialization with `npx wrangler secret delete OPENFISH_BOOTSTRAP_SECRET --config cloudflare/wrangler.toml`. Do not remove `OPENFISH_VAULT_KEY`.
+2. After successful initialization, remove `OPENFISH_BOOTSTRAP_SECRET` from the Worker with `npx wrangler secret delete OPENFISH_BOOTSTRAP_SECRET --config cloudflare/wrangler.toml`, and remove the same GitHub Actions repository secret in Settings → Secrets and variables → Actions. Later deploys skip bootstrap-secret installation when it is absent. Do not remove `OPENFISH_VAULT_KEY`.
 3. Log in with the owner account.
 4. In **服务器密钥库**, enter the existing Relay Token used by the desktop Relay Agent. If using the self-hosted browser engine, also enter its HTTPS URL and Engine Token. Save the settings.
 5. On the desktop Relay Agent, keep `OPENFISH_RELAY_TOKEN` set to the exact same Relay Token. The cloud Worker reads its encrypted copy from the vault; it never returns the raw value to browser JavaScript.
