@@ -168,9 +168,30 @@ export async function handleAuthVaultRoute(request, ctx, env) {
       (!request.headers.get("origin") || !safeOrigin(request))) return json({ error: "Same-origin request required." }, 403);
   const readJson = async (maxBytes = 8192) => {
     const length = Number(request.headers.get("content-length") || 0);
-    if (length > maxBytes) throw new Error("Request body too large.");
+    if (Number.isFinite(length) && length > maxBytes) throw new Error("Request body too large.");
+    if (!request.body) throw new Error("Invalid JSON body.");
+    const reader = request.body.getReader();
+    const chunks = [];
+    let total = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel();
+          throw new Error("Request body too large.");
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const bytes = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
     let data;
-    try { data = await request.json(); } catch { throw new Error("Invalid JSON body."); }
+    try { data = JSON.parse(new TextDecoder().decode(bytes)); } catch { throw new Error("Invalid JSON body."); }
     if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid JSON body.");
     return data;
   };
