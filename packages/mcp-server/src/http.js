@@ -6,7 +6,7 @@ import { z } from "zod";
 const PORT = Number(process.env.OPENFISH_MCP_HTTP_PORT || 8788);
 const HOST = process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1";
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const VERSION = "2.24.0";
+const VERSION = "2.25.0";
 const LOCAL_NO_AUTH = process.env.OPENFISH_LOCAL_NO_AUTH !== "false" && ["127.0.0.1", "::1", "localhost"].includes(HOST);
 function isLoopbackAddress(address = "") {
   return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1" || address.startsWith("::ffff:127.");
