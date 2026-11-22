@@ -2,6 +2,17 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { runLocalChecks } from "./local-checks.js";
 
+// Load .env values into this process without ever printing them.
+if (existsSync(".env")) {
+  const { readFile } = await import("node:fs/promises");
+  for (const line of (await readFile(".env", "utf8")).split(/\r?\n/)) {
+    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
+    if (!match || Object.hasOwn(process.env, match[1])) continue;
+    let value = match[2];
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+    process.env[match[1]] = value;
+  }
+}
 const checks = await runLocalChecks();
 for (const check of checks.checks) {
   const mark = check.ok ? "✓" : check.required ? "✗" : "!";
@@ -12,8 +23,7 @@ if (!checks.requiredOk) {
   process.exit(1);
 }
 
-const envFile = existsSync(".env");
-const args = [...(envFile ? ["--env-file=.env"] : []), "packages/runtime/src/bridge.js"];
+const args = ["packages/runtime/src/bridge.js"];
 const child = spawn(process.execPath, args, { stdio: "inherit", env: process.env });
 let stopping = false;
 const stop = signal => {
