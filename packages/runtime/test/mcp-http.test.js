@@ -40,7 +40,7 @@ test("browser sessions use separate contexts and unknown session IDs are rejecte
 test("release metadata includes HTTP MCP entry point", async () => {
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
   const httpMcp = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
-  assert.equal(pkg.version, "2.19.0");
+  assert.equal(pkg.version, "2.20.0");
   assert.equal(pkg.scripts["start:mcp:http"], "node packages/mcp-server/src/http.js");
   assert.ok(pkg.scripts.check.includes("node --check packages/mcp-server/src/http.js"));
   assert.ok(httpMcp.includes(`const VERSION = "${pkg.version}"`));
@@ -62,7 +62,7 @@ test("AI client registry persists client metadata and enforces per-key rate limi
   assert.ok(httpMcp.includes('clientId: String(req.headers["x-openfish-client"] || "mcp-http")'));
   assert.ok(admin.includes('api("/api/admin/clients")'));
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "2.19.0");
+  assert.equal(pkg.version, "2.20.0");
   assert.ok(pkg.scripts.check.includes("packages/runtime/src/client-registry.js"));
 });
 
@@ -85,7 +85,7 @@ test("Cloudflare relay is authenticated, allowlisted, bounded, and outbound-only
   assert.ok(agent.includes('http://127.0.0.1:8787'));
   assert.ok(agent.includes('AbortSignal.timeout(40000)'));
   assert.ok(!agent.includes('new URL(message.destination'));
-  assert.equal(pkg.version, "2.19.0");
+  assert.equal(pkg.version, "2.20.0");
   assert.equal(pkg.scripts["start:relay-agent"], "node --env-file=.env packages/runtime/src/relay-agent.js");
   assert.ok(pkg.scripts.check.includes("node --check cloudflare/worker.js"));
 });
@@ -169,6 +169,6 @@ test("AI integration center generates MCP configuration and keeps API key scopes
   assert.ok(app.includes('/api/v1/browser/status'));
   assert.ok(app.includes('Worker 地址必须使用 HTTPS'));
   assert.ok(keys.includes('const SCOPES = new Set(["browser:read", "browser:write"])'));
-  assert.ok(httpMcp.includes('const VERSION = "2.19.0"'));
+  assert.ok(httpMcp.includes('const VERSION = "2.20.0"'));
   assert.ok(httpMcp.includes('Authorization: Bearer API_KEY'));
 });
