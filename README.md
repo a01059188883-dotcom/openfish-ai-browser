@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.16.1**.
+Open-source, free-first browser automation starter. Version: **2.17.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -9,7 +9,7 @@ Open-source, free-first browser automation starter. Version: **2.16.1**.
 - **Local AI planner**: optional Ollama integration (default model `qwen2.5:3b`) creates constrained JSON plans.
 - **Safety defaults**: no credential collection; sensitive fields and potentially irreversible actions are blocked during plan execution.
 
-## AI workbench (2.16.1 integration center)
+## AI workbench (2.17.0 integration center)
 - Integrates page and multi-tab context, model-provider settings, local Skills and Memory, writing, approved browser task plans, workspace snapshots, voice I/O, research search, and file input.
 - Supports Ollama and OpenAI-compatible, Anthropic, and Gemini-style chat endpoints configured by the user. API keys and local Memory/Skills are stored in the browser's local profile; they are not synced between devices.
 - Research uses authenticated Worker endpoints to query DuckDuckGo and Bing, then fetches public web pages for source cross-checking. Public-source fetching is restricted to HTTP(S) hostnames, rejects IP-literal/local targets, and revalidates redirects.
@@ -244,7 +244,7 @@ OpenFish's existing runtime module set includes Chromium/Playwright navigation, 
 Local task records are stored in `.openfish/tasks.json` with atomic file replacement and restrictive permissions. The store retains at most 500 records by default (`OPENFISH_MAX_TASKS` can be set between 50 and 2,000), redacts common credentials, and supports search, detail, and restore. Restored plans return to the review state and always require a new explicit approval. For Cloud Run or other ephemeral container hosting, mount a persistent volume or use a durable database; the container writable layer alone is not a cross-restart or multi-instance store.
 
 
-## AI client integration center (v2.16.1)
+## AI client integration center (v2.17.0)
 
 The local admin dashboard at `http://127.0.0.1:8787/admin` includes an integration configuration generator. Create a separate API key for each client under **API Keys**, choose `browser:read` for read-only access or both `browser:read` and `browser:write` for approved browser actions, then paste the key into **AI Integration** to generate a Streamable HTTP MCP client configuration. The MCP endpoint is `http://127.0.0.1:8788/mcp`; REST tools are available at `http://127.0.0.1:8787/api/v1/tools/<tool_name>`.
 
