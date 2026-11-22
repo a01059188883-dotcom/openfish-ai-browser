@@ -286,7 +286,7 @@ Google Cloud setup is still required once: enable Cloud Run, Cloud Build, Artifa
 
 The engine requires the matching Bearer token and a client-specific `X-OpenFish-Session` header. It isolates browser contexts per session and provides bounded cloud download delivery (15 MB per file, 50 MB in-memory per session). Browser Run fallback remains for compatibility, but its download endpoint returns HTTP 501 because no verified file-transfer implementation exists there.
 
-CI builds the Docker image and validates the Worker bundle without deploying. Production deployment is normally manual (`workflow_dispatch`). The v2.25.0 release also has one explicit, versioned path trigger (`.release/openfish-v2.25.0`) that runs only when this approved release is merged to `main`; ordinary PR merges and unrelated main pushes do not deploy. The workflow requires configured GitHub and Google Cloud credentials. An authenticated health check is not a substitute for testing a real iPhone session and file handoff.
+CI builds the Docker image and validates the Worker bundle without deploying. The v2.25.0 release has one explicit, versioned path trigger (`.release/openfish-v2.25.0`) that publishes the Cloudflare Worker and static frontend when this approved release is merged to `main`; ordinary PR merges and unrelated main pushes do not deploy. The Cloud Run browser engine is unchanged in v2.25.0 and its separate deployment remains manual (`workflow_dispatch`) until GCP Workload Identity and engine-token secrets are configured. The Worker release requires the Cloudflare repository credentials. An authenticated health check is not a substitute for testing a real iPhone session and file handoff.
 
 ## Browser workspace refresh (v2.13.4)
 
