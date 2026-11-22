@@ -179,7 +179,7 @@ test("cloud auth enforces login throttling and keeps raw vault credentials off p
   const allowlistLine = worker.split("\n").find(line => line.includes("const publicAuthPaths"));
   assert.ok(allowlistLine);
   assert.ok(allowlistLine.includes("/api/auth/vault"));
-  assert.ok(allowlistLine.includes("/api/auth/password"));
+  assert.ok(allowlistLine.includes("/api/auth/password"));\n  assert.ok(allowlistLine.includes("/api/auth/vault/backup"));
   assert.equal(allowlistLine.includes("/api/auth/credentials"), false);
   assert.equal(allowlistLine.includes("/api/auth/relay-verify"), false);
   assert.ok(worker.includes("if (!publicAuthPaths.has(url.pathname)) return json"));
@@ -200,7 +200,7 @@ test("cloud browser frontends use HttpOnly login cookies, not a client-side Rela
   assert.equal(mobileAdmin.includes('localStorage.setItem("openfish.relay.token"'), false);
   assert.equal(mobileAdmin.includes('authorization:'), false);
   assert.ok(mobileAdmin.includes("/api/auth/login"));
-  assert.ok(mobileAdmin.includes("/api/auth/password"));
+  assert.ok(mobileAdmin.includes("/api/auth/password"));\n  assert.ok(mobileAdmin.includes("/api/auth/vault/backup"));\n  assert.ok(mobileAdmin.includes("加密备份与恢复"));
   assert.ok(mobileAdmin.includes("修改密码并退出其他设备"));
   assert.ok(mobileAdmin.includes("clearOpenAI"));
   assert.ok(mobileAdmin.includes("删除不再使用的密钥"));
@@ -216,4 +216,30 @@ test("cloud browser frontends use HttpOnly login cookies, not a client-side Rela
   assert.ok(worker.includes("https://api.anthropic.com/v1/messages"));
   assert.ok(worker.includes("https://generativelanguage.googleapis.com/v1beta/models/"));
   assert.ok(worker.includes('if (!sessionCheck.ok) return json({ error: "Cloud login required." }, 401);'));
+});
+
+test("vault backup exports ciphertext only and restores atomically after passphrase verification", async () => {
+  const ctx = makeContext();
+  const password = "owner-password-for-vault-backup-tests";
+  await handleAuthVaultRoute(request("/auth/bootstrap", { method: "POST", body: { bootstrapSecret: env.OPENFISH_BOOTSTRAP_SECRET, username: "owner", password } }), ctx, env);
+  const login = await handleAuthVaultRoute(request("/auth/login", { method: "POST", body: { username: "owner", password } }), ctx, env);
+  const cookie = login.headers.get("set-cookie").split(";")[0];
+  const original = "original-relay-secret-value-that-is-over-32-characters";
+  await handleAuthVaultRoute(request("/auth/vault", { method: "PUT", cookie, body: { secrets: { OPENFISH_RELAY_TOKEN: original } } }), ctx, env);
+  const passphrase = "separate-backup-passphrase-long-enough";
+  const exported = await handleAuthVaultRoute(request("/auth/vault/backup", { method: "POST", cookie, body: { action: "export", passphrase } }), ctx, env);
+  assert.equal(exported.status, 200);
+  const envelope = (await exported.json()).backup;
+  assert.equal(envelope.cipher, "AES-256-GCM");
+  assert.equal(JSON.stringify(envelope).includes(original), false);
+  await handleAuthVaultRoute(request("/auth/vault", { method: "PUT", cookie, body: { secrets: { clear: ["OPENFISH_RELAY_TOKEN"] } } }), ctx, env);
+  const wrong = await handleAuthVaultRoute(request("/auth/vault/backup", { method: "POST", cookie, body: { action: "restore", passphrase: "incorrect-backup-passphrase", backup: envelope } }), ctx, env);
+  assert.equal(wrong.status, 500);
+  assert.equal((await (await handleAuthVaultRoute(request("/auth/credentials", { method: "POST", cookie }), ctx, env)).json()).secrets.OPENFISH_RELAY_TOKEN, undefined);
+  const restored = await handleAuthVaultRoute(request("/auth/vault/backup", { method: "POST", cookie, body: { action: "restore", passphrase, backup: envelope } }), ctx, env);
+  assert.equal(restored.status, 200);
+  const credentials = await handleAuthVaultRoute(request("/auth/credentials", { method: "POST", cookie }), ctx, env);
+  assert.equal((await credentials.json()).secrets.OPENFISH_RELAY_TOKEN, original);
+  const malformed = await handleAuthVaultRoute(request("/auth/vault/backup", { method: "POST", cookie, body: { action: "restore", passphrase, backup: { ...envelope, version: 999 } } }), ctx, env);
+  assert.equal(malformed.status, 400);
 });
