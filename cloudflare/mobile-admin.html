@@ -26,6 +26,7 @@ npm run start:relay-agent</pre><small>保持电脑开机、网络连接正常，
 </main>
 <script>
 (()=>{const $=id=>document.getElementById(id);let plan=null;let currentTaskId=null;let busy=false;let authenticated=false;
+for(const key of ["openfish.mobileAdminToken","openfish.relay.token"]){localStorage.removeItem(key);sessionStorage.removeItem(key)}
 function message(text,kind=""){const el=$("message");el.textContent=text;el.className="status "+kind}
 const ADMIN_SESSION_KEY="openfish.admin.browser.session";let adminSession=sessionStorage.getItem(ADMIN_SESSION_KEY)||"";if(!/^[a-zA-Z0-9_-]{8,80}$/.test(adminSession)){adminSession=crypto.randomUUID();sessionStorage.setItem(ADMIN_SESSION_KEY,adminSession)}
 async function api(path,body,method){const verb=method||(body===undefined?"GET":"POST");const res=await fetch(path,{method:verb,credentials:"same-origin",headers:{"x-openfish-session":adminSession,...(body===undefined?{}:{"content-type":"application/json"})},body:body===undefined?undefined:JSON.stringify(body),cache:"no-store"});const data=await res.json().catch(()=>({}));if(!res.ok)throw Error(data.error||("HTTP "+res.status));return data}
