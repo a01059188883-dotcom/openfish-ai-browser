@@ -5,8 +5,8 @@ import { chromium } from "playwright";
 
 export async function loadLocalEnv() {
   if (!existsSync(".env")) return;
-  for (const line of (await readFile(".env", "utf8")).split(/\\r?\\n/)) {
-    const match = /^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(.*)\\s*$/.exec(line);
+  for (const line of (await readFile(".env", "utf8")).split(/\r?\n/)) {
+    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
     if (!match || Object.hasOwn(process.env, match[1])) continue;
     let value = match[2];
     if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
