@@ -1,0 +1,6 @@
+OpenFish v2.25.0 one-time production release marker.
+
+This file is intentionally a dedicated GitHub Actions path trigger. Merging the
+approved v2.25.0 release to main runs the authenticated Cloud Run + Cloudflare
+deployment workflow once. Do not edit or remove this file after release; future
+releases must use a new versioned marker path.
