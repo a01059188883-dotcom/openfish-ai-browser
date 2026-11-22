@@ -182,15 +182,12 @@ The optional Cloudflare relay lets a local OpenFish runtime make an **outbound-o
 2. Create a long random relay secret (at least 32 characters) and store it securely.
 3. Set the Worker secret: `npx wrangler secret put OPENFISH_RELAY_TOKEN --config cloudflare/wrangler.toml`.
 4. Deploy: `npm run deploy:relay`. Wrangler provisions the SQLite-backed Durable Object namespace from the migration in `cloudflare/wrangler.toml`.
-5. On the computer running OpenFish, create a local API key in the admin panel with **read and write** scopes. Keep it separate from the relay token.
-6. Set these environment variables on that computer:
+5. On the computer running OpenFish, add these two values to the local `.env` file:
    - `OPENFISH_RELAY_URL=wss://YOUR-WORKER.workers.dev/agent/connect`
    - `OPENFISH_RELAY_TOKEN=the-same-long-random-relay-secret`
-   - `OPENFISH_LOCAL_API_KEY=your-local-OpenFish-API-key`
-   - optionally `OPENFISH_BRIDGE_URL=http://127.0.0.1:8787` and `OPENFISH_MCP_URL=http://127.0.0.1:8788/mcp`
-7. Start the bridge, HTTP MCP server, and then `npm run start:relay-agent`.
+6. Run `npm run start:local` once. The launcher starts Bridge, HTTP MCP and the outbound Relay Agent together. It automatically provisions a least-privilege local API key for the agent, verifies it, and stores it in `.openfish/relay-agent-key` with owner-only file permissions. You do not need to create or copy `OPENFISH_LOCAL_API_KEY` manually; it remains available as an optional override.
 
-Remote MCP endpoint: `https://YOUR-WORKER.workers.dev/mcp`. Remote clients use `Authorization: Bearer RELAY_TOKEN`; the local agent injects its separately stored local API key when forwarding to the local MCP server. The relay currently supports stateless JSON MCP requests and allowlisted REST discovery/tool routes; it buffers responses and caps request/response bodies at 512 KB with a 45-second relay timeout. It is not a general-purpose TCP tunnel or arbitrary URL proxy.
+Remote MCP endpoint: `https://YOUR-WORKER.workers.dev/mcp`. Remote clients use `Authorization: Bearer RELAY_TOKEN`; the local agent injects its separately stored local API key when forwarding to the local MCP server. The relay currently supports stateless JSON MCP requests and allowlisted REST discovery/tool routes; it buffers responses and caps request/response bodies at 512 KB with a 45-second relay timeout. It is not a general-purpose TCP tunnel or arbitrary URL proxy. Remote browser control remains authenticated; do not expose an anonymous browser-control URL.
 
 ### Relay security and limitations
 
