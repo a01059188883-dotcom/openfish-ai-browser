@@ -248,4 +248,27 @@ Local task records are stored in `.openfish/tasks.json` with atomic file replace
 
 The local admin dashboard at `http://127.0.0.1:8787/admin` includes an integration configuration generator. Create a separate API key for each client under **API Keys**, choose `browser:read` for read-only access or both `browser:read` and `browser:write` for approved browser actions, then paste the key into **AI Integration** to generate a Streamable HTTP MCP client configuration. The MCP endpoint is `http://127.0.0.1:8788/mcp`; REST tools are available at `http://127.0.0.1:8787/api/v1/tools/<tool_name>`.
 
-The generated configuration keeps the API key in the client configuration as a Bearer header. The server stores only a SHA-256 digest and shows the raw key only once. Revoke a client key from the local admin panel to disable that client. Use a unique key per application and least-privilege scopes. The local MCP listener binds to `127.0.0.1` by default. Prefer SSH local port forwarding (for example, `ssh -L 8787:127.0.0.1:8787 -L 8788:127.0.0.1:8788 user@host`) so the client continues to connect to its own `127.0.0.1`. Do not expose the local ports directly to the public internet. The Cloudflare Relay Token is a separate credential and is not interchangeable with an `ofb_live_` API key.
+The generated configuration keeps the API key in the client configuration as a Bearer header. For Cursor / Cherry Studio, use the `mcpServers` format:
+```json
+{
+  "mcpServers": {
+    "openfish-browser": {
+      "url": "http://127.0.0.1:8788/mcp",
+      "headers": { "Authorization": "Bearer YOUR_OPENFISH_API_KEY" }
+    }
+  }
+}
+```
+For Visual Studio Code, use its native `servers` format:
+```json
+{
+  "servers": {
+    "openfish-browser": {
+      "type": "http",
+      "url": "http://127.0.0.1:8788/mcp",
+      "headers": { "Authorization": "Bearer YOUR_OPENFISH_API_KEY" }
+    }
+  }
+}
+```
+For REST, send `POST http://127.0.0.1:8787/api/v1/tools/read_page` with `Authorization: Bearer YOUR_OPENFISH_API_KEY` and `Content-Type: application/json`; the JSON body can be `{}` for the current page. Choose the read-only scope for read tools; browser actions require the write scope. The server stores only a SHA-256 digest and shows the raw key only once. Revoke a client key from the local admin panel to disable that client. Use a unique key per application and least-privilege scopes. The local MCP listener binds to `127.0.0.1` by default. Prefer SSH local port forwarding (for example, `ssh -L 8787:127.0.0.1:8787 -L 8788:127.0.0.1:8788 user@host`) so the client continues to connect to its own `127.0.0.1`. Do not expose the local ports directly to the public internet. The Cloudflare Relay Token is a separate credential and is not interchangeable with an `ofb_live_` API key.
