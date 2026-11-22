@@ -6,7 +6,11 @@ import { z } from "zod";
 const PORT = Number(process.env.OPENFISH_MCP_HTTP_PORT || 8788);
 const HOST = process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1";
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const VERSION = "2.14.2";
+const VERSION = "2.25.0";
+const LOCAL_NO_AUTH = process.env.OPENFISH_LOCAL_NO_AUTH !== "false" && ["127.0.0.1", "::1", "localhost"].includes(HOST);
+function isLoopbackAddress(address = "") {
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1" || address.startsWith("::ffff:127.");
+}
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -37,7 +41,7 @@ async function bridgeRequest(path, { token, sessionId, clientId, platform, body,
     response = await fetch(`${BRIDGE}${path}`, {
       method,
       headers: {
-        authorization: `Bearer ${token}`,
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
         "x-openfish-session": sessionId,
         "x-openfish-client": clientId,
         "x-openfish-platform": platform,
@@ -75,7 +79,7 @@ function toolResult(value) {
 function createMcpServer(token, sessionId, clientMeta) {
   const server = new McpServer({ name: "openfish-ai-browser-http", version: VERSION });
   const call = async (name, args = {}, write = false) => {
-    if (write) {
+    if (write && token) {
       await verifyKey(token, "browser:write", { ...clientMeta, sessionId });
     }
     return toolResult(await bridgeRequest(`/api/v1/tools/${name}`, { token, sessionId, ...clientMeta, body: args }));
@@ -88,7 +92,8 @@ function createMcpServer(token, sessionId, clientMeta) {
       action: z.enum(["navigate", "click", "fill", "inspect"]), url: z.string().optional(),
       selector: z.string().optional(), value: z.string().optional(), reason: z.string().optional()
     }).passthrough()).max(8) }),
-    approved: z.literal(true).describe("Only true after explicit user approval of this exact plan.")
+    approved: z.literal(true).describe("Only true after explicit user approval of this exact plan."),
+    taskId: z.string().uuid().optional()
   }, args => call("execute_plan", args, true));
   server.tool("click_element", "Click a unique visible button-like target after explicit approval.", {
     selector: z.string().min(1).max(500), approved: z.literal(true)
@@ -143,20 +148,28 @@ const httpServer = http.createServer(async (req, res) => {
   if (!["POST", "GET", "DELETE"].includes(req.method || "")) {
     res.writeHead(405, { allow: "GET, POST, DELETE" }); return res.end();
   }
+  const host = String(req.headers.host || "");
+  const localHosts = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`, `[::1]:${PORT}`]);
+  const origin = String(req.headers.origin || "");
+  const localOrigins = new Set([`http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`, `http://[::1]:${PORT}`]);
+  const localNoAuthRequest = LOCAL_NO_AUTH && isLoopbackAddress(req.socket.remoteAddress) && req.headers["x-openfish-platform"] !== "cloudflare-relay" && localHosts.has(host) && (!origin || localOrigins.has(origin));
   const bearer = /^Bearer (.+)$/i.exec(req.headers.authorization || "");
-  if (!bearer) return sendError(res, 401, "Authorization: Bearer API_KEY is required.");
+  const token = localNoAuthRequest ? "" : (bearer?.[1] || "");
   const sessionId = req.headers["x-openfish-session"] || "default";
   const clientMeta = {
     clientId: String(req.headers["x-openfish-client"] || "mcp-http").slice(0, 80),
     platform: String(req.headers["x-openfish-platform"] || "mcp-http").slice(0, 40)
   };
   if (sessionId !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) return sendError(res, 400, "Invalid browser session ID.");
-  try { await verifyKey(bearer[1], "browser:read", { ...clientMeta, sessionId }); }
-  catch (error) { return sendError(res, error.statusCode || 401, error.message); }
+  if (!localNoAuthRequest) {
+    if (!token) return sendError(res, 401, "Authorization: Bearer API_KEY is required outside local no-token mode.");
+    try { await verifyKey(token, "browser:read", { ...clientMeta, sessionId }); }
+    catch (error) { return sendError(res, error.statusCode || 401, error.message); }
+  }
   try {
     const body = req.method === "POST" ? await readBody(req) : undefined;
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-    const server = createMcpServer(bearer[1], sessionId, clientMeta);
+    const server = createMcpServer(token, sessionId, clientMeta);
     await server.connect(transport);
     await transport.handleRequest(req, res, body);
   } catch (error) {

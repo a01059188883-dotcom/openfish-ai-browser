@@ -2,6 +2,7 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { getPage, getBrowserStatus, runWithBrowserSession, createBrowserSession, listBrowserSessions, closeBrowserSession, hasBrowserSession, listBrowserTabs, createBrowserTab, switchBrowserTab, closeBrowserTab, getPageDiagnostics, clearPageDiagnostics, listRecentlyClosedTabs, duplicateBrowserTab, reopenClosedBrowserTab, saveCurrentWorkspace, getSavedWorkspaces, restoreSavedWorkspace, clearSessionData } from "./browser.js";
 import { runTask, getPageContext } from "./task.js";
+import { createTask, updateTask, getTask, listTasks, restoreTask } from "./task-store.js";
 import { createPlan } from "./ai-planner.js";
 import { executePlan } from "./executor.js";
 import { validateHttpUrl } from "./safety.js";
@@ -11,7 +12,42 @@ import { downloadLink, listDownloads, removeDownload } from "./download-manager.
 import { addBookmark, listBookmarks, removeBookmark, listHistory, clearHistory, addReadingItem, listReadingItems, removeReadingItem, setTabOrganization, getLibraryStats, removeWorkspace, exportBrowserLibrary, importBrowserLibrary } from "./browser-library.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const VERSION = "2.14.2";
+const VERSION = "2.25.0";
+const LOCAL_NO_AUTH = process.env.OPENFISH_LOCAL_NO_AUTH !== "false";
+function isLoopbackAddress(address = "") {
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1" || address.startsWith("::ffff:127.");
+}
+const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
+const MODEL = process.env.OPENFISH_MODEL || "qwen2.5:3b";
+let ollamaCache = null;
+let extensionLastSeenAt = null;
+let extensionVersion = null;
+async function testOllamaModel() {
+  const base = OLLAMA_URL.endsWith("/") ? OLLAMA_URL.slice(0, -1) : OLLAMA_URL;
+  const started = Date.now();
+  const response = await fetch(`${base}/api/generate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: MODEL, prompt: "Reply with exactly: OK", stream: false, options: { num_predict: 8 } }), signal: AbortSignal.timeout(12000) });
+  if (!response.ok) throw new Error(`Ollama HTTP ${response.status}`);
+  const data = await response.json();
+  const answer = String(data.response || "").trim();
+  if (!answer) throw new Error("Ollama returned an empty model response.");
+  return { ok: true, model: MODEL, response: answer.slice(0, 160), durationMs: Date.now() - started };
+}
+async function getOllamaStatus() {
+  if (ollamaCache && Date.now() - ollamaCache.checkedAtMs < 15000) return ollamaCache.value;
+  try {
+    const response = await fetch(`${OLLAMA_URL.endsWith("/") ? OLLAMA_URL.slice(0, -1) : OLLAMA_URL}/api/tags`, { signal: AbortSignal.timeout(2500) });
+    if (!response.ok) throw new Error(`Ollama HTTP ${response.status}`);
+    const payload = await response.json();
+    const models = Array.isArray(payload.models) ? payload.models.map(item => item.name).filter(Boolean) : [];
+    const value = { reachable: true, model: MODEL, modelInstalled: models.some(name => name === MODEL || name.startsWith(MODEL + ":")), installedModels: models.slice(0, 30), checkedAt: new Date().toISOString() };
+    ollamaCache = { checkedAtMs: Date.now(), value };
+    return value;
+  } catch (error) {
+    const value = { reachable: false, model: MODEL, modelInstalled: false, installedModels: [], error: String(error.message || error).slice(0, 180), checkedAt: new Date().toISOString() };
+    ollamaCache = { checkedAtMs: Date.now(), value };
+    return value;
+  }
+}
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`]);
 const startedAt = Date.now();
 const metrics = { requests: 0, errors: 0, events: [] };
@@ -73,7 +109,7 @@ function readBody(req) {
 }
 
 
-const TOOL_CATALOG = [{"name":"open_page","description":"Navigate the shared browser to a public HTTP(S) URL.","inputSchema":{"type":"object","properties":{"url":{"type":"string","format":"uri"}},"required":["url"],"additionalProperties":false},"approval":"not_required"},{"name":"read_page","description":"Read title, URL, and visible page text.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"plan_task","description":"Create a proposed browser action plan. Does not execute it.","inputSchema":{"type":"object","properties":{"goal":{"type":"string","minLength":1,"maxLength":2000}},"required":["goal"],"additionalProperties":false},"approval":"not_required"},{"name":"execute_plan","description":"Execute a reviewed plan. Requires explicit approval of the exact plan.","inputSchema":{"type":"object","properties":{"plan":{"type":"object"},"approved":{"type":"boolean","const":true}},"required":["plan","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"list_interactive_elements","description":"List visible interactive page elements.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"get_accessibility_snapshot","description":"Read page headings and landmarks.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"go_back","description":"Go back one page in the current browser tab.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"go_forward","description":"Go forward one page in the current browser tab.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"reload_page","description":"Reload the current browser page.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"list_tabs","description":"List tabs in the current isolated browser session.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"new_tab","description":"Open a new tab, optionally navigating to a public HTTP(S) URL.","inputSchema":{"type":"object","properties":{"url":{"type":"string","format":"uri"}},"additionalProperties":false},"approval":"not_required"},{"name":"switch_tab","description":"Switch the active tab by its current list index.","inputSchema":{"type":"object","properties":{"index":{"type":"integer","minimum":0}},"required":["index"],"additionalProperties":false},"approval":"not_required"},{"name":"close_tab","description":"Close a tab by its current list index after explicit approval.","inputSchema":{"type":"object","properties":{"index":{"type":"integer","minimum":0},"approved":{"type":"boolean","const":true}},"required":["index","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"click_element","description":"Click a unique visible button-like element; requires explicit approval.","inputSchema":{"type":"object","properties":{"selector":{"type":"string","minLength":1,"maxLength":500},"approved":{"type":"boolean","const":true}},"required":["selector","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"fill_element","description":"Fill a unique ordinary field; requires explicit approval.","inputSchema":{"type":"object","properties":{"selector":{"type":"string","minLength":1,"maxLength":500},"value":{"type":"string","maxLength":10000},"approved":{"type":"boolean","const":true}},"required":["selector","value","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"take_screenshot","description":"Capture the current browser viewport.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"list_bookmarks","description":"List local bookmarks.","inputSchema":{"type":"object","properties":{"query":{"type":"string","maxLength":200}},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"add_bookmark","description":"Save a public URL as a local bookmark.","inputSchema":{"type":"object","properties":{"url":{"type":"string","format":"uri"},"title":{"type":"string","maxLength":180}},"required":["url"],"additionalProperties":false},"approval":"not_required"},{"name":"remove_bookmark","description":"Remove a bookmark after explicit approval.","inputSchema":{"type":"object","properties":{"id":{"type":"string"},"approved":{"type":"boolean","const":true}},"required":["id","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"list_history","description":"Search local browsing history.","inputSchema":{"type":"object","properties":{"query":{"type":"string","maxLength":200},"limit":{"type":"integer","minimum":1,"maximum":500}},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"clear_history","description":"Clear local history after explicit approval.","inputSchema":{"type":"object","properties":{"approved":{"type":"boolean","const":true}},"required":["approved"],"additionalProperties":false},"approval":"explicit"},{"name":"list_reading_list","description":"List pages saved for later reading.","inputSchema":{"type":"object","properties":{"query":{"type":"string","maxLength":200}},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"add_reading_item","description":"Save a page for later reading.","inputSchema":{"type":"object","properties":{"url":{"type":"string","format":"uri"},"title":{"type":"string","maxLength":180},"note":{"type":"string","maxLength":500}},"required":["url"],"additionalProperties":false},"approval":"not_required"},{"name":"remove_reading_item","description":"Remove a reading-list item after explicit approval.","inputSchema":{"type":"object","properties":{"id":{"type":"string"},"approved":{"type":"boolean","const":true}},"required":["id","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"organize_tab","description":"Set tab group label and/or pinned state after explicit approval.","inputSchema":{"type":"object","properties":{"url":{"type":"string","format":"uri"},"groupName":{"type":"string","maxLength":40},"pinned":{"type":"boolean"},"approved":{"type":"boolean","const":true}},"required":["url","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"get_page_diagnostics","description":"Read recent console errors, page exceptions, failed requests, and HTTP errors for the active page.","inputSchema":{"type":"object","properties":{"limit":{"type":"integer","minimum":1,"maximum":100}},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"clear_page_diagnostics","description":"Clear captured diagnostics for the active page.","inputSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"extract_reader_content","description":"Extract a clean reading view from the active page, including title, description, headings, and article text.","inputSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"find_in_page","description":"Find occurrences of a phrase in the active page text.","inputSchema":{"type":"object","properties":{"query":{"type":"string","minLength":1,"maxLength":200}},"required":["query"],"additionalProperties":false},"approval":"not_required"},{"name":"get_page_performance","description":"Read navigation timing and resource-transfer summaries for the active page.","inputSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"list_recently_closed_tabs","description":"List recently closed tabs that can be restored.","inputSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"duplicate_tab","description":"Duplicate a browser tab by its current list index.","inputSchema":{"type":"object","properties":{"index":{"type":"integer","minimum":0}},"required":["index"],"additionalProperties":false},"approval":"not_required"},{"name":"reopen_closed_tab","description":"Restore the most recently closed tab after explicit approval.","inputSchema":{"type":"object","properties":{"approved":{"type":"boolean","const":true}},"required":["approved"],"additionalProperties":false},"approval":"explicit"},{"name":"search_tabs","description":"Search open tabs by title, URL, or group label.","inputSchema":{"type":"object","properties":{"query":{"type":"string","minLength":1,"maxLength":200}},"required":["query"],"additionalProperties":false},"approval":"not_required"},{"name":"save_workspace","description":"Save the currently open public tabs as a named local workspace.","inputSchema":{"type":"object","properties":{"name":{"type":"string","minLength":1,"maxLength":60}},"required":["name"],"additionalProperties":false},"approval":"not_required"},{"name":"list_workspaces","description":"List saved local browser workspaces.","inputSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"restore_workspace","description":"Restore a saved workspace by opening its saved URLs; requires explicit approval.","inputSchema":{"type":"object","properties":{"id":{"type":"string"},"approved":{"type":"boolean","const":true}},"required":["id","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"remove_workspace","description":"Delete a saved workspace after explicit approval.","inputSchema":{"type":"object","properties":{"id":{"type":"string"},"approved":{"type":"boolean","const":true}},"required":["id","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"download_link","description":"Download a file from one unique visible link in the active page after explicit approval.","inputSchema":{"type":"object","properties":{"selector":{"type":"string","minLength":1,"maxLength":500},"approved":{"type":"boolean","const":true}},"required":["selector","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"list_downloads","description":"List files downloaded and managed by OpenFish.","inputSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"remove_download","description":"Delete a managed downloaded file after explicit approval.","inputSchema":{"type":"object","properties":{"id":{"type":"string"},"approved":{"type":"boolean","const":true}},"required":["id","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"clear_session_data","description":"Clear cookies and site storage for the active isolated browser session after explicit approval.","inputSchema":{"type":"object","properties":{"approved":{"type":"boolean","const":true}},"required":["approved"],"additionalProperties":false},"approval":"explicit"},{"name":"export_browser_library","description":"Export local bookmarks, browsing history, reading list, tab organization, and workspaces as a JSON backup. Does not include cookies or downloaded files.","inputSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"import_browser_library","description":"Merge a validated JSON backup into the local browser library after explicit approval.","inputSchema":{"type":"object","properties":{"data":{"type":"object"},"approved":{"type":"boolean","const":true}},"required":["data","approved"],"additionalProperties":false},"approval":"explicit"}];
+const TOOL_CATALOG = [{"name":"open_page","description":"Navigate the shared browser to a public HTTP(S) URL.","inputSchema":{"type":"object","properties":{"url":{"type":"string","format":"uri"}},"required":["url"],"additionalProperties":false},"approval":"not_required"},{"name":"read_page","description":"Read title, URL, and visible page text.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"plan_task","description":"Create a proposed browser action plan. Does not execute it.","inputSchema":{"type":"object","properties":{"goal":{"type":"string","minLength":1,"maxLength":2000}},"required":["goal"],"additionalProperties":false},"approval":"not_required"},{"name":"execute_plan","description":"Execute a reviewed plan. Requires explicit approval of the exact plan.","inputSchema":{"type":"object","properties":{"plan":{"type":"object"},"approved":{"type":"boolean","const":true},"taskId":{"type":"string","format":"uuid"}},"required":["plan","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"list_interactive_elements","description":"List visible interactive page elements.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"get_accessibility_snapshot","description":"Read page headings and landmarks.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"go_back","description":"Go back one page in the current browser tab.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"go_forward","description":"Go forward one page in the current browser tab.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"reload_page","description":"Reload the current browser page.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"list_tabs","description":"List tabs in the current isolated browser session.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"new_tab","description":"Open a new tab, optionally navigating to a public HTTP(S) URL.","inputSchema":{"type":"object","properties":{"url":{"type":"string","format":"uri"}},"additionalProperties":false},"approval":"not_required"},{"name":"switch_tab","description":"Switch the active tab by its current list index.","inputSchema":{"type":"object","properties":{"index":{"type":"integer","minimum":0}},"required":["index"],"additionalProperties":false},"approval":"not_required"},{"name":"close_tab","description":"Close a tab by its current list index after explicit approval.","inputSchema":{"type":"object","properties":{"index":{"type":"integer","minimum":0},"approved":{"type":"boolean","const":true}},"required":["index","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"click_element","description":"Click a unique visible button-like element; requires explicit approval.","inputSchema":{"type":"object","properties":{"selector":{"type":"string","minLength":1,"maxLength":500},"approved":{"type":"boolean","const":true}},"required":["selector","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"fill_element","description":"Fill a unique ordinary field; requires explicit approval.","inputSchema":{"type":"object","properties":{"selector":{"type":"string","minLength":1,"maxLength":500},"value":{"type":"string","maxLength":10000},"approved":{"type":"boolean","const":true}},"required":["selector","value","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"take_screenshot","description":"Capture the current browser viewport.","inputSchema":{"type":"object","properties":{},"additionalProperties":false},"approval":"not_required"},{"name":"list_bookmarks","description":"List local bookmarks.","inputSchema":{"type":"object","properties":{"query":{"type":"string","maxLength":200}},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"add_bookmark","description":"Save a public URL as a local bookmark.","inputSchema":{"type":"object","properties":{"url":{"type":"string","format":"uri"},"title":{"type":"string","maxLength":180}},"required":["url"],"additionalProperties":false},"approval":"not_required"},{"name":"remove_bookmark","description":"Remove a bookmark after explicit approval.","inputSchema":{"type":"object","properties":{"id":{"type":"string"},"approved":{"type":"boolean","const":true}},"required":["id","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"list_history","description":"Search local browsing history.","inputSchema":{"type":"object","properties":{"query":{"type":"string","maxLength":200},"limit":{"type":"integer","minimum":1,"maximum":500}},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"clear_history","description":"Clear local history after explicit approval.","inputSchema":{"type":"object","properties":{"approved":{"type":"boolean","const":true}},"required":["approved"],"additionalProperties":false},"approval":"explicit"},{"name":"list_reading_list","description":"List pages saved for later reading.","inputSchema":{"type":"object","properties":{"query":{"type":"string","maxLength":200}},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"add_reading_item","description":"Save a page for later reading.","inputSchema":{"type":"object","properties":{"url":{"type":"string","format":"uri"},"title":{"type":"string","maxLength":180},"note":{"type":"string","maxLength":500}},"required":["url"],"additionalProperties":false},"approval":"not_required"},{"name":"remove_reading_item","description":"Remove a reading-list item after explicit approval.","inputSchema":{"type":"object","properties":{"id":{"type":"string"},"approved":{"type":"boolean","const":true}},"required":["id","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"organize_tab","description":"Set tab group label and/or pinned state after explicit approval.","inputSchema":{"type":"object","properties":{"url":{"type":"string","format":"uri"},"groupName":{"type":"string","maxLength":40},"pinned":{"type":"boolean"},"approved":{"type":"boolean","const":true}},"required":["url","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"get_page_diagnostics","description":"Read recent console errors, page exceptions, failed requests, and HTTP errors for the active page.","inputSchema":{"type":"object","properties":{"limit":{"type":"integer","minimum":1,"maximum":100}},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"clear_page_diagnostics","description":"Clear captured diagnostics for the active page.","inputSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"extract_reader_content","description":"Extract a clean reading view from the active page, including title, description, headings, and article text.","inputSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"find_in_page","description":"Find occurrences of a phrase in the active page text.","inputSchema":{"type":"object","properties":{"query":{"type":"string","minLength":1,"maxLength":200}},"required":["query"],"additionalProperties":false},"approval":"not_required"},{"name":"get_page_performance","description":"Read navigation timing and resource-transfer summaries for the active page.","inputSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"list_recently_closed_tabs","description":"List recently closed tabs that can be restored.","inputSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"duplicate_tab","description":"Duplicate a browser tab by its current list index.","inputSchema":{"type":"object","properties":{"index":{"type":"integer","minimum":0}},"required":["index"],"additionalProperties":false},"approval":"not_required"},{"name":"reopen_closed_tab","description":"Restore the most recently closed tab after explicit approval.","inputSchema":{"type":"object","properties":{"approved":{"type":"boolean","const":true}},"required":["approved"],"additionalProperties":false},"approval":"explicit"},{"name":"search_tabs","description":"Search open tabs by title, URL, or group label.","inputSchema":{"type":"object","properties":{"query":{"type":"string","minLength":1,"maxLength":200}},"required":["query"],"additionalProperties":false},"approval":"not_required"},{"name":"save_workspace","description":"Save the currently open public tabs as a named local workspace.","inputSchema":{"type":"object","properties":{"name":{"type":"string","minLength":1,"maxLength":60}},"required":["name"],"additionalProperties":false},"approval":"not_required"},{"name":"list_workspaces","description":"List saved local browser workspaces.","inputSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"restore_workspace","description":"Restore a saved workspace by opening its saved URLs; requires explicit approval.","inputSchema":{"type":"object","properties":{"id":{"type":"string"},"approved":{"type":"boolean","const":true}},"required":["id","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"remove_workspace","description":"Delete a saved workspace after explicit approval.","inputSchema":{"type":"object","properties":{"id":{"type":"string"},"approved":{"type":"boolean","const":true}},"required":["id","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"download_link","description":"Download a file from one unique visible link in the active page after explicit approval.","inputSchema":{"type":"object","properties":{"selector":{"type":"string","minLength":1,"maxLength":500},"approved":{"type":"boolean","const":true}},"required":["selector","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"list_downloads","description":"List files downloaded and managed by OpenFish.","inputSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"remove_download","description":"Delete a managed downloaded file after explicit approval.","inputSchema":{"type":"object","properties":{"id":{"type":"string"},"approved":{"type":"boolean","const":true}},"required":["id","approved"],"additionalProperties":false},"approval":"explicit"},{"name":"clear_session_data","description":"Clear cookies and site storage for the active isolated browser session after explicit approval.","inputSchema":{"type":"object","properties":{"approved":{"type":"boolean","const":true}},"required":["approved"],"additionalProperties":false},"approval":"explicit"},{"name":"export_browser_library","description":"Export local bookmarks, browsing history, reading list, tab organization, and workspaces as a JSON backup. Does not include cookies or downloaded files.","inputSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false},"approval":"not_required"},{"name":"import_browser_library","description":"Merge a validated JSON backup into the local browser library after explicit approval.","inputSchema":{"type":"object","properties":{"data":{"type":"object"},"approved":{"type":"boolean","const":true}},"required":["data","approved"],"additionalProperties":false},"approval":"explicit"}];
 function adapterTools(kind) {
   if (kind === "openai") return TOOL_CATALOG.map(t => ({ type: "function", function: { name: t.name, description: t.description + (t.approval === "explicit" ? " Explicit user approval is required." : ""), parameters: t.inputSchema, strict: true } }));
   if (kind === "anthropic") return TOOL_CATALOG.map(t => ({ name: t.name, description: t.description + (t.approval === "explicit" ? " Explicit user approval is required." : ""), input_schema: t.inputSchema }));
@@ -91,12 +127,24 @@ async function invokeTool(name, args = {}) {
     const page = await getPage(); return { title: await page.title().catch(() => ""), url: page.url(), text: (await page.locator("body").innerText().catch(() => "")).slice(0,20000) };
   }
   if (name === "plan_task") {
-    const plan = await createPlan(a.goal, await getPageContext());
-    return { status: "plan_ready_for_review", ...plan, warning: "No action has been executed." };
+    const page = await getPageContext();
+    const plan = await createPlan(a.goal, page);
+    const task = await createTask({ goal: a.goal, plan, page: { title: page.title, url: page.url }, source: "mcp" });
+    return { status: "plan_ready_for_review", ...plan, taskId: task.id, warning: "No action has been executed." };
   }
   if (name === "execute_plan") {
     if (a.approved !== true) throw Object.assign(new Error("Explicit approval of the exact plan is required."), { statusCode: 403 });
-    return executePlan(a.plan, { approved: true });
+    const task = a.taskId ? await getTask(a.taskId) : await createTask({ goal: a.goal || "MCP approved browser plan", plan: a.plan, source: "mcp" });
+    await updateTask(task.id, { status: "approved", plan: a.plan, message: "Explicit approval received" });
+    await updateTask(task.id, { status: "running", message: "Execution started" });
+    try {
+      const result = await executePlan(a.plan, { approved: true });
+      await updateTask(task.id, { status: result.status === "completed" ? "succeeded" : "stopped", result, message: result.status });
+      return { ...result, taskId: task.id };
+    } catch (error) {
+      await updateTask(task.id, { status: "failed", error: error.message, message: "Execution failed" });
+      throw error;
+    }
   }
   if (name === "click_element" || name === "fill_element") {
     if (a.approved !== true) throw Object.assign(new Error("Explicit approval is required."), { statusCode: 403 });
@@ -170,7 +218,7 @@ const server = http.createServer(async (req, res) => {
   if (!ALLOWED_HOSTS.has(host)) return send(res, 403, { error: "Unexpected Host header." });
   const allowedOrigin = process.env.ALLOWED_EXTENSION_ORIGIN || "";
   const localOrigins = new Set([`http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`]);
-  const isExtensionOrigin = origin.startsWith("chrome-extension://") && (!allowedOrigin || origin === allowedOrigin);
+  const isExtensionOrigin = origin.startsWith("chrome-extension://") && Boolean(allowedOrigin) && origin === allowedOrigin;
   if (origin && !localOrigins.has(origin) && !isExtensionOrigin) {
     return send(res, 403, { error: "Origin not allowed. Set ALLOWED_EXTENSION_ORIGIN to your extension ID origin." });
   }
@@ -241,18 +289,32 @@ const server = http.createServer(async (req, res) => {
       const name = res.reqPath.slice("/api/v1/tools/".length);
       const body = await readBody(req);
       const writeTools = new Set(["open_page", "execute_plan", "click_element", "fill_element", "go_back", "go_forward", "reload_page", "new_tab", "switch_tab", "close_tab", "add_bookmark", "remove_bookmark", "clear_history", "add_reading_item", "remove_reading_item", "organize_tab", "duplicate_tab", "reopen_closed_tab", "save_workspace", "restore_workspace", "remove_workspace", "download_link", "remove_download", "clear_session_data", "import_browser_library"]);
-      const requiredScope = writeTools.has(name) ? "browser:write" : "browser:read";
-      const bearer = /^Bearer (.+)$/i.exec(req.headers.authorization || "");
-      const identity = await authenticateApiKey(bearer?.[1], requiredScope);
-      if (!identity) return send(res, 401, { error: "A valid OpenFish API key is required.", code: "API_KEY_REQUIRED" });
-      if (identity.forbidden) return send(res, 403, { error: `API key lacks the ${requiredScope} scope.`, code: "INSUFFICIENT_SCOPE" });
-      await registerClient(identity, { clientId: req.headers["x-openfish-client"], platform: req.headers["x-openfish-platform"], sessionId: requestedSession });
-      const rate = checkClientRateLimit(identity.id, Number(process.env.OPENFISH_RATE_LIMIT_PER_MINUTE || 120));
-      res.reqRateHeaders = { "x-ratelimit-limit": String(rate.limit), "x-ratelimit-remaining": String(rate.remaining), "x-ratelimit-reset": rate.resetAt };
-      if (!rate.allowed) { res.setHeader("retry-after", String(rate.retryAfterSeconds)); return send(res, 429, { error: "API key rate limit exceeded.", code: "RATE_LIMITED", retryAfterSeconds: rate.retryAfterSeconds }); }
+      const localNoAuth = LOCAL_NO_AUTH && isLoopbackAddress(req.socket.remoteAddress) && req.headers["x-openfish-platform"] !== "cloudflare-relay";
+      if (!localNoAuth) {
+        const requiredScope = writeTools.has(name) ? "browser:write" : "browser:read";
+        const bearer = /^Bearer (.+)$/i.exec(req.headers.authorization || "");
+        const identity = await authenticateApiKey(bearer?.[1], requiredScope);
+        if (!identity) return send(res, 401, { error: "A valid OpenFish API key is required.", code: "API_KEY_REQUIRED" });
+        if (identity.forbidden) return send(res, 403, { error: `API key lacks the ${requiredScope} scope.`, code: "INSUFFICIENT_SCOPE" });
+        await registerClient(identity, { clientId: req.headers["x-openfish-client"], platform: req.headers["x-openfish-platform"], sessionId: requestedSession });
+        const rate = checkClientRateLimit(identity.id, Number(process.env.OPENFISH_RATE_LIMIT_PER_MINUTE || 120));
+        res.reqRateHeaders = { "x-ratelimit-limit": String(rate.limit), "x-ratelimit-remaining": String(rate.remaining), "x-ratelimit-reset": rate.resetAt };
+        if (!rate.allowed) { res.setHeader("retry-after", String(rate.retryAfterSeconds)); return send(res, 429, { error: "API key rate limit exceeded.", code: "RATE_LIMITED", retryAfterSeconds: rate.retryAfterSeconds }); }
+      }
       return send(res, 200, { tool: name, result: await invokeTool(name, body) });
     }
-    if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, name: "OpenFish AI Browser", version: VERSION });
+    if (req.method === "POST" && res.reqPath === "/api/admin/ollama-test") {
+      try { return send(res, 200, await testOllamaModel()); }
+      catch (error) { return send(res, 503, { ok: false, model: MODEL, error: String(error.message || error).slice(0, 240) }); }
+    }
+    if (req.method === "POST" && res.reqPath === "/api/extension/heartbeat") {
+      if (!res.reqOrigin?.startsWith("chrome-extension://")) return send(res, 403, { error: "Chrome extension origin is required." });
+      const body = await readBody(req);
+      extensionLastSeenAt = new Date().toISOString();
+      extensionVersion = String(body.version || "").slice(0, 32) || null;
+      return send(res, 200, { ok: true, version: VERSION, extensionVersion, lastSeenAt: extensionLastSeenAt });
+    }
+    if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, name: "OpenFish AI Browser", version: VERSION, localNoAuth: LOCAL_NO_AUTH });
     if (req.method === "GET" && req.url === "/api/admin/status") {
       const browser = getBrowserStatus();
       const uptime = Math.floor((Date.now() - startedAt) / 1000);
@@ -260,13 +322,67 @@ const server = http.createServer(async (req, res) => {
         name: "OpenFish AI Browser", version: VERSION, uptime,
         uptimeText: uptime < 60 ? `${uptime}s` : uptime < 3600 ? `${Math.floor(uptime / 60)}m ${uptime % 60}s` : `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
         requests: metrics.requests, errors: metrics.errors, maxBrowserSessions: getBrowserStatus().maxSessions,
+        localNoAuth: LOCAL_NO_AUTH, runtime: { node: process.versions.node, platform: process.platform, pid: process.pid, memoryMb: Math.round(process.memoryUsage().rss / 1024 / 1024), supervisorRestarts: Number(process.env.OPENFISH_SUPERVISOR_RESTARTS || 0) },
         clientCount: (await listClients()).length,
-        model: process.env.OPENFISH_MODEL || "qwen2.5:3b",
+        model: MODEL,
+        ollama: await getOllamaStatus(),
+        extension: { connected: Boolean(extensionLastSeenAt && Date.now() - Date.parse(extensionLastSeenAt) < 45000), version: extensionVersion, lastSeenAt: extensionLastSeenAt },
         browser, port: PORT
       });
     }
     if (req.method === "GET" && req.url === "/api/admin/events") return send(res, 200, { events: metrics.events });
+    if (req.method === "GET" && res.reqPath === "/api/admin/tasks") {
+      const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
+      return send(res, 200, { tasks: await listTasks({ query: url.searchParams.get("q") || "", status: url.searchParams.get("status") || "", limit: url.searchParams.get("limit") || 100 }), maxTasks: Number(process.env.OPENFISH_MAX_TASKS || 500) });
+    }
+    if (req.method === "GET" && res.reqPath.startsWith("/api/admin/tasks/")) {
+      const id = decodeURIComponent(res.reqPath.slice("/api/admin/tasks/".length));
+      return send(res, 200, { task: await getTask(id) });
+    }
+    if (req.method === "POST" && res.reqPath.startsWith("/api/admin/tasks/") && res.reqPath.endsWith("/restore")) {
+      const id = decodeURIComponent(res.reqPath.slice("/api/admin/tasks/".length, -"/restore".length));
+      return send(res, 201, { task: await restoreTask(id), warning: "Restored plan requires fresh explicit approval." });
+    }
+    if (req.method === "POST" && res.reqPath.startsWith("/api/admin/tasks/") && res.reqPath.endsWith("/execute")) {
+      const id = decodeURIComponent(res.reqPath.slice("/api/admin/tasks/".length, -"/execute".length));
+      const body = await readBody(req);
+      if (body.approved !== true) return send(res, 403, { error: "Explicit approval of this saved plan is required." });
+      const task = await getTask(id);
+      if (!task.plan || !Array.isArray(task.plan.steps)) return send(res, 409, { error: "Saved task has no executable plan." });
+      await updateTask(id, { status: "approved", message: "Explicit approval received" });
+      await updateTask(id, { status: "running", message: "Execution started" });
+      try {
+        const result = await executePlan(task.plan, { approved: true });
+        const saved = await updateTask(id, { status: result.status === "completed" ? "succeeded" : "stopped", result, message: result.status });
+        return send(res, 200, { task: saved, result });
+      } catch (error) {
+        await updateTask(id, { status: "failed", error: error.message, message: "Execution failed" });
+        throw error;
+      }
+    }
 
+    if (req.method === "POST" && req.url === "/api/mcp/plan_task") {
+      const body = await readBody(req);
+      const page = await getPageContext();
+      const plan = await createPlan(body.goal, page);
+      const task = await createTask({ goal: body.goal, plan, page: { title: page.title, url: page.url }, source: "mcp-http" });
+      return send(res, 200, { status: "plan_ready_for_review", ...plan, taskId: task.id, warning: "No action has been executed." });
+    }
+    if (req.method === "POST" && req.url === "/api/mcp/execute_plan") {
+      const body = await readBody(req);
+      if (body.approved !== true) return send(res, 403, { error: "Explicit approval of the exact plan is required." });
+      const task = body.taskId ? await getTask(body.taskId) : await createTask({ goal: body.goal || "MCP approved browser plan", plan: body.plan, source: "mcp-http" });
+      await updateTask(task.id, { status: "approved", plan: body.plan, message: "Explicit approval received" });
+      await updateTask(task.id, { status: "running", message: "Execution started" });
+      try {
+        const result = await executePlan(body.plan, { approved: true });
+        await updateTask(task.id, { status: result.status === "completed" ? "succeeded" : "stopped", result, message: result.status });
+        return send(res, 200, { ...result, taskId: task.id });
+      } catch (error) {
+        await updateTask(task.id, { status: "failed", error: error.message, message: "Execution failed" });
+        throw error;
+      }
+    }
     if (req.method === "GET" && req.url === "/api/mcp/list_workspaces") return send(res, 200, { workspaces: await getSavedWorkspaces() });
     if (req.method === "POST" && req.url === "/api/mcp/save_workspace") { const body = await readBody(req); return send(res, 201, await saveCurrentWorkspace(body.name)); }
     if (req.method === "POST" && req.url === "/api/mcp/restore_workspace") { const body = await readBody(req); return send(res, 200, await restoreSavedWorkspace(body.id, body.approved)); }
@@ -315,13 +431,25 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/api/mcp/plan_task") {
       const body = await readBody(req);
       if (!String(body.goal || "").trim()) return send(res, 400, { error: "Task description is required." });
-      const plan = await createPlan(body.goal, await getPageContext());
-      return send(res, 200, { status: "plan_ready_for_review", ...plan, warning: "Review every step. No action has been executed." });
+      const page = await getPageContext();
+      const plan = await createPlan(body.goal, page);
+      const task = await createTask({ goal: body.goal, plan, page: { title: page.title, url: page.url }, source: "admin" });
+      return send(res, 200, { status: "plan_ready_for_review", ...plan, taskId: task.id, warning: "Review every step. No action has been executed." });
     }
     if (req.method === "POST" && req.url === "/api/mcp/execute_plan") {
       const body = await readBody(req);
       if (body.approved !== true) return send(res, 403, { error: "Explicit approval of the exact plan is required." });
-      return send(res, 200, await executePlan(body.plan, { approved: true }));
+      const task = body.taskId ? await getTask(body.taskId) : await createTask({ goal: body.goal || "Approved browser plan", plan: body.plan, source: "admin" });
+      await updateTask(task.id, { status: "approved", plan: body.plan, message: "Explicit approval received" });
+      await updateTask(task.id, { status: "running", message: "Execution started" });
+      try {
+        const result = await executePlan(body.plan, { approved: true });
+        await updateTask(task.id, { status: result.status === "completed" ? "succeeded" : "stopped", result, message: result.status });
+        return send(res, 200, { ...result, taskId: task.id });
+      } catch (error) {
+        await updateTask(task.id, { status: "failed", error: error.message, message: "Execution failed" });
+        throw error;
+      }
     }
     if (req.method === "POST" && req.url === "/api/mcp/click_element") {
       const body = await readBody(req);

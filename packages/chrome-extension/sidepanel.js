@@ -1,6 +1,7 @@
 const API = "http://127.0.0.1:8787";
 const $ = id => document.getElementById(id);
 let currentPlan = null;
+let currentTaskId = null;
 let libraryTab = "bookmarks";
 let libraryItems = [];
 async function request(path, body = {}, method = "POST") {
@@ -10,8 +11,12 @@ async function request(path, body = {}, method = "POST") {
   return data;
 }
 async function health() {
-  try { const r = await fetch(API + "/health"); if (!r.ok) throw new Error(); $("status").textContent = "本地服务已连接"; }
-  catch { $("status").textContent = "本地服务未启动"; }
+  try {
+    const r = await fetch(API + "/health");
+    if (!r.ok) throw new Error();
+    await request("/api/extension/heartbeat", { version: chrome.runtime.getManifest().version, extensionId: chrome.runtime.id });
+    $("status").textContent = "本地服务已连接";
+  } catch { $("status").textContent = "本地服务未连接，正在重试"; }
 }
 
 $("captureScreenshot").addEventListener("click", async () => {
@@ -40,6 +45,7 @@ $("inspect").addEventListener("click", async () => {
 });
 $("goal").addEventListener("input", () => {
   currentPlan = null;
+  currentTaskId = null;
   $("execute").hidden = true;
   $("execute").disabled = true;
 });
@@ -50,8 +56,8 @@ $("run").addEventListener("click", async () => {
   const goal = $("goal").value.trim(); if (!goal) return $("result").textContent = "请先输入任务。";
   $("run").disabled = true;
   $("result").textContent = "正在调用本地 AI 生成计划…";
-  try { const [tab] = await chrome.tabs.query({active:true,currentWindow:true}); const data = await request("/api/plan",{goal,url:tab?.url?.startsWith("http") ? tab.url : undefined}); currentPlan = data; $("result").textContent = JSON.stringify(data,null,2); $("execute").hidden = !Array.isArray(data.steps) || data.steps.length === 0; $("execute").disabled = $("execute").hidden; }
-  catch(e) { currentPlan = null; $("execute").hidden = true; $("result").textContent = e.message; }
+  try { const [tab] = await chrome.tabs.query({active:true,currentWindow:true}); const data = await request("/api/plan",{goal,url:tab?.url?.startsWith("http") ? tab.url : undefined}); currentPlan = data; currentTaskId = data.taskId || null; $("result").textContent = JSON.stringify(data,null,2); $("execute").hidden = !Array.isArray(data.steps) || data.steps.length === 0; $("execute").disabled = $("execute").hidden; }
+  catch(e) { currentPlan = null; currentTaskId = null; $("execute").hidden = true; $("result").textContent = e.message; }
   finally { $("run").disabled = false; }
 });
 async function browserAction(action) {
@@ -155,6 +161,7 @@ function openCommandPalette(){$("commandPalette").hidden=false;$("commandSearch"
 $("openCommandPalette").addEventListener("click",openCommandPalette);$("closeCommandPalette").addEventListener("click",()=>$("commandPalette").hidden=true);$("commandSearch").addEventListener("input",renderCommandResults);
 document.addEventListener("keydown",event=>{const mod=event.ctrlKey||event.metaKey;const key=event.key.toLowerCase();if(mod&&key==="k"){event.preventDefault();openCommandPalette();}else if(event.key==="Escape"&&!$("commandPalette").hidden){$("commandPalette").hidden=true;}else if(mod&&event.shiftKey&&key==="t"){event.preventDefault();$("restoreClosedTab").click();}else if(mod&&key==="l"&&document.activeElement?.tagName!=="INPUT"&&document.activeElement?.tagName!=="TEXTAREA"){event.preventDefault();$("newTabUrl").focus();}else if(mod&&event.shiftKey&&key==="s"){event.preventDefault();$("workspaceName").focus();}});
 health();
+window.setInterval(health, 15000);
 refreshTabs();
 refreshLibrary();
 refreshWorkspaces();
@@ -169,8 +176,8 @@ $("execute").addEventListener("click", async () => {
   $("execute").disabled = true;
   $("run").disabled = true;
   try {
-    const data = await request("/api/execute", { plan: approvedPlan, approved: true });
+    const data = await request("/api/execute", { plan: approvedPlan, taskId: currentTaskId, approved: true });
     $("result").textContent = JSON.stringify(data, null, 2);
   } catch (e) { $("result").textContent = e.message; }
-  finally { currentPlan = null; $("execute").hidden = true; $("execute").disabled = true; $("run").disabled = false; }
+  finally { currentPlan = null; currentTaskId = null; $("execute").hidden = true; $("execute").disabled = true; $("run").disabled = false; }
 });

@@ -14,6 +14,8 @@ jobs:
       - run: npm run check
       - name: Install Playwright Chromium for mobile UI smoke tests
         run: npx playwright install --with-deps chromium
+      - name: Verify local single-machine setup diagnostics
+        run: npm run doctor
       - run: npm test
       - name: Build self-hosted Chromium engine image
         run: docker build --pull -f services/browser-engine/Dockerfile -t openfish-browser-engine:ci services/browser-engine

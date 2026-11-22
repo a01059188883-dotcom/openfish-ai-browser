@@ -1,6 +1,8 @@
 const $ = id => document.getElementById(id);
 const TEMPLATE_KEY = "openfish.taskTemplates.v1";
 let plan = null;
+let currentTaskId = null;
+let taskSearchTimer = null;
 let pollBusy = false;
 let latestEvents = [];
 
@@ -76,11 +78,17 @@ async function refresh() {
     $("browserMode").textContent = status.browser?.remote ? "远程 Chromium" : "本地 Chromium";
     $("bridgeHealth").textContent = "正常";
     $("bridgeHealth").className = "status-good";
-    $("browserHealth").textContent = status.browser?.connected ? "已连接" : "待启动";
+    if ($("localAuthHealth")) { $("localAuthHealth").textContent = status.localNoAuth ? "已启用 · 仅回环地址" : "已关闭 · 需要 API Key"; $("localAuthHealth").className = status.localNoAuth ? "status-good" : "muted"; }
+    if ($("runtimeHealth")) $("runtimeHealth").textContent = (status.runtime?.platform || "未知平台") + " · Node " + (status.runtime?.node || "未知") + " · PID " + (status.runtime?.pid || "—") + " · 内存 " + (status.runtime?.memoryMb ?? "—") + " MB · 自动恢复 " + (status.runtime?.supervisorRestarts ?? 0) + " 次";
+    $("browserHealth").textContent = status.browser?.connected ? "已连接 · " + (status.browser.sessionCount ?? 0) + " 个会话" : "待启动";
     $("model").textContent = status.model || "未配置";
+    $("ollamaHealth").textContent = status.ollama?.reachable ? (status.ollama.modelInstalled ? "已连接 · 模型就绪" : "已连接 · 缺少模型") : "不可达";
+    $("ollamaHealth").className = status.ollama?.reachable && status.ollama.modelInstalled ? "status-good" : "status-bad";
+    $("extensionHealth").textContent = status.extension?.connected ? "已连接 · " + (status.extension.version || "版本未知") : "未检测到连接";
+    $("extensionHealth").className = status.extension?.connected ? "status-good" : "muted";
     if ($("clientCount")) $("clientCount").textContent = status.clientCount ?? 0;
     $("mode").textContent = status.browser?.remote ? "远程" : "本地";
-    $("version").textContent = status.version || "2.14.2";
+    $("version").textContent = status.version || "2.22.0";
     latestEvents = Array.isArray(activity.events) ? activity.events : [];
     renderEvents(latestEvents);
     drawBars(latestEvents);
@@ -95,6 +103,7 @@ async function refresh() {
 }
 function invalidatePlan() {
   plan = null;
+  currentTaskId = null;
   $("approve").disabled = true;
   $("plan").textContent = "任务已修改，请重新生成计划并审核。";
   $("plan").className = "plan empty";
@@ -113,6 +122,7 @@ $("makePlan").addEventListener("click", async () => {
     const result = await api("/api/plan", { goal });
     if (!Array.isArray(result.steps) || !result.steps.length) throw new Error("AI 未返回可执行步骤，请调整任务描述。");
     plan = result;
+    currentTaskId = result.taskId || null;
     $("plan").textContent = JSON.stringify(result, null, 2);
     $("approve").disabled = false;
   } catch (error) {
@@ -121,6 +131,7 @@ $("makePlan").addEventListener("click", async () => {
   } finally {
     $("makePlan").disabled = false;
     refresh();
+    loadTasks();
   }
 });
 $("approve").addEventListener("click", async () => {
@@ -131,10 +142,12 @@ $("approve").addEventListener("click", async () => {
   $("makePlan").disabled = true;
   $("plan").textContent = "执行中…";
   try {
-    const result = await api("/api/execute", { plan: approvedPlan, approved: true });
+    const result = await api("/api/execute", { plan: approvedPlan, taskId: currentTaskId, approved: true });
     $("plan").textContent = JSON.stringify(result, null, 2);
+    await loadTasks();
   } catch (error) {
     $("plan").textContent = "执行失败：" + error.message;
+    await loadTasks();
   } finally {
     plan = null;
     $("makePlan").disabled = false;
@@ -149,6 +162,77 @@ $("clear").addEventListener("click", () => {
 $("refresh").addEventListener("click", refresh);
 $("refreshLog").addEventListener("click", refresh);
 $("eventFilter").addEventListener("input", () => renderEvents(latestEvents));
+
+
+function taskStatusLabel(status) {
+  return ({ planned: "待审核", approved: "已批准", running: "执行中", succeeded: "成功", stopped: "已停止", failed: "失败" })[status] || status || "未知";
+}
+$("testOllama")?.addEventListener("click", async () => {
+  const button = $("testOllama");
+  button.disabled = true;
+  button.textContent = "正在测试模型…";
+  $("ollamaTestResult").textContent = "正在向本地 Ollama 发送最小测试提示…";
+  try {
+    const result = await api("/api/admin/ollama-test", {});
+    $("ollamaTestResult").textContent = result.model + " · " + result.durationMs + " ms · " + result.response;
+  } catch (error) { $("ollamaTestResult").textContent = "模型测试失败：" + error.message; }
+  finally { button.disabled = false; button.textContent = "测试模型实际响应"; }
+});
+async function loadTasks() {
+  const host = $("taskList");
+  if (!host) return;
+  try {
+    const params = new URLSearchParams({ q: $("taskSearch")?.value || "", status: $("taskStatus")?.value || "", limit: "100" });
+    const data = await api("/api/admin/tasks?" + params.toString());
+    const tasks = Array.isArray(data.tasks) ? data.tasks : [];
+    $("taskCount").textContent = tasks.length + " 条 / 最多 " + (data.maxTasks || 500) + " 条";
+    host.replaceChildren();
+    if (!tasks.length) { host.append(textNode("p", "没有匹配的任务记录。", "muted")); return; }
+    for (const task of tasks) {
+      const row = document.createElement("div");
+      row.className = "task-row";
+      const details = document.createElement("div");
+      details.className = "task-details";
+      details.append(textNode("b", task.goal), textNode("small", task.id + " · " + fmtTime(task.createdAt) + " · " + (task.source || "unknown")));
+      const state = textNode("span", taskStatusLabel(task.status), "task-status status-" + task.status);
+      const actions = document.createElement("div");
+      actions.className = "task-actions";
+      const view = textNode("button", "查看");
+      view.type = "button";
+      view.addEventListener("click", async () => {
+        try { const detail = await api("/api/admin/tasks/" + encodeURIComponent(task.id)); $("taskDetail").textContent = JSON.stringify(detail.task, null, 2); }
+        catch (error) { $("taskDetail").textContent = "读取失败：" + error.message; }
+      });
+      const restore = textNode("button", "恢复计划", "primary");
+      restore.type = "button";
+      restore.disabled = !task.hasPlan && !task.plan;
+      restore.addEventListener("click", async () => {
+        restore.disabled = true;
+        try {
+          const result = await api("/api/admin/tasks/" + encodeURIComponent(task.id) + "/restore", {});
+          plan = result.task.plan;
+          currentTaskId = result.task.id;
+          $("goal").value = result.task.goal;
+          $("plan").textContent = JSON.stringify(result.task, null, 2);
+          $("plan").className = "plan";
+          $("approve").disabled = !plan?.steps?.length;
+          $("taskDetail").textContent = JSON.stringify(result.task, null, 2);
+          await loadTasks();
+          $("goal").scrollIntoView({ behavior: "smooth", block: "center" });
+        } catch (error) { window.alert("恢复失败：" + error.message); restore.disabled = false; }
+      });
+      actions.append(view, restore);
+      row.append(details, state, actions);
+      host.append(row);
+    }
+  } catch (error) { host.replaceChildren(textNode("p", "读取任务历史失败：" + error.message, "muted")); }
+}
+$("refreshTasks")?.addEventListener("click", loadTasks);
+$("taskStatus")?.addEventListener("change", loadTasks);
+$("taskSearch")?.addEventListener("input", () => {
+  window.clearTimeout(taskSearchTimer);
+  taskSearchTimer = window.setTimeout(loadTasks, 220);
+});
 
 async function loadToolCatalog() {
   const host = $("toolCatalog");
@@ -244,6 +328,78 @@ document.querySelectorAll("[data-copy]").forEach(button => button.addEventListen
   }
 }));
 
+function isLoopbackAddressUrl(value) {
+  try {
+    const hostname = new URL(value).hostname;
+    return ["127.0.0.1", "localhost", "[::1]"].includes(hostname);
+  } catch { return false; }
+}
+function integrationConfigText() {
+  const key = $("integrationApiKey")?.value.trim() || "";
+  const url = $("integrationMcpUrl")?.value.trim() || "";
+  const sessionId = $("integrationSession")?.value.trim() || "default";
+  if (!/^https?:\/\//i.test(url) || !url.endsWith("/mcp")) throw new Error("MCP 地址必须是 http(s) URL，并以 /mcp 结尾。");
+  if (!key && !isLoopbackAddressUrl(url)) throw new Error("远程地址必须使用访问 Token；本机 127.0.0.1 / localhost 可免 Token。");
+  if (sessionId !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) throw new Error("浏览器会话 ID 格式不正确。");
+  const headers = {};
+  if (key) {
+    headers.Authorization = "Bearer " + key;
+    headers["X-OpenFish-Client"] = $("integrationClient").value;
+    headers["X-OpenFish-Platform"] = $("integrationClient").value;
+  }
+  if (sessionId !== "default") headers["X-OpenFish-Session"] = sessionId;
+  const client = $("integrationClient").value;
+  const server = { url, ...(Object.keys(headers).length ? { headers } : {}) };
+  const config = client === "vscode"
+    ? { servers: { "openfish-browser": { type: "http", ...server } } }
+    : { mcpServers: { "openfish-browser": server } };
+  return JSON.stringify(config, null, 2);
+}
+function refreshIntegrationConfig() {
+  const output = $("integrationConfig");
+  if (!output) return;
+  try { output.textContent = integrationConfigText(); }
+  catch (error) { output.textContent = error.message; }
+}
+$("generateIntegration")?.addEventListener("click", refreshIntegrationConfig);
+["integrationClient", "integrationMcpUrl", "integrationApiKey", "integrationSession"].forEach(id => $(id)?.addEventListener("input", refreshIntegrationConfig));
+$("copyIntegrationConfig")?.addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(integrationConfigText()); $("copyIntegrationConfig").textContent = "已复制"; }
+  catch (error) { window.alert("复制配置失败：" + error.message); }
+});
+refreshIntegrationConfig();
+function relayCurlCommand() {
+  const base = $("relayWorkerUrl")?.value.trim().replace(/\/$/, "") || "";
+  const token = $("relayAccessToken")?.value.trim() || "";
+  if (!/^https:\/\//i.test(base)) throw new Error("Worker 地址必须使用 HTTPS。");
+  if (!token) throw new Error("请先填写 Relay Token。");
+  return "curl \"" + base + "/api/v1/browser/status\" \\\n  -H \"Authorization: Bearer " + token + "\"";
+}
+$("copyRelayCurl")?.addEventListener("click", async () => {
+  try {
+    const command = relayCurlCommand();
+    $("relayConfigPreview").textContent = command;
+    await navigator.clipboard.writeText(command);
+    $("copyRelayCurl").textContent = "已复制";
+  } catch (error) { $("relayConfigPreview").textContent = error.message; }
+});
+["relayWorkerUrl", "relayAccessToken"].forEach(id => $(id)?.addEventListener("input", () => {
+  try { $("relayConfigPreview").textContent = relayCurlCommand(); }
+  catch (error) { $("relayConfigPreview").textContent = error.message; }
+}));
+$("copyRestExample")?.addEventListener("click", async () => {
+  try {
+    const key = $("integrationApiKey").value.trim();
+    const mcp = new URL($("integrationMcpUrl").value.trim());
+    const base = mcp.origin.replace(/:8788$/, ":8787");
+    if (!/^https?:$/.test(mcp.protocol)) throw new Error("请填写有效的服务地址。");
+    if (!key && !isLoopbackAddressUrl(base)) throw new Error("远程 REST 地址必须使用 API 密钥；本机地址可免 Token。");
+    const auth = key ? `  -H "Authorization: Bearer ${key}" \\\n` : "";
+    const command = `curl -X POST "${base}/api/v1/tools/read_page" \\\n${auth}  -H "Content-Type: application/json" \\\n  -d '{}'`;
+    await navigator.clipboard.writeText(command);
+    $("copyRestExample").textContent = "已复制";
+  } catch (error) { window.alert("生成 REST 示例失败：" + error.message); }
+});
 async function loadApiKeys() {
   const host = $("keyList");
   if (!host) return;
@@ -299,6 +455,8 @@ $("createKey")?.addEventListener("click", async () => {
       copy.textContent = "已复制";
     });
     notice.append(copy);
+    $("integrationApiKey").value = result.key;
+    refreshIntegrationConfig();
     $("keyName").value = "";
     await loadApiKeys();
   } catch (error) {

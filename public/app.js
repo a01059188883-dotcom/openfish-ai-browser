@@ -1,7 +1,8 @@
 (()=>{
 "use strict";
-const $=id=>document.getElementById(id), downloadObjectUrls=new Map(), TOKEN_KEY="openfish.relay.token", BOOKMARK_KEY="openfish.bookmarks", HISTORY_KEY="openfish.history.v1", READING_KEY="openfish.readingList.v1", SEARCH_KEY="openfish.searchEngine", SESSION_KEY="openfish.browser.session";
-let token=sessionStorage.getItem(TOKEN_KEY)||"",sessionId=sessionStorage.getItem(SESSION_KEY)||"",currentUrl="",lastView=null,busy=false,readerMode=false;
+const $=id=>document.getElementById(id), downloadObjectUrls=new Map(), BOOKMARK_KEY="openfish.bookmarks", HISTORY_KEY="openfish.history.v1", READING_KEY="openfish.readingList.v1", SEARCH_KEY="openfish.searchEngine", SESSION_KEY="openfish.browser.session";
+localStorage.removeItem("openfish.relay.token");sessionStorage.removeItem("openfish.relay.token");
+let sessionId=sessionStorage.getItem(SESSION_KEY)||"",currentUrl="",lastView=null,busy=false,readerMode=false;
 if(!/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)){sessionId=crypto.randomUUID();sessionStorage.setItem(SESSION_KEY,sessionId)}
 const readStore=(key,fallback)=>{try{const v=JSON.parse(localStorage.getItem(key)||"null");return Array.isArray(v)?v:fallback}catch{return fallback}};
 let bookmarks=readStore(BOOKMARK_KEY,[]),historyItems=readStore(HISTORY_KEY,[]),readingItems=readStore(READING_KEY,[]);
@@ -9,10 +10,9 @@ const toast=message=>{const el=$("toast");el.textContent=String(message);el.clas
 const setState=(message,provider)=>{$("state").textContent=message;if(provider)$("provider").textContent=provider};
 const save=(key,value)=>localStorage.setItem(key,JSON.stringify(value));
 async function api(path,body){
- if(!token){token=prompt("请输入 Cloudflare Relay Token（与管理后台使用的 Token 相同）")||"";if(!token)throw Error("需要 Relay Token 才能使用云端浏览器");sessionStorage.setItem(TOKEN_KEY,token)}
- const response=await fetch(path,{method:body===undefined?"GET":"POST",headers:{"Authorization":"Bearer "+token,"X-OpenFish-Session":sessionId,...(body===undefined?{}:{"Content-Type":"application/json"})},body:body===undefined?undefined:JSON.stringify(body),cache:"no-store"});
+ const response=await fetch(path,{method:body===undefined?"GET":"POST",credentials:"same-origin",headers:{"X-OpenFish-Session":sessionId,...(body===undefined?{}:{"Content-Type":"application/json"})},body:body===undefined?undefined:JSON.stringify(body),cache:"no-store"});
  const data=await response.json().catch(()=>({}));
- if(!response.ok){if(response.status===401){sessionStorage.removeItem(TOKEN_KEY);token=""}throw Error(data.error||("HTTP "+response.status))}
+ if(!response.ok){if(response.status===401)throw Error("云端登录已失效，请先打开管理后台重新登录。");throw Error(data.error||("HTTP "+response.status))}
  return data;
 }
 function renderTabs(tabs=[]){
@@ -34,9 +34,8 @@ function render(d){
  renderTabs(d.tabs||[]);setState("浏览器在线",d.provider||"云端浏览器已连接");
 }
 async function apiFile(path,body){
- if(!token){token=prompt("请输入 Cloudflare Relay Token（与管理后台使用的 Token 相同）")||"";if(!token)throw Error("需要 Relay Token 才能使用云端浏览器");sessionStorage.setItem(TOKEN_KEY,token)}
- const response=await fetch(path,{method:"POST",headers:{"Authorization":"Bearer "+token,"X-OpenFish-Session":sessionId,"Content-Type":"application/json"},body:JSON.stringify(body),cache:"no-store"});
- if(!response.ok){const data=await response.json().catch(()=>({}));if(response.status===401){sessionStorage.removeItem(TOKEN_KEY);token=""}throw Error(data.error||("HTTP "+response.status))}
+ const response=await fetch(path,{method:"POST",credentials:"same-origin",headers:{"X-OpenFish-Session":sessionId,"Content-Type":"application/json"},body:JSON.stringify(body),cache:"no-store"});
+ if(!response.ok){const data=await response.json().catch(()=>({}));if(response.status===401)throw Error("云端登录已失效，请先打开管理后台重新登录。");throw Error(data.error||("HTTP "+response.status))}
  return response.blob();
 }
 function addDownloadSaveLink(item,blob){
@@ -118,7 +117,7 @@ $("searchEngineSetting").addEventListener("change",()=>{$("searchEngine").value=
 $("exportData").addEventListener("click",()=>{const payload={schemaVersion:1,exportedAt:new Date().toISOString(),bookmarks,history:historyItems,readingList:readingItems};const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="openfish-browser-backup.json";a.click();URL.revokeObjectURL(url);toast("本机浏览数据备份已导出")});
 $("importData").addEventListener("click",()=>$("importDataFile").click());
 $("importDataFile").addEventListener("change",async event=>{const file=event.target.files?.[0];if(!file)return;if(file.size>1024*1024){toast("备份文件不能超过 1 MB");event.target.value="";return}try{const data=JSON.parse(await file.text());if(!data||typeof data!=="object"||!Array.isArray(data.bookmarks)||!Array.isArray(data.history)||!Array.isArray(data.readingList))throw Error("备份文件格式不正确");if(!confirm("导入备份将替换当前手机上的收藏、历史和稍后阅读清单，是否继续？"))return;bookmarks=data.bookmarks.slice(0,200);historyItems=data.history.slice(0,100);readingItems=data.readingList.slice(0,200);save(BOOKMARK_KEY,bookmarks);save(HISTORY_KEY,historyItems);save(READING_KEY,readingItems);renderBookmarks();renderHistory();renderReading();toast("浏览数据已恢复")}catch(error){toast("导入失败："+error.message)}finally{event.target.value=""}});
-async function boot(){renderBookmarks();renderHistory();renderReading();try{const status=await api("/api/cloud-browser/status");renderQuota([],status);setState(status.connected?"云端会话可恢复":"浏览器待机",status.provider||"云端浏览器");if(status.connected){await loadDownloads().catch(()=>{});const view=await api("/api/cloud-browser/view");if(view.screenshot){render(view);recordHistory({url:view.url,title:view.title});renderHistory()}}}catch(error){setState("需要连接");if(token)toast(error.message)}}
+async function boot(){renderBookmarks();renderHistory();renderReading();try{const status=await api("/api/cloud-browser/status");renderQuota([],status);setState(status.connected?"云端会话可恢复":"浏览器待机",status.provider||"云端浏览器");if(status.connected){await loadDownloads().catch(()=>{});const view=await api("/api/cloud-browser/view");if(view.screenshot){render(view);recordHistory({url:view.url,title:view.title});renderHistory()}}}catch(error){setState("请先登录","打开右上角管理后台完成云端登录");toast(error.message)}}
 $("refreshDownloads").addEventListener("click",()=>loadDownloads().catch(error=>toast(error.message)));
 $("refreshQuota").addEventListener("click",async()=>{try{const [downloads,status]=await Promise.all([api("/api/cloud-browser/downloads"),api("/api/cloud-browser/status")]);renderQuota(downloads.downloads||[],status);toast("额度信息已刷新")}catch(error){toast("额度刷新失败："+error.message)}});
 boot();

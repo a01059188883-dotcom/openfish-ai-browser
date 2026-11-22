@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 const BRIDGE = (process.env.OPENFISH_BRIDGE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
-const server = new McpServer({ name: "openfish-ai-browser", version: "2.14.2" });
+const server = new McpServer({ name: "openfish-ai-browser", version: "2.25.0" });
 const result = value => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }] });
 
 async function bridgeRequest(path, options = {}) {
@@ -44,8 +44,9 @@ server.tool("execute_plan", "Execute a reviewed browser plan in the shared brows
       reason: z.string().optional()
     }).passthrough()).max(8)
   }),
-  approved: z.literal(true).describe("Must be true only after the user has reviewed and explicitly approved this exact plan.")
-}, async ({ plan, approved }) => result(await bridgeRequest("/api/mcp/execute_plan", { method: "POST", body: { plan, approved } })));
+  approved: z.literal(true).describe("Must be true only after the user has reviewed and explicitly approved this exact plan."),
+  taskId: z.string().uuid().optional()
+}, async ({ plan, approved, taskId }) => result(await bridgeRequest("/api/mcp/execute_plan", { method: "POST", body: { plan, approved, taskId } })));
 
 server.tool("click_element", "Click a unique visible button-like target in the shared browser. Requires explicit user approval; potentially irreversible actions remain blocked.", {
   selector: z.string().min(1).max(500),

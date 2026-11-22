@@ -82,7 +82,7 @@ test("mobile downloads remain resumable and require an explicit save tap", async
   const app = await readFile(new URL("../../../public/app.js", import.meta.url), "utf8");
   const worker = await readFile(new URL("../../../cloudflare/worker.js", import.meta.url), "utf8");
   const index = await readFile(new URL("../../../public/index.html", import.meta.url), "utf8");
-  assert.ok(index.includes("OpenFish AI Browser · v2.14.2"));
+  assert.ok(index.includes("OpenFish AI Browser · v2.25.0"));
   assert.match(app, /downloads\/file/);
   assert.match(app, /点按保存到手机/);
   assert.match(app, /downloadObjectUrls/);
@@ -95,12 +95,13 @@ test("release deployment builds and verifies Cloud Run before deploying the Work
   assert.match(workflow, /google-github-actions\/auth@v2/);
   assert.match(workflow, /GCP_WORKLOAD_IDENTITY_PROVIDER/);
   assert.match(workflow, /h\.version!==\"1\.3\.6\"/);
-  assert.match(workflow, /steps\.engine\.outputs\.url/);
+  assert.ok(workflow.includes("id: engine"));
+  assert.ok(workflow.includes('echo "url=$ENGINE_URL" >> "$GITHUB_OUTPUT"'));
   assert.match(workflow, /--no-traffic --tag=preflight/);
   assert.match(workflow, /--to-latest --remove-tags=preflight/);
   assert.match(workflow, /workflow_dispatch:/);
-  assert.ok(workflow.includes("  push:"));
-  assert.ok(workflow.includes("  push:"));
+  assert.match(workflow, /branches: \[main\]/);
+  assert.ok(workflow.includes(".release/openfish-v2.25.0"), "only the dedicated v2.25.0 release marker triggers deployment");
 });
 
 test("engine bearer authentication uses constant-time token comparison", async () => {

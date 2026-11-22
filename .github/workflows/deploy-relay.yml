@@ -2,11 +2,12 @@ name: Deploy OpenFish Relay
 
 on:
   workflow_dispatch:
+  # One-time v2.25.0 release gate: only the dedicated marker file on main deploys.
+  # Normal PR merges and unrelated main pushes never deploy production.
   push:
     branches: [main]
     paths:
-      - "services/browser-engine/**"
-      - ".github/workflows/deploy-relay.yml"
+      - ".release/openfish-v2.25.0"
 
 concurrency:
   group: openfish-cloudrun-engine-deploy
@@ -40,14 +41,16 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          OPENFISH_RELAY_TOKEN: ${{ secrets.OPENFISH_RELAY_TOKEN }}
+          OPENFISH_BOOTSTRAP_SECRET: ${{ secrets.OPENFISH_BOOTSTRAP_SECRET }}
+          OPENFISH_VAULT_KEY: ${{ secrets.OPENFISH_VAULT_KEY }}
           GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
           BROWSER_ENGINE_TOKEN: ${{ secrets.BROWSER_ENGINE_TOKEN }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN repository secret"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID repository secret"; exit 1; }
-          test "${#OPENFISH_RELAY_TOKEN}" -ge 32 || { echo "OPENFISH_RELAY_TOKEN must be at least 32 characters"; exit 1; }
+          if [ -n "$OPENFISH_BOOTSTRAP_SECRET" ]; then test "${#OPENFISH_BOOTSTRAP_SECRET}" -ge 32 || { echo "OPENFISH_BOOTSTRAP_SECRET must be at least 32 characters when set"; exit 1; }; fi
+          test "${#OPENFISH_VAULT_KEY}" -ge 32 || { echo "OPENFISH_VAULT_KEY must be at least 32 characters"; exit 1; }
           test -n "$GCP_WORKLOAD_IDENTITY_PROVIDER" || { echo "Missing GCP_WORKLOAD_IDENTITY_PROVIDER repository secret"; exit 1; }
           test -n "$GCP_SERVICE_ACCOUNT" || { echo "Missing GCP_SERVICE_ACCOUNT repository secret"; exit 1; }
           test "${#BROWSER_ENGINE_TOKEN}" -ge 32 || { echo "BROWSER_ENGINE_TOKEN must be at least 32 characters"; exit 1; }
@@ -102,20 +105,28 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Store relay token as a Worker secret
+      - name: Configure cloud login bootstrap and vault encryption secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          OPENFISH_RELAY_TOKEN: ${{ secrets.OPENFISH_RELAY_TOKEN }}
+          OPENFISH_BOOTSTRAP_SECRET: ${{ secrets.OPENFISH_BOOTSTRAP_SECRET }}
+          OPENFISH_VAULT_KEY: ${{ secrets.OPENFISH_VAULT_KEY }}
         run: |
-          printf '%s' "$OPENFISH_RELAY_TOKEN" | npx --yes wrangler@4 secret put OPENFISH_RELAY_TOKEN --config cloudflare/wrangler.toml
+          if [ -n "$OPENFISH_BOOTSTRAP_SECRET" ]; then
+            printf '%s' "$OPENFISH_BOOTSTRAP_SECRET" | npx --yes wrangler@4 secret put OPENFISH_BOOTSTRAP_SECRET --config cloudflare/wrangler.toml
+          else
+            echo "Bootstrap secret not set; leaving the existing Worker bootstrap secret unchanged."
+          fi
+          printf '%s' "$OPENFISH_VAULT_KEY" | npx --yes wrangler@4 secret put OPENFISH_VAULT_KEY --config cloudflare/wrangler.toml
 
-      - name: Configure self-hosted browser engine Worker secrets
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          BROWSER_ENGINE_URL: ${{ steps.engine.outputs.url }}
-          BROWSER_ENGINE_TOKEN: ${{ secrets.BROWSER_ENGINE_TOKEN }}
+      - name: Smoke test deployed OpenFish web app
         run: |
-          printf '%s' "$BROWSER_ENGINE_URL" | npx --yes wrangler@4 secret put BROWSER_ENGINE_URL --config cloudflare/wrangler.toml
-          printf '%s' "$BROWSER_ENGINE_TOKEN" | npx --yes wrangler@4 secret put BROWSER_ENGINE_TOKEN --config cloudflare/wrangler.toml
+          set -euo pipefail
+          base="https://openfish-ai-browser-relay.a01059188883.workers.dev"
+          curl --retry 5 --retry-delay 2 -fsS "$base/?v=2.25.0" -o /tmp/openfish-index.html
+          grep -Fq 'ai-workbench.js?v=2.25.0' /tmp/openfish-index.html
+          curl --retry 5 --retry-delay 2 -fsS "$base/ai-workbench.js?v=2.25.0" -o /tmp/openfish-ai-workbench.js
+          grep -Fq 'function validatePlan' /tmp/openfish-ai-workbench.js
+          curl --retry 5 --retry-delay 2 -fsS "$base/app.js?v=2.25.0" -o /tmp/openfish-app.js
+          grep -Fq 'OpenFish' /tmp/openfish-app.js
+          echo "Production Worker frontend assets are reachable and match v2.25.0."

@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.14.2**.
+Open-source, free-first browser automation starter. Version: **2.25.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -9,13 +9,13 @@ Open-source, free-first browser automation starter. Version: **2.14.2**.
 - **Local AI planner**: optional Ollama integration (default model `qwen2.5:3b`) creates constrained JSON plans.
 - **Safety defaults**: no credential collection; sensitive fields and potentially irreversible actions are blocked during plan execution.
 
-## AI workbench (2.14.2 hardening)
+## AI workbench (2.23.0 integration center)
 - Integrates page and multi-tab context, model-provider settings, local Skills and Memory, writing, approved browser task plans, workspace snapshots, voice I/O, research search, and file input.
-- Supports Ollama and OpenAI-compatible, Anthropic, and Gemini-style chat endpoints configured by the user. API keys and local Memory/Skills are stored in the browser's local profile; they are not synced between devices.
+- Supports local Ollama plus cloud OpenAI, Anthropic, and Gemini providers. Cloud provider API keys are stored in the authenticated server-side encrypted vault; local Memory/Skills remain in the browser profile and are not synced between devices.
 - Research uses authenticated Worker endpoints to query DuckDuckGo and Bing, then fetches public web pages for source cross-checking. Public-source fetching is restricted to HTTP(S) hostnames, rejects IP-literal/local targets, and revalidates redirects.
 - PDF.js, Mammoth (DOCX), and SheetJS (XLS/XLSX) are loaded from public CDNs; image understanding is passed to compatible vision-capable models. Scanned PDFs need OCR, which is not yet included.
 - Browser Agent plans are limited to approved navigation, tab switching, history, and scrolling actions. Each plan requires explicit user approval; failed steps are retried once and may produce a separate recovery plan for review.
-- Cloud model use may incur provider charges. Local model use requires the browser device to reach the Ollama host; a phone's `127.0.0.1` refers to the phone itself. Direct provider calls can be limited by provider CORS policies.
+- Cloud model use may incur provider charges. Local model use requires the browser device to reach the Ollama host; a phone's `127.0.0.1` refers to the phone itself. Cloud model calls are proxied through authenticated same-origin Worker endpoints; provider keys are never returned to browser JavaScript.
 - This is an integration release, not a claim that every capability is fully production-verified. Cross-device Memory sync, scanned-document OCR, broader file formats, and real-device end-to-end acceptance remain follow-up work. Agent plans are revalidated at generation, recovery, and execution time; editing the goal invalidates prior approval.
 
 ## Requirements
@@ -30,10 +30,23 @@ Install [Ollama](https://ollama.com), then run `ollama pull qwen2.5:3b`. Configu
 ## Run locally
 ```bash
 npm install
-npm run start:bridge
+npx playwright install chromium
+cp .env.example .env
+npm run start:local
 ```
-Then load `packages/chrome-extension` in `chrome://extensions` → Developer mode → Load unpacked.
+On Windows, you can double-click `scripts/start-local.cmd` after installing dependencies and Chromium. `npm run doctor` checks Node.js, project dependencies, Playwright Chromium, port availability, local no-token mode, and optional Ollama without starting the server. The launcher waits for the local health endpoint and prints the dashboard URL; it never prints `.env` values.\n\nThen load `packages/chrome-extension` in `chrome://extensions` → Developer mode → Load unpacked.
 The extension connects to `http://127.0.0.1:8787`.
+
+### Local single-machine no-token mode (default)
+OpenFish now starts in local no-token mode by default. When the bridge and HTTP MCP server are bound to loopback, you can test browser tools without creating an API key or entering a Relay Token / Browser Engine Token:
+
+- Local browser dashboard: `http://127.0.0.1:8787/admin`
+- Local REST tools: `http://127.0.0.1:8787/api/v1/tools/<tool_name>` (no Authorization header)
+- Local Streamable HTTP MCP: run `npm run start:local` once, then connect to `http://127.0.0.1:8788/mcp` without an Authorization header
+- Local Chrome extension: load the unpacked extension; no API key setup is needed
+- Local stdio MCP: `npm run start:mcp`; it shares the local bridge and does not need a token
+
+This mode is deliberately restricted to loopback connections. The bridge binds to `127.0.0.1`; the HTTP MCP server binds to `127.0.0.1` by default and only skips authentication when the client socket and Host/Origin checks are local. Set `OPENFISH_LOCAL_NO_AUTH=false` to require scoped API keys even on the local machine. Do not bind unauthenticated services to `0.0.0.0`, a LAN address, reverse proxy, or public interface.
 
 Run the MCP server separately:
 ```bash
@@ -41,7 +54,13 @@ npm run start:mcp
 ```
 Configure your MCP host to launch `node packages/mcp-server/src/index.js` from this project directory using stdio.
 
-## Visual admin dashboard\nOpen `http://127.0.0.1:8787/admin` after starting the bridge to open the local control panel. It displays bridge uptime, API request/error counts, browser connection mode, recent API activity, and a task planner with explicit approval before execution. Dashboard telemetry is held in process memory and resets when the bridge restarts. The panel is served only by the local bridge; it is not a public cloud admin site.\n\n## Unified local runtime (v1.3.3)\nThe bridge is the single owner of the Playwright browser. Both the Chrome side panel and the stdio MCP server call the same local bridge API; MCP no longer launches a second browser process. Start `npm run start:bridge` before launching either client. The MCP server exposes `open_page`, `read_page`, `plan_task`, `execute_plan`, `click_element`, `fill_element`, `take_screenshot`, `list_interactive_elements`, and `get_accessibility_snapshot`.\n\n## Review and execution flow
+## Visual admin dashboard
+Open `http://127.0.0.1:8787/admin` after starting the bridge to open the local control panel. It displays bridge uptime, API request/error counts, browser connection mode, recent API activity, and a task planner with explicit approval before execution. Dashboard telemetry is held in process memory and resets when the bridge restarts. The panel is served only by the local bridge; it is not a public cloud admin site.
+
+## Unified local runtime (v1.3.3)
+The bridge is the single owner of the Playwright browser. Both the Chrome side panel and the stdio MCP server call the same local bridge API; MCP no longer launches a second browser process. Start `npm run start:bridge` before launching either client. The MCP server exposes `open_page`, `read_page`, `plan_task`, `execute_plan`, `click_element`, `fill_element`, `take_screenshot`, `list_interactive_elements`, and `get_accessibility_snapshot`.
+
+## Review and execution flow
 1. Ask the local AI planner to generate a plan for the current page.
 2. Review the complete plan in the Chrome side panel or MCP response.
 3. Explicitly approve the exact plan using the side-panel confirmation or the MCP `execute_plan` tool with `approved: true`.
@@ -52,8 +71,58 @@ The side panel invalidates old plans when the task text changes, disables execut
 ## Cloud browser
 Set `BROWSER_WS_ENDPOINT` to a Chromium Playwright-compatible WebSocket endpoint and run the bridge/MCP server in a trusted server environment. A free local setup is included; a permanently available cloud browser needs compute hosting and may not remain free.
 
-## Deployment readiness
-This is a local-first developer tool, not yet a hardened multi-user SaaS. Before public hosting, add authentication, per-user browser isolation, SSRF/private-network protections, rate limits, a durable task queue, observability, and deployment secret management. Set `ALLOWED_EXTENSION_ORIGIN=chrome-extension://YOUR_EXTENSION_ID` in `.env` to pin the local bridge to your extension ID; leave it blank only during initial unpacked-extension setup.
+## Cloud login and encrypted secret vault (v2.23.0)
+
+The Cloudflare mobile admin at `/admin` now uses a server-side owner account instead of asking the browser to retain a Relay Token.
+
+### One-time Cloudflare setup
+
+Run these commands from the repository root. Generate each value independently; do not reuse a password or commit either value to Git:
+
+```bash
+openssl rand -base64 48
+npx wrangler secret put OPENFISH_BOOTSTRAP_SECRET --config cloudflare/wrangler.toml
+# Paste the first generated value when prompted.
+openssl rand -base64 48
+npx wrangler secret put OPENFISH_VAULT_KEY --config cloudflare/wrangler.toml
+# Paste the second generated value when prompted.
+```
+
+Keep `OPENFISH_VAULT_KEY` backed up in a secure password manager. It is the encryption root for the Durable Object secret vault; losing or replacing it without decrypting and re-encrypting the vault makes stored secrets unrecoverable. Never put it in `wrangler.toml`, source code, screenshots, issue comments, or chat.
+
+For local Wrangler development, copy `cloudflare/.dev.vars.example` to `cloudflare/.dev.vars` and replace both placeholders with separate random values. The real `.dev.vars` file is ignored by Git.
+
+Deploy the Worker using the normal reviewed release process (deployment is not triggered by this setup guide):
+
+```bash
+npx wrangler deploy --config cloudflare/wrangler.toml
+```
+
+Then open `https://YOUR_WORKER_HOST/admin`:
+
+1. Under **首次初始化管理员账号**, enter the one-time bootstrap secret, choose a username and a unique password of at least 14 characters, then create the owner account.
+2. After successful initialization, remove `OPENFISH_BOOTSTRAP_SECRET` from the Worker with `npx wrangler secret delete OPENFISH_BOOTSTRAP_SECRET --config cloudflare/wrangler.toml`, and remove the same GitHub Actions repository secret in Settings → Secrets and variables → Actions. Later deploys skip bootstrap-secret installation when it is absent. Do not remove `OPENFISH_VAULT_KEY`.
+3. Log in with the owner account.
+4. In **服务器密钥库**, enter the existing Relay Token used by the desktop Relay Agent. If using the self-hosted browser engine, also enter its HTTPS URL and Engine Token. Save the settings.
+5. On the desktop Relay Agent, keep `OPENFISH_RELAY_TOKEN` set to the exact same Relay Token. The cloud Worker reads its encrypted copy from the vault; it never returns the raw value to browser JavaScript.
+
+For the manual GitHub Actions production workflow, configure repository secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `OPENFISH_BOOTSTRAP_SECRET`, `OPENFISH_VAULT_KEY`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`, and `BROWSER_ENGINE_TOKEN`. The workflow installs only the bootstrap and vault-encryption secrets in the Worker; it does not duplicate the Relay or Engine bearer tokens as Worker secrets. `BROWSER_ENGINE_TOKEN` is required by the Cloud Run engine and must also be entered into the authenticated vault after first login. The Relay Token is entered in the vault and must match the desktop Agent's `.env` value.
+
+### Encrypted backup and restore
+
+The mobile admin supports an encrypted vault backup envelope. Export and restore require a separate 16–256 character passphrase; the Worker derives an AES-256-GCM key with PBKDF2-SHA-256 (600,000 iterations), random salt and IV, and authenticated context. The browser receives only ciphertext. Restore validates the entire schema and all credential fields before a single encrypted vault write; a wrong passphrase or malformed backup leaves the current vault unchanged. Keep the backup file and passphrase in separate secure locations. This is a portable encrypted backup, not automatic encryption-key rotation.
+
+### Security model
+
+- Owner password hashes use PBKDF2-HMAC-SHA-256 with a per-account random salt and 310,000 iterations; login attempts are rate-limited.
+- Admin sessions are random, 12-hour, `HttpOnly`, `Secure`, `SameSite=Strict` cookies. The UI uses same-origin requests and does not save bearer tokens in localStorage or sessionStorage.
+- Relay and Engine tokens are encrypted at rest with AES-256-GCM using the separately configured `OPENFISH_VAULT_KEY`; only masked status is returned to the browser.
+- Session records, encrypted vault data and bounded security audit events live in the existing Cloudflare Durable Object storage.
+- The bootstrap route is one-time only. The Worker must be served over HTTPS. Do not expose the self-hosted engine directly to the public internet.
+- The app vault intentionally does not accept broad Cloudflare account API tokens. Manage infrastructure credentials through Cloudflare's own secret manager and least-privilege access controls.
+- Third-party model-provider API keys configured in the AI Workbench are still device-profile settings in this release; they are not part of the Relay/Engine vault and are not synchronized to the cloud login. Do not treat them as server-side encrypted by this feature.
+
+This adds a single-owner cloud admin login and encrypted token vault; it is not yet a general multi-tenant user-management product. Keep PR #40 in draft until CI and real deployment acceptance are complete. Set `ALLOWED_EXTENSION_ORIGIN=chrome-extension://YOUR_EXTENSION_ID` in `.env` to pin the local bridge to your exact extension ID. Extension-origin requests are denied until this value is set; do not leave it blank for normal use.
 
 ## Safety
 - Never paste passwords, recovery codes, payment details, or API keys into task prompts.
@@ -86,15 +155,15 @@ The dashboard supports creating, reading/loading, updating, and deleting reusabl
 MCP `click_element` and `fill_element` now require an explicit `approved: true` argument for the exact action. The bridge independently checks this value before execution. Existing plan execution continues to require explicit approval. Sensitive fields and irreversible actions remain blocked by runtime policy.
 
 ## Current scope and deployment limitations
-This release remains a local-first single-user runtime, not a hardened public multi-user SaaS. API keys and named browser sessions are now supported locally. Session state is in memory and is cleared when the bridge restarts; the HTTP MCP listener is loopback-bound by default and authenticated with scoped API keys. Provider adapters expose compatible tool schemas and REST endpoints; they do not establish vendor account connections or proxy vendor credentials. A public deployment still requires TLS termination, tenant-level isolation, durable storage, rate limiting, DNS-rebinding-resistant egress controls, and deployment-level network protections.
+This release remains a local-first single-user runtime, not a hardened public multi-user SaaS. Local single-machine mode is tokenless by default for loopback browser tools and HTTP MCP; set `OPENFISH_LOCAL_NO_AUTH=false` to require scoped API keys locally. API keys remain available for authenticated integrations and Cloudflare relay forwarding. Named browser sessions are supported locally. Session state is in memory and is cleared when the bridge restarts; the HTTP MCP listener is loopback-bound by default. Provider adapters expose compatible tool schemas and REST endpoints; they do not establish vendor account connections or proxy vendor credentials. A public deployment still requires TLS termination, tenant-level isolation, durable storage, rate limiting, DNS-rebinding-resistant egress controls, and deployment-level network protections.
 
 
 ## Local MCP HTTP setup
 1. Start the bridge: `npm run start:bridge`.
 2. Start the HTTP MCP endpoint in another terminal: `npm run start:mcp:http`.
-3. Create a key with read or read/write scope in `http://127.0.0.1:8787/admin`.
-4. Configure your MCP client with endpoint `http://127.0.0.1:8788/mcp` and HTTP Bearer authentication. Add `X-OpenFish-Session` as a request header if using a named session.
-5. Keep the endpoint local unless you put it behind a separately hardened TLS/authenticated gateway.
+3. Connect your MCP client to `http://127.0.0.1:8788/mcp` with no Authorization header. No API key or cloud token is needed for local testing.
+4. Add `X-OpenFish-Session` only if you want a named isolated browser session.
+5. Keep both listeners on loopback. If you explicitly set `OPENFISH_LOCAL_NO_AUTH=false`, create a scoped API key in `/admin` and use HTTP Bearer authentication.
 
 The HTTP endpoint uses the MCP Streamable HTTP transport. It is stateless at the protocol transport layer; browser state is selected separately by the session header. Stdio MCP remains available for local MCP hosts.
 
@@ -113,15 +182,12 @@ The optional Cloudflare relay lets a local OpenFish runtime make an **outbound-o
 2. Create a long random relay secret (at least 32 characters) and store it securely.
 3. Set the Worker secret: `npx wrangler secret put OPENFISH_RELAY_TOKEN --config cloudflare/wrangler.toml`.
 4. Deploy: `npm run deploy:relay`. Wrangler provisions the SQLite-backed Durable Object namespace from the migration in `cloudflare/wrangler.toml`.
-5. On the computer running OpenFish, create a local API key in the admin panel with **read and write** scopes. Keep it separate from the relay token.
-6. Set these environment variables on that computer:
+5. On the computer running OpenFish, add these two values to the local `.env` file:
    - `OPENFISH_RELAY_URL=wss://YOUR-WORKER.workers.dev/agent/connect`
    - `OPENFISH_RELAY_TOKEN=the-same-long-random-relay-secret`
-   - `OPENFISH_LOCAL_API_KEY=your-local-OpenFish-API-key`
-   - optionally `OPENFISH_BRIDGE_URL=http://127.0.0.1:8787` and `OPENFISH_MCP_URL=http://127.0.0.1:8788/mcp`
-7. Start the bridge, HTTP MCP server, and then `npm run start:relay-agent`.
+6. Run `npm run start:local` once. The launcher starts Bridge, HTTP MCP and the outbound Relay Agent together. It automatically provisions a least-privilege local API key for the agent, verifies it, and stores it in `.openfish/relay-agent-key` with owner-only file permissions. You do not need to create or copy `OPENFISH_LOCAL_API_KEY` manually; it remains available as an optional override.
 
-Remote MCP endpoint: `https://YOUR-WORKER.workers.dev/mcp`. Remote clients use `Authorization: Bearer RELAY_TOKEN`; the local agent injects its separately stored local API key when forwarding to the local MCP server. The relay currently supports stateless JSON MCP requests and allowlisted REST discovery/tool routes; it buffers responses and caps request/response bodies at 512 KB with a 45-second relay timeout. It is not a general-purpose TCP tunnel or arbitrary URL proxy.
+Remote MCP endpoint: `https://YOUR-WORKER.workers.dev/mcp`. Remote clients use `Authorization: Bearer RELAY_TOKEN`; the local agent injects its separately stored local API key when forwarding to the local MCP server. The relay currently supports stateless JSON MCP requests and allowlisted REST discovery/tool routes; it buffers responses and caps request/response bodies at 512 KB with a 45-second relay timeout. It is not a general-purpose TCP tunnel or arbitrary URL proxy. Remote browser control remains authenticated; do not expose an anonymous browser-control URL.
 
 ### Relay security and limitations
 
@@ -220,7 +286,7 @@ Google Cloud setup is still required once: enable Cloud Run, Cloud Build, Artifa
 
 The engine requires the matching Bearer token and a client-specific `X-OpenFish-Session` header. It isolates browser contexts per session and provides bounded cloud download delivery (15 MB per file, 50 MB in-memory per session). Browser Run fallback remains for compatibility, but its download endpoint returns HTTP 501 because no verified file-transfer implementation exists there.
 
-CI builds the Docker image and validates the Worker bundle without deploying. The production deployment workflow is manual-only (`workflow_dispatch`) so merging prerequisite pull requests cannot unexpectedly deploy an incomplete release. It requires the configured GitHub and Google Cloud credentials. An authenticated health check is not a substitute for testing a real iPhone session and file handoff.
+CI builds the Docker image and validates the Worker bundle without deploying. Production deployment is normally manual (`workflow_dispatch`). The v2.25.0 release also has one explicit, versioned path trigger (`.release/openfish-v2.25.0`) that runs only when this approved release is merged to `main`; ordinary PR merges and unrelated main pushes do not deploy. The workflow requires configured GitHub and Google Cloud credentials. An authenticated health check is not a substitute for testing a real iPhone session and file handoff.
 
 ## Browser workspace refresh (v2.13.4)
 
@@ -239,3 +305,63 @@ The public-source review used these projects as architecture references, not as 
 OpenFish's existing runtime module set includes Chromium/Playwright navigation, isolated sessions, local tab management, bookmarks, browsing history, reading list, downloads, tab organization, page diagnostics, accessibility snapshots, reader-content extraction, screenshots, AI task planning, explicit action approval, MCP/REST tool discovery and provider adapters. The v2.13.4 mobile workspace adds searchable local history and favorites, selectable search engines, page-text copy and a simplified reading view while preserving the existing legacy bookmark storage key.
 
 **Not represented as completed in this release:** durable per-tab profiles, private-profile isolation in the mobile cloud UI, built-in network ad blocking, extension installation management, browser sync, and a full native desktop browser shell. These require separate backend, permission and security work; the UI does not expose fake controls for them.
+
+## Durable task history (v2.15.0)
+Local task records are stored in `.openfish/tasks.json` with atomic file replacement and restrictive permissions. The store retains at most 500 records by default (`OPENFISH_MAX_TASKS` can be set between 50 and 2,000), redacts common credentials, and supports search, detail, and restore. Restored plans return to the review state and always require a new explicit approval. For Cloud Run or other ephemeral container hosting, mount a persistent volume or use a durable database; the container writable layer alone is not a cross-restart or multi-instance store.
+
+
+## AI client integration center (v2.17.0)
+
+The local admin dashboard at `http://127.0.0.1:8787/admin` includes an integration configuration generator. For local single-machine use, the browser REST tools and HTTP MCP endpoint work without a token by default. If connecting a separate remote client or if you set `OPENFISH_LOCAL_NO_AUTH=false`, create a separate API key for each client under **API Keys**, choose `browser:read` or both `browser:read` and `browser:write`, then use the generated Bearer configuration. REST tools are available at `http://127.0.0.1:8787/api/v1/tools/<tool_name>`.
+
+When API-key authentication is enabled or the client is remote, the generated configuration keeps the API key in the client configuration as a Bearer header. For local no-token mode, omit the `headers` property. For Cursor / Cherry Studio with a key, use the `mcpServers` format:
+```json
+{
+  "mcpServers": {
+    "openfish-browser": {
+      "url": "http://127.0.0.1:8788/mcp",
+      "headers": { "Authorization": "Bearer YOUR_OPENFISH_API_KEY" }
+    }
+  }
+}
+```
+For Visual Studio Code, use its native `servers` format:
+```json
+{
+  "servers": {
+    "openfish-browser": {
+      "type": "http",
+      "url": "http://127.0.0.1:8788/mcp",
+      "headers": { "Authorization": "Bearer YOUR_OPENFISH_API_KEY" }
+    }
+  }
+}
+```
+For local no-token REST, send `POST http://127.0.0.1:8787/api/v1/tools/read_page` with `Content-Type: application/json` and body `{}`. If local no-token mode is disabled, add `Authorization: Bearer YOUR_OPENFISH_API_KEY`; choose read scope for read tools and write scope for browser actions. The server stores only a SHA-256 digest and shows the raw key only once. Revoke a client key from the local admin panel to disable that client. Use a unique key per application and least-privilege scopes. The local MCP listener binds to `127.0.0.1` by default. In no-token mode it must remain loopback-only; do not expose it through a LAN or public reverse proxy. Prefer SSH local port forwarding (for example, `ssh -L 8787:127.0.0.1:8787 -L 8788:127.0.0.1:8788 user@host`) so the client continues to connect to its own `127.0.0.1`. Do not expose the local ports directly to the public internet. The Cloudflare Relay Token is a separate credential and is not interchangeable with an `ofb_live_` API key.
+
+
+## Encrypted cloud AI provider vault (v2.18.0)
+
+The cloud administrator at `/admin` can store OpenAI, Anthropic, and Gemini API keys in the same AES-256-GCM encrypted Durable Object vault as the Relay and Browser Engine credentials. The AI Workbench sends model requests to the authenticated same-origin `POST /api/ai/chat` endpoint; the Worker injects the provider key server-side and forwards only to fixed official provider endpoints. Provider keys are never returned to browser JavaScript or written to browser localStorage. The OpenAI, Anthropic, and Gemini options require a cloud login and a matching key configured in `/admin`. The Ollama option remains a direct local/LAN connection and does not use the cloud proxy. Custom cloud provider endpoints are intentionally not supported by this proxy to avoid turning it into an SSRF-capable arbitrary URL forwarder. Existing API keys previously stored in the browser's AI Workbench configuration are removed from that configuration on next load; re-enter them in the cloud admin vault.
+
+
+### Account and vault hardening (v2.23.0)
+
+The mobile cloud admin includes an account-security panel to change the owner password. Password changes require the current password, enforce the 14-character minimum, rotate the password salt/hash, revoke every existing session, and issue a fresh session only to the device that completed the change. Reauthentication failures are throttled per session. The vault panel also supports explicitly deleting individual stored credentials; deletion takes effect immediately and disables the associated integration until a new value is saved.
+
+The owner password cannot currently be reset by email or a public recovery link. Keep the password in a trusted password manager. There is currently no self-service password reset or recovery route. If the owner password is lost, do not delete or recreate the Durable Object data; operator-assisted recovery needs a separately reviewed and tested procedure before production use. Do not expose bootstrap or vault secrets in chat or issue trackers. The vault encryption key remains separate from the account password and must be backed up independently.
+
+
+## One-command local and cloud browser connection (v2.25.0)
+
+Run `npm run start:local` once. The launcher starts and supervises the local Browser Bridge and Streamable HTTP MCP server as one service group. It no longer requires a second terminal or a separate MCP startup command.
+
+- Admin: `http://127.0.0.1:8787/admin`
+- Browser REST tools: `http://127.0.0.1:8787/api/v1/tools`
+- MCP endpoint: `http://127.0.0.1:8788/mcp`
+- Health: `http://127.0.0.1:8787/health`
+
+Local REST and MCP clients connect without an API key by default. Use the printed MCP URL in an MCP-compatible client; do not add an Authorization header in local no-token mode. The launcher checks both ports and restarts the service group after unexpected exits, subject to the bounded restart policy. Both listeners remain bound to loopback.
+
+When `OPENFISH_RELAY_URL` and `OPENFISH_RELAY_TOKEN` are set in `.env`, the same command also starts the outbound Relay Agent and automatically provisions its local scoped API key in `.openfish/relay-agent-key` (file mode 0600). Remote clients use `https://YOUR-WORKER.workers.dev/mcp` with the Relay Token as Bearer authorization. Remote access remains authenticated; an anonymous public browser-control URL would expose the owner's live browser and data.
+

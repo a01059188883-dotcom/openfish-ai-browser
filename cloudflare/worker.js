@@ -1,15 +1,16 @@
 import mobileAdminHtml from "./mobile-admin.html";
+import { handleAuthVaultRoute } from "./auth-vault.js";
 import { acquire, connect } from "@cloudflare/playwright";
 
-const VERSION = "2.14.2";
+const VERSION = "2.25.0";
 const MAX_BODY_BYTES = 512 * 1024;
 const guardedBrowserContexts = new WeakSet();
-const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/browser/sessions"]);
+const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/admin/tasks", "/api/browser/sessions"]);
 const ALLOWED_PATH = path => path === "/mcp" || path === "/health" ||
   path === "/.well-known/openfish-tools.json" ||
   path === "/api/v1/tools" || path.startsWith("/api/v1/tools/") ||
   path.startsWith("/api/v1/adapters/") || path === "/api/v1/openapi.json" || path.startsWith("/api/v1/browser/") ||
-  ADMIN_PATHS.has(path) || /^\/api\/browser\/sessions\/[A-Za-z0-9_-]+\/close$/.test(path) ||
+  ADMIN_PATHS.has(path) || /^\/api\/admin\/tasks\/[A-Za-z0-9-]+(?:\/restore)?$/.test(path) || /^\/api\/browser\/sessions\/[A-Za-z0-9_-]+\/close$/.test(path) ||
   path === "/api/plan" || path === "/api/execute";
 
 function bearer(request) {
@@ -59,8 +60,61 @@ export default {
       return new Response(mobileAdminHtml, { headers: {
         "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
         "x-content-type-options": "nosniff", "referrer-policy": "no-referrer",
+        "x-frame-options": "DENY", "strict-transport-security": "max-age=63072000; includeSubDomains",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "cross-origin-opener-policy": "same-origin", "cross-origin-resource-policy": "same-origin",
         "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
       }});
+    }
+    if (url.pathname.startsWith("/api/auth/")) {
+      const publicAuthPaths = new Set(["/api/auth/bootstrap", "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/vault", "/api/auth/vault/backup", "/api/auth/password"]);
+      if (!publicAuthPaths.has(url.pathname)) return json({ error: "Not found." }, 404);
+      const headers = new Headers();
+      for (const name of ["cookie", "origin", "content-type", "cf-connecting-ip"]) {
+        const value = request.headers.get(name);
+        if (value) headers.set(name, value);
+      }
+      const body = ["POST", "PUT", "PATCH"].includes(request.method) ? await request.arrayBuffer() : undefined;
+      const authPath = url.pathname.replace(/^\/api/, "");
+      const maxAuthBodyBytes = url.pathname === "/api/auth/vault/backup" ? 100 * 1024 : 8192;
+      if (["POST", "PUT"].includes(request.method) && body && body.byteLength > maxAuthBodyBytes) return json({ error: "Authentication request body too large." }, 413);
+      const internal = new Request(new URL(authPath, request.url), { method: request.method, headers, body });
+      return relayStub(env).fetch(internal);
+    }
+    // An authenticated HttpOnly session may use the admin APIs without ever
+    // returning the Relay or Engine tokens to JavaScript.
+    const sessionCheck = await relayStub(env).fetch(new Request("https://relay.internal/auth/validate", {
+      method: "POST", headers: { cookie: request.headers.get("cookie") || "" }
+    }));
+    if (sessionCheck.ok) {
+      const credentialResponse = await relayStub(env).fetch(new Request("https://relay.internal/auth/credentials", {
+        method: "POST", headers: { cookie: request.headers.get("cookie") || "" }
+      }));
+      if (credentialResponse.ok) {
+        const credentials = (await credentialResponse.json()).secrets || {};
+        env = {
+          ...env,
+          OPENFISH_RELAY_TOKEN: credentials.OPENFISH_RELAY_TOKEN || env.OPENFISH_RELAY_TOKEN,
+          BROWSER_ENGINE_TOKEN: credentials.BROWSER_ENGINE_TOKEN || env.BROWSER_ENGINE_TOKEN,
+          BROWSER_ENGINE_URL: credentials.BROWSER_ENGINE_URL || env.BROWSER_ENGINE_URL,
+          OPENAI_API_KEY: credentials.OPENAI_API_KEY || "",
+          ANTHROPIC_API_KEY: credentials.ANTHROPIC_API_KEY || "",
+          GEMINI_API_KEY: credentials.GEMINI_API_KEY || ""
+        };
+        if (!request.headers.get("authorization") && env.OPENFISH_RELAY_TOKEN) {
+          const headers = new Headers(request.headers);
+          headers.set("authorization", "Bearer " + env.OPENFISH_RELAY_TOKEN);
+          request = new Request(request, { headers });
+        }
+      }
+    } else if (bearer(request)) {
+      // Desktop Relay Agents and external API clients authenticate with the
+      // bearer token; compare it inside the Durable Object without returning
+      // the stored secret to this request's caller.
+      const relayCheck = await relayStub(env).fetch(new Request("https://relay.internal/auth/relay-verify", {
+        method: "POST", headers: { authorization: "Bearer " + bearer(request) }
+      }));
+      if (relayCheck.ok) env = { ...env, OPENFISH_RELAY_TOKEN: bearer(request) };
     }
     // Public plugin discovery document; all browser operations remain bearer-authenticated.
     if (url.pathname === "/api/v1/openapi.json" && request.method === "GET") {
@@ -80,14 +134,58 @@ export default {
         }
       }), { headers: { "content-type": "application/vnd.oai.openapi+json;version=3.1", "cache-control": "public, max-age=300", "x-openfish-version": VERSION } });
     }
+    if (url.pathname === "/api/ai/chat") {
+      if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+      if (!sessionCheck.ok) return json({ error: "Cloud login required." }, 401);
+      const declaredLength = Number(request.headers.get("content-length") || 0);
+      if (declaredLength > 450000) return json({ error: "Model request exceeds 450 KB." }, 413);
+      let input;
+      try {
+        const rawBody = await request.text();
+        if (rawBody.length > 450000) return json({ error: "Model request exceeds 450 KB." }, 413);
+        input = JSON.parse(rawBody);
+      } catch { return json({ error: "Invalid JSON body." }, 400); }
+      const provider = String(input.provider || "");
+      const model = String(input.model || "").trim().slice(0, 160);
+      const payload = input.payload;
+      if (!model || !payload || typeof payload !== "object" || Array.isArray(payload) || payload.stream === true) return json({ error: "A model and non-streaming request payload are required." }, 400);
+      let endpoint, headers = { "content-type": "application/json" }, apiKey;
+      if (provider === "openai") {
+        apiKey = env.OPENAI_API_KEY; endpoint = "https://api.openai.com/v1/chat/completions";
+        if (apiKey) headers.authorization = "Bearer " + apiKey;
+      } else if (provider === "anthropic") {
+        apiKey = env.ANTHROPIC_API_KEY; endpoint = "https://api.anthropic.com/v1/messages";
+        if (apiKey) { headers["x-api-key"] = apiKey; headers["anthropic-version"] = "2023-06-01"; }
+      } else if (provider === "gemini") {
+        apiKey = env.GEMINI_API_KEY; endpoint = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent";
+        if (apiKey) headers["x-goog-api-key"] = apiKey;
+      } else return json({ error: "Unsupported cloud model provider." }, 400);
+      if (!apiKey) return json({ error: provider.toUpperCase() + " API Key is not configured in /admin." }, 503);
+      const serialized = JSON.stringify(payload);
+      if (serialized.length > 450000) return json({ error: "Model request exceeds 450 KB." }, 413);
+      try {
+        const upstream = await fetch(endpoint, { method: "POST", headers, body: serialized, signal: AbortSignal.timeout(60000) });
+        const raw = await upstream.text();
+        if (raw.length > 480000) return json({ error: "Model response exceeds relay limit." }, 502);
+        let data;
+        try { data = JSON.parse(raw); } catch { return json({ error: "Model provider returned invalid JSON." }, 502); }
+        if (!upstream.ok) {
+          const detail = data.error?.message || data.error?.status || "Provider request failed.";
+          return json({ error: String(detail).slice(0, 500) }, upstream.status >= 400 && upstream.status < 500 ? upstream.status : 502);
+        }
+        return json(data);
+      } catch (error) {
+        return json({ error: "Model provider request failed: " + String(error?.message || error).slice(0, 180) }, 502);
+      }
+    }
     if (url.pathname === "/api/ai/search") {
       if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
-      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      if (!sessionCheck.ok && !authorized(request, env)) return json({ error: "Unauthorized." }, 401);
       let payload;
       try { payload = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
       const query = String(payload.query || "").trim().slice(0, 300);
       if (!query) return json({ error: "A search query is required." }, 400);
-      const headers = { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.2)", "accept": "text/html" };
+      const headers = { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.16.1)", "accept": "text/html" };
       const sources = await Promise.allSettled([
         fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), { headers, signal: AbortSignal.timeout(12000) }),
         fetch("https://www.bing.com/search?q=" + encodeURIComponent(query), { headers, signal: AbortSignal.timeout(12000) })
@@ -113,7 +211,7 @@ export default {
     }
     if (url.pathname === "/api/ai/fetch") {
       if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
-      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      if (!sessionCheck.ok && !authorized(request, env)) return json({ error: "Unauthorized." }, 401);
       let payload;
       try { payload = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
       const validPublicUrl = value => {
@@ -131,7 +229,7 @@ export default {
       try {
         let response;
         for (let hop = 0; hop < 4; hop++) {
-          response = await fetch(target.href, { redirect: "manual", signal: AbortSignal.timeout(12000), headers: { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.2)", "accept": "text/html,text/plain;q=0.9" } });
+          response = await fetch(target.href, { redirect: "manual", signal: AbortSignal.timeout(12000), headers: { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.16.1)", "accept": "text/html,text/plain;q=0.9" } });
           if (![301, 302, 303, 307, 308].includes(response.status)) break;
           const location = response.headers.get("location");
           if (!location || hop === 3) return json({ error: "Too many or invalid redirects." }, 502);
@@ -226,6 +324,8 @@ export class OpenFishRelay {
     this.ctx = ctx; this.env = env; this.pending = new Map(); this.cloudLocks = new Map(); this.maxPending = 32; this.requestTimeoutMs = 45000;
   }
   async fetch(request) {
+    const authResponse = await handleAuthVaultRoute(request, this.ctx, this.env);
+    if (authResponse) return authResponse;
     const url = new URL(request.url);
     if (url.pathname.startsWith("/cloud/")) return this.withCloudSessionLock(request);
     if (url.pathname === "/connect") {
