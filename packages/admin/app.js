@@ -339,7 +339,7 @@ function integrationConfigText() {
   const url = $("integrationMcpUrl")?.value.trim() || "";
   const sessionId = $("integrationSession")?.value.trim() || "default";
   if (!/^https?:\/\//i.test(url) || !url.endsWith("/mcp")) throw new Error("MCP 地址必须是 http(s) URL，并以 /mcp 结尾。");
-  if (!key && !isLoopbackAddressUrl(url)) throw new Error("远程地址必须使用 API 密钥；本机 127.0.0.1 / localhost 可免 Token。");
+  if (!key && !isLoopbackAddressUrl(url)) throw new Error("远程地址必须使用访问 Token；本机 127.0.0.1 / localhost 可免 Token。");
   if (sessionId !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) throw new Error("浏览器会话 ID 格式不正确。");
   const headers = {};
   if (key) {
