@@ -10,7 +10,7 @@ test("public browser loads the mobile-first workspace design", async () => {
   assert.match(html, /\/workspace\.css/);
   assert.match(html, /viewport-fit=cover/);
   assert.doesNotMatch(html, /maximum-scale=1/);
-  assert.match(html, /v2\.22\.0/);
+  assert.match(html, /v2\.23\.0/);
   assert.match(css, /@media\(max-width:700px\)/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /prefers-reduced-motion/);
@@ -23,8 +23,8 @@ test("admin and mobile admin load the v2.23.0 responsive visual system", async (
   const mobile = await read("../cloudflare/mobile-admin.html");
   assert.match(admin, /@media\(max-width:620px\)/);
   assert.match(admin, /position:sticky/);
-  assert.match(adminHtml, /v2\.22\.0/);
-  assert.match(mobile, /OpenFish v2\.22\.0 mobile admin visual refinement/);
+  assert.match(adminHtml, /v2\.23\.0/);
+  assert.match(mobile, /OpenFish v2\.23\.0 mobile admin visual refinement/);
   assert.match(mobile, /env\(safe-area-inset-bottom\)/);
 });
 
