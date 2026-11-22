@@ -76,7 +76,8 @@ export default {
       }
       const body = ["POST", "PUT", "PATCH"].includes(request.method) ? await request.arrayBuffer() : undefined;
       const authPath = url.pathname.replace(/^\/api/, "");
-      if (["POST", "PUT"].includes(request.method) && body && body.byteLength > 8192) return json({ error: "Authentication request body too large." }, 413);
+      const maxAuthBodyBytes = url.pathname === "/api/auth/vault/backup" ? 100 * 1024 : 8192;
+      if (["POST", "PUT"].includes(request.method) && body && body.byteLength > maxAuthBodyBytes) return json({ error: "Authentication request body too large." }, 413);
       const internal = new Request(new URL(authPath, request.url), { method: request.method, headers, body });
       return relayStub(env).fetch(internal);
     }
