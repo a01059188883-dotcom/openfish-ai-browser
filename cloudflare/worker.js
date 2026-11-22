@@ -2,7 +2,7 @@ import mobileAdminHtml from "./mobile-admin.html";
 import { handleAuthVaultRoute } from "./auth-vault.js";
 import { acquire, connect } from "@cloudflare/playwright";
 
-const VERSION = "2.17.0";
+const VERSION = "2.18.0";
 const MAX_BODY_BYTES = 512 * 1024;
 const guardedBrowserContexts = new WeakSet();
 const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/admin/tasks", "/api/browser/sessions"]);
@@ -173,7 +173,7 @@ export default {
     }
     if (url.pathname === "/api/ai/search") {
       if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
-      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      if (!sessionCheck.ok && !authorized(request, env)) return json({ error: "Unauthorized." }, 401);
       let payload;
       try { payload = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
       const query = String(payload.query || "").trim().slice(0, 300);
