@@ -113,3 +113,15 @@ jobs:
             echo "Bootstrap secret not set; leaving the existing Worker bootstrap secret unchanged."
           fi
           printf '%s' "$OPENFISH_VAULT_KEY" | npx --yes wrangler@4 secret put OPENFISH_VAULT_KEY --config cloudflare/wrangler.toml
+
+      - name: Smoke test deployed OpenFish web app
+        run: |
+          set -euo pipefail
+          base="https://openfish-ai-browser-relay.a01059188883.workers.dev"
+          curl --retry 5 --retry-delay 2 -fsS "$base/?v=2.25.0" -o /tmp/openfish-index.html
+          grep -Fq 'ai-workbench.js?v=2.25.0' /tmp/openfish-index.html
+          curl --retry 5 --retry-delay 2 -fsS "$base/ai-workbench.js?v=2.25.0" -o /tmp/openfish-ai-workbench.js
+          grep -Fq 'function validatePlan' /tmp/openfish-ai-workbench.js
+          curl --retry 5 --retry-delay 2 -fsS "$base/app.js?v=2.25.0" -o /tmp/openfish-app.js
+          grep -Fq 'OpenFish' /tmp/openfish-app.js
+          echo "Production Worker frontend assets are reachable and match v2.25.0."
