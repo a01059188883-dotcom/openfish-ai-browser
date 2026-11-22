@@ -350,4 +350,18 @@ The cloud administrator at `/admin` can store OpenAI, Anthropic, and Gemini API 
 The mobile cloud admin includes an account-security panel to change the owner password. Password changes require the current password, enforce the 14-character minimum, rotate the password salt/hash, revoke every existing session, and issue a fresh session only to the device that completed the change. Reauthentication failures are throttled per session. The vault panel also supports explicitly deleting individual stored credentials; deletion takes effect immediately and disables the associated integration until a new value is saved.
 
 The owner password cannot currently be reset by email or a public recovery link. Keep the password in a trusted password manager. There is currently no self-service password reset or recovery route. If the owner password is lost, do not delete or recreate the Durable Object data; operator-assisted recovery needs a separately reviewed and tested procedure before production use. Do not expose bootstrap or vault secrets in chat or issue trackers. The vault encryption key remains separate from the account password and must be backed up independently.
-\n\n## One-command local and cloud browser connection (v2.25.0)\n\nRun `npm run start:local` once. The launcher starts and supervises both the local Browser Bridge and the Streamable HTTP MCP server as one service group. You no longer need to open a second terminal or run `npm run start:mcp:http` separately. When ready, the terminal prints the exact addresses:\n\n- Admin: `http://127.0.0.1:8787/admin`\n- Browser REST tools: `http://127.0.0.1:8787/api/v1/tools`\n- MCP endpoint: `http://127.0.0.1:8788/mcp`\n- Health: `http://127.0.0.1:8787/health`\n\nLocal REST and MCP clients can connect without an API key by default. Use the printed MCP URL in an MCP-compatible client; do not add an Authorization header in local no-token mode. The launcher checks both ports before starting and restarts the whole service group together after an unexpected child-process exit, subject to the existing bounded restart policy. Both listeners remain bound to loopback. When the two Relay environment variables are configured, the launcher also starts the outbound Relay Agent and automatically provisions its local scoped API key in `.openfish/relay-agent-key` (file mode 0600). Remote clients use `https://YOUR-WORKER.workers.dev/mcp` with the Relay Token as Bearer authorization. The remote endpoint is intentionally authenticated; a public anonymous browser-control URL would expose the owner's live browser and data.\n
+
+
+## One-command local and cloud browser connection (v2.25.0)
+
+Run `npm run start:local` once. The launcher starts and supervises the local Browser Bridge and Streamable HTTP MCP server as one service group. It no longer requires a second terminal or a separate MCP startup command.
+
+- Admin: `http://127.0.0.1:8787/admin`
+- Browser REST tools: `http://127.0.0.1:8787/api/v1/tools`
+- MCP endpoint: `http://127.0.0.1:8788/mcp`
+- Health: `http://127.0.0.1:8787/health`
+
+Local REST and MCP clients connect without an API key by default. Use the printed MCP URL in an MCP-compatible client; do not add an Authorization header in local no-token mode. The launcher checks both ports and restarts the service group after unexpected exits, subject to the bounded restart policy. Both listeners remain bound to loopback.
+
+When `OPENFISH_RELAY_URL` and `OPENFISH_RELAY_TOKEN` are set in `.env`, the same command also starts the outbound Relay Agent and automatically provisions its local scoped API key in `.openfish/relay-agent-key` (file mode 0600). Remote clients use `https://YOUR-WORKER.workers.dev/mcp` with the Relay Token as Bearer authorization. Remote access remains authenticated; an anonymous public browser-control URL would expose the owner's live browser and data.
+
