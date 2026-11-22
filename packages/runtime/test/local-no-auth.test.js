@@ -61,6 +61,10 @@ test("local single-machine bridge allows browser tools without any API token by 
     method: "POST", headers: { "content-type": "application/json" }, body: "{}"
   });
   assert.equal(response.status, 200);
+  const relayed = await fetch(base + "/api/v1/tools/list_workspaces", {
+    method: "POST", headers: { "content-type": "application/json", "x-openfish-platform": "cloudflare-relay" }, body: "{}"
+  });
+  assert.equal(relayed.status, 401, "Cloudflare relay forwarding must still present its separate local API key");
 });
 
 test("local tokenless mode can be disabled to require API keys", async t => {
