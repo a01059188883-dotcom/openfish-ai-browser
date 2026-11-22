@@ -3,6 +3,8 @@ const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const PASSWORD_ITERATIONS = 310000;
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const BACKUP_ITERATIONS = 600000;
+const BACKUP_AAD = encoder.encode("OpenFish encrypted vault backup v1");
 const encoder = new TextEncoder();
 
 function json(data, status = 200, headers = {}) {
@@ -104,6 +106,48 @@ async function writeVault(ctx, env, secrets) {
   const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plain);
   await ctx.storage.put("vault:encrypted", { iv: base64url(iv), data: base64url(new Uint8Array(encrypted)), updatedAt: Date.now() });
 }
+
+async function backupKey(passphrase, salt) {
+  const material = await crypto.subtle.importKey("raw", encoder.encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt, iterations: BACKUP_ITERATIONS }, material, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+function validVaultPayload(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const allowed = ["OPENFISH_RELAY_TOKEN", "BROWSER_ENGINE_TOKEN", "BROWSER_ENGINE_URL", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"];
+  if (Object.keys(value).some(key => !allowed.includes(key))) return false;
+  for (const name of allowed) {
+    if (value[name] === undefined) continue;
+    if (name === "BROWSER_ENGINE_URL") {
+      try { const parsed = new URL(value[name]); if (parsed.protocol !== "https:" || parsed.username || parsed.password || value[name] !== parsed.origin) return false; } catch { return false; }
+    } else if (!validSecret(value[name])) return false;
+  }
+  return true;
+}
+async function createVaultBackup(secrets, passphrase) {
+  const salt = new Uint8Array(16); crypto.getRandomValues(salt);
+  const iv = new Uint8Array(12); crypto.getRandomValues(iv);
+  const key = await backupKey(passphrase, salt);
+  const plain = encoder.encode(JSON.stringify({ schema: "openfish-vault-backup", version: 1, exportedAt: new Date().toISOString(), secrets }));
+  const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: BACKUP_AAD }, key, plain);
+  return { schema: "openfish-vault-backup", version: 1, kdf: "PBKDF2-SHA-256", iterations: BACKUP_ITERATIONS, cipher: "AES-256-GCM", salt: base64url(salt), iv: base64url(iv), data: base64url(new Uint8Array(data)) };
+}
+async function openVaultBackup(backup, passphrase) {
+  if (!backup || typeof backup !== "object" || backup.schema !== "openfish-vault-backup" || backup.version !== 1 ||
+      backup.kdf !== "PBKDF2-SHA-256" || backup.iterations !== BACKUP_ITERATIONS || backup.cipher !== "AES-256-GCM" ||
+      typeof backup.salt !== "string" || typeof backup.iv !== "string" || typeof backup.data !== "string" ||
+      backup.salt.length > 64 || backup.iv.length > 32 || backup.data.length > 90000) throw new Error("备份文件格式无效或版本不受支持。");
+  const salt = fromBase64url(backup.salt), iv = fromBase64url(backup.iv), data = fromBase64url(backup.data);
+  if (salt.length !== 16 || iv.length !== 12 || data.length < 17 || data.length > 65536) throw new Error("备份文件大小或加密参数无效。");
+  const key = await backupKey(passphrase, salt);
+  let plain;
+  try { plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv, additionalData: BACKUP_AAD }, key, data); }
+  catch { throw new Error("备份解密失败：口令错误或文件已损坏。"); }
+  let payload;
+  try { payload = JSON.parse(new TextDecoder().decode(plain)); } catch { throw new Error("备份内容无法解析。"); }
+  if (payload?.schema !== "openfish-vault-backup" || payload.version !== 1 || !validVaultPayload(payload.secrets)) throw new Error("备份内容结构无效，未修改现有密钥库。");
+  return payload.secrets;
+}
+
 function publicVault(secrets) {
   return Object.fromEntries(["OPENFISH_RELAY_TOKEN", "BROWSER_ENGINE_TOKEN", "BROWSER_ENGINE_URL", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"].map(name => [
     name,
@@ -247,6 +291,28 @@ export async function handleAuthVaultRoute(request, ctx, env) {
     const expected = (await readVault(ctx, env)).OPENFISH_RELAY_TOKEN || "";
     const valid = validSecret(expected) && constantTimeEqual(encoder.encode(supplied), encoder.encode(expected));
     return json({ ok: valid }, valid ? 200 : 401);
+  }
+
+
+  if (path === "/auth/vault/backup" && request.method === "POST") {
+    const found = await sessionRecord(ctx, request);
+    if (!found || found.record.role !== "owner") return json({ error: "Unauthorized." }, 401);
+    let body;
+    try { body = await readJson(); } catch (error) { return json({ error: error.message }, 400); }
+    const passphrase = String(body.passphrase || "");
+    if (passphrase.length < 16 || passphrase.length > 256) return json({ error: "备份口令必须为 16–256 个字符。" }, 400);
+    if (body.action === "export") {
+      const backup = await createVaultBackup(await readVault(ctx, env), passphrase);
+      await audit(ctx, "vault.backup.exported", found.record.username);
+      return json({ ok: true, backup });
+    }
+    if (body.action === "restore") {
+      const backup = await openVaultBackup(body.backup, passphrase);
+      await writeVault(ctx, env, backup);
+      await audit(ctx, "vault.backup.restored", found.record.username);
+      return json({ ok: true, secrets: publicVault(backup), message: "备份已验证并恢复；原密钥库已整体替换。" });
+    }
+    return json({ error: "action must be export or restore." }, 400);
   }
 
   if (path === "/auth/vault" && request.method === "GET") {
