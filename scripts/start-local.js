@@ -1,18 +1,6 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import { runLocalChecks } from "./local-checks.js";
 
-// Load .env values into this process without ever printing them.
-if (existsSync(".env")) {
-  const { readFile } = await import("node:fs/promises");
-  for (const line of (await readFile(".env", "utf8")).split(/\r?\n/)) {
-    const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
-    if (!match || Object.hasOwn(process.env, match[1])) continue;
-    let value = match[2];
-    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
-    process.env[match[1]] = value;
-  }
-}
 const checks = await runLocalChecks();
 for (const check of checks.checks) {
   const mark = check.ok ? "✓" : check.required ? "✗" : "!";
@@ -23,8 +11,7 @@ if (!checks.requiredOk) {
   process.exit(1);
 }
 
-const args = ["packages/runtime/src/bridge.js"];
-const child = spawn(process.execPath, args, { stdio: "inherit", env: process.env });
+const child = spawn(process.execPath, ["packages/runtime/src/bridge.js"], { stdio: "inherit", env: process.env });
 let stopping = false;
 const stop = signal => {
   if (stopping) return;
@@ -54,6 +41,4 @@ if (!ready) {
   console.log("免 Token 模式：" + (process.env.OPENFISH_LOCAL_NO_AUTH === "false" ? "关闭" : "开启（仅本机回环地址）"));
   console.log("按 Ctrl+C 停止服务。\n");
 }
-if (child.exitCode === null) {
-  await new Promise(resolve => child.once("exit", resolve));
-}
+if (child.exitCode === null) await new Promise(resolve => child.once("exit", resolve));
