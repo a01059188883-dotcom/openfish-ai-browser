@@ -15,6 +15,7 @@ test("Streamable HTTP MCP endpoint supports tokenless loopback mode and retains 
   assert.ok(source.includes('process.env.OPENFISH_LOCAL_NO_AUTH !== "false"'));
   assert.ok(source.includes("localNoAuthRequest"));
   assert.ok(source.includes("isLoopbackAddress(req.socket.remoteAddress)"));
+  assert.ok(source.includes('req.headers["x-openfish-platform"] !== "cloudflare-relay"'));
   assert.ok(source.includes("if (!localNoAuthRequest)"));
   assert.ok(source.includes("if (write && token)"));
   assert.ok(source.includes('await verifyKey(bearer[1], "browser:read", { ...clientMeta, sessionId })'));
