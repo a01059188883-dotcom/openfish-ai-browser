@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { handleAuthVaultRoute } from "../../../cloudflare/auth-vault.js";
 
 function makeContext() {
@@ -103,4 +104,25 @@ test("cloud auth rejects cross-origin state changes and invalid vault settings",
     body: { bootstrapSecret: env.OPENFISH_BOOTSTRAP_SECRET, username: "owner", password: "short" }
   }), ctx, env);
   assert.equal(shortPassword.status, 400);
+});
+
+test("cloud auth enforces login throttling and keeps raw vault credentials off public routes", async () => {
+  const ctx = makeContext();
+  for (let i = 0; i < 5; i++) {
+    const failed = await handleAuthVaultRoute(request("/auth/login", {
+      method: "POST", body: { username: "nobody", password: "wrong-password" }
+    }), ctx, env);
+    assert.equal(failed.status, 401);
+  }
+  const throttled = await handleAuthVaultRoute(request("/auth/login", {
+    method: "POST", body: { username: "nobody", password: "wrong-password" }
+  }), ctx, env);
+  assert.equal(throttled.status, 429);
+
+  const worker = await readFile(new URL("../../../cloudflare/worker.js", import.meta.url), "utf8");
+  const allowlist = /const publicAuthPaths = new Set\\(\\[([^\\]]+)\\]\\)/.exec(worker)?.[1] || "";
+  assert.ok(allowlist.includes("/api/auth/bootstrap"));
+  assert.ok(allowlist.includes("/api/auth/vault"));
+  assert.equal(allowlist.includes("/api/auth/credentials"), false);
+  assert.match(worker, /if \\(!publicAuthPaths\\.has\\(url\\.pathname\\)\\) return json/);
 });
