@@ -1,8 +1,13 @@
 name: Deploy OpenFish Relay
 
 on:
-  # Production Cloud Run + Worker release is manual-only; PR merges never deploy.
   workflow_dispatch:
+  # One-time v2.25.0 release gate: only the dedicated marker file on main deploys.
+  # Normal PR merges and unrelated main pushes never deploy production.
+  push:
+    branches: [main]
+    paths:
+      - ".release/openfish-v2.25.0"
 
 concurrency:
   group: openfish-cloudrun-engine-deploy
