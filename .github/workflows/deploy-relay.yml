@@ -44,7 +44,7 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN repository secret"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID repository secret"; exit 1; }
-          test "${#OPENFISH_BOOTSTRAP_SECRET}" -ge 32 || { echo "OPENFISH_BOOTSTRAP_SECRET must be at least 32 characters"; exit 1; }
+          if [ -n "$OPENFISH_BOOTSTRAP_SECRET" ]; then test "${#OPENFISH_BOOTSTRAP_SECRET}" -ge 32 || { echo "OPENFISH_BOOTSTRAP_SECRET must be at least 32 characters when set"; exit 1; }; fi
           test "${#OPENFISH_VAULT_KEY}" -ge 32 || { echo "OPENFISH_VAULT_KEY must be at least 32 characters"; exit 1; }
           test -n "$GCP_WORKLOAD_IDENTITY_PROVIDER" || { echo "Missing GCP_WORKLOAD_IDENTITY_PROVIDER repository secret"; exit 1; }
           test -n "$GCP_SERVICE_ACCOUNT" || { echo "Missing GCP_SERVICE_ACCOUNT repository secret"; exit 1; }
@@ -107,5 +107,9 @@ jobs:
           OPENFISH_BOOTSTRAP_SECRET: ${{ secrets.OPENFISH_BOOTSTRAP_SECRET }}
           OPENFISH_VAULT_KEY: ${{ secrets.OPENFISH_VAULT_KEY }}
         run: |
-          printf '%s' "$OPENFISH_BOOTSTRAP_SECRET" | npx --yes wrangler@4 secret put OPENFISH_BOOTSTRAP_SECRET --config cloudflare/wrangler.toml
+          if [ -n "$OPENFISH_BOOTSTRAP_SECRET" ]; then
+            printf '%s' "$OPENFISH_BOOTSTRAP_SECRET" | npx --yes wrangler@4 secret put OPENFISH_BOOTSTRAP_SECRET --config cloudflare/wrangler.toml
+          else
+            echo "Bootstrap secret not set; leaving the existing Worker bootstrap secret unchanged."
+          fi
           printf '%s' "$OPENFISH_VAULT_KEY" | npx --yes wrangler@4 secret put OPENFISH_VAULT_KEY --config cloudflare/wrangler.toml
