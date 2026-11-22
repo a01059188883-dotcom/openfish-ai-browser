@@ -7,3 +7,5 @@ playwright/.auth/
 .DS_Store
 
 .openfish/
+
+cloudflare/.dev.vars
