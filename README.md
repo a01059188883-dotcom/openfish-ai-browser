@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.17.0**.
+Open-source, free-first browser automation starter. Version: **2.18.0**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -318,3 +318,8 @@ For Visual Studio Code, use its native `servers` format:
 }
 ```
 For REST, send `POST http://127.0.0.1:8787/api/v1/tools/read_page` with `Authorization: Bearer YOUR_OPENFISH_API_KEY` and `Content-Type: application/json`; the JSON body can be `{}` for the current page. Choose the read-only scope for read tools; browser actions require the write scope. The server stores only a SHA-256 digest and shows the raw key only once. Revoke a client key from the local admin panel to disable that client. Use a unique key per application and least-privilege scopes. The local MCP listener binds to `127.0.0.1` by default. Prefer SSH local port forwarding (for example, `ssh -L 8787:127.0.0.1:8787 -L 8788:127.0.0.1:8788 user@host`) so the client continues to connect to its own `127.0.0.1`. Do not expose the local ports directly to the public internet. The Cloudflare Relay Token is a separate credential and is not interchangeable with an `ofb_live_` API key.
+
+
+## Encrypted cloud AI provider vault (v2.18.0)
+
+The cloud administrator at `/admin` can store OpenAI, Anthropic, and Gemini API keys in the same AES-256-GCM encrypted Durable Object vault as the Relay and Browser Engine credentials. The AI Workbench sends model requests to the authenticated same-origin `POST /api/ai/chat` endpoint; the Worker injects the provider key server-side and forwards only to fixed official provider endpoints. Provider keys are never returned to browser JavaScript or written to browser localStorage. The OpenAI, Anthropic, and Gemini options require a cloud login and a matching key configured in `/admin`. The Ollama option remains a direct local/LAN connection and does not use the cloud proxy. Custom cloud provider endpoints are intentionally not supported by this proxy to avoid turning it into an SSRF-capable arbitrary URL forwarder. Existing API keys previously stored in the browser's AI Workbench configuration are removed from that configuration on next load; re-enter them in the cloud admin vault.
