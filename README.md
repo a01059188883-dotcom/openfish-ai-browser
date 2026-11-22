@@ -41,7 +41,13 @@ npm run start:mcp
 ```
 Configure your MCP host to launch `node packages/mcp-server/src/index.js` from this project directory using stdio.
 
-## Visual admin dashboard\nOpen `http://127.0.0.1:8787/admin` after starting the bridge to open the local control panel. It displays bridge uptime, API request/error counts, browser connection mode, recent API activity, and a task planner with explicit approval before execution. Dashboard telemetry is held in process memory and resets when the bridge restarts. The panel is served only by the local bridge; it is not a public cloud admin site.\n\n## Unified local runtime (v1.3.3)\nThe bridge is the single owner of the Playwright browser. Both the Chrome side panel and the stdio MCP server call the same local bridge API; MCP no longer launches a second browser process. Start `npm run start:bridge` before launching either client. The MCP server exposes `open_page`, `read_page`, `plan_task`, `execute_plan`, `click_element`, `fill_element`, `take_screenshot`, `list_interactive_elements`, and `get_accessibility_snapshot`.\n\n## Review and execution flow
+## Visual admin dashboard
+Open `http://127.0.0.1:8787/admin` after starting the bridge to open the local control panel. It displays bridge uptime, API request/error counts, browser connection mode, recent API activity, and a task planner with explicit approval before execution. Dashboard telemetry is held in process memory and resets when the bridge restarts. The panel is served only by the local bridge; it is not a public cloud admin site.
+
+## Unified local runtime (v1.3.3)
+The bridge is the single owner of the Playwright browser. Both the Chrome side panel and the stdio MCP server call the same local bridge API; MCP no longer launches a second browser process. Start `npm run start:bridge` before launching either client. The MCP server exposes `open_page`, `read_page`, `plan_task`, `execute_plan`, `click_element`, `fill_element`, `take_screenshot`, `list_interactive_elements`, and `get_accessibility_snapshot`.
+
+## Review and execution flow
 1. Ask the local AI planner to generate a plan for the current page.
 2. Review the complete plan in the Chrome side panel or MCP response.
 3. Explicitly approve the exact plan using the side-panel confirmation or the MCP `execute_plan` tool with `approved: true`.
@@ -89,7 +95,11 @@ Then open `https://YOUR_WORKER_HOST/admin`:
 
 For the manual GitHub Actions production workflow, configure repository secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `OPENFISH_BOOTSTRAP_SECRET`, `OPENFISH_VAULT_KEY`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`, and `BROWSER_ENGINE_TOKEN`. The workflow installs only the bootstrap and vault-encryption secrets in the Worker; it does not duplicate the Relay or Engine bearer tokens as Worker secrets. `BROWSER_ENGINE_TOKEN` is required by the Cloud Run engine and must also be entered into the authenticated vault after first login. The Relay Token is entered in the vault and must match the desktop Agent's `.env` value.
 
-### Encrypted backup and restore\n\nThe mobile admin supports an encrypted vault backup envelope. Export and restore require a separate 16–256 character passphrase; the Worker derives an AES-256-GCM key with PBKDF2-SHA-256 (600,000 iterations), random salt and IV, and authenticated context. The browser receives only ciphertext. Restore validates the entire schema and all credential fields before a single encrypted vault write; a wrong passphrase or malformed backup leaves the current vault unchanged. Keep the backup file and passphrase in separate secure locations. This is a portable encrypted backup, not automatic encryption-key rotation.\n\n### Security model
+### Encrypted backup and restore
+
+The mobile admin supports an encrypted vault backup envelope. Export and restore require a separate 16–256 character passphrase; the Worker derives an AES-256-GCM key with PBKDF2-SHA-256 (600,000 iterations), random salt and IV, and authenticated context. The browser receives only ciphertext. Restore validates the entire schema and all credential fields before a single encrypted vault write; a wrong passphrase or malformed backup leaves the current vault unchanged. Keep the backup file and passphrase in separate secure locations. This is a portable encrypted backup, not automatic encryption-key rotation.
+
+### Security model
 
 - Owner password hashes use PBKDF2-HMAC-SHA-256 with a per-account random salt and 310,000 iterations; login attempts are rate-limited.
 - Admin sessions are random, 12-hour, `HttpOnly`, `Secure`, `SameSite=Strict` cookies. The UI uses same-origin requests and does not save bearer tokens in localStorage or sessionStorage.
