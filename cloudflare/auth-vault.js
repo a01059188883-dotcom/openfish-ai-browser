@@ -164,7 +164,7 @@ export async function handleAuthVaultRoute(request, ctx, env) {
   const url = new URL(request.url);
   const path = url.pathname;
   if (!path.startsWith("/auth/")) return null;
-  if (["/auth/bootstrap", "/auth/login", "/auth/logout", "/auth/vault", "/auth/password"].includes(path) && request.method !== "GET" &&
+  if (["/auth/bootstrap", "/auth/login", "/auth/logout", "/auth/vault", "/auth/vault/backup", "/auth/password"].includes(path) && request.method !== "GET" &&
       (!request.headers.get("origin") || !safeOrigin(request))) return json({ error: "Same-origin request required." }, 403);
   const readJson = async (maxBytes = 8192) => {
     const length = Number(request.headers.get("content-length") || 0);
