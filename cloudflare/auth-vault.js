@@ -211,8 +211,8 @@ export async function handleAuthVaultRoute(request, ctx, env) {
     if (sessionKeys.length) await ctx.storage.delete(sessionKeys);
     const token = randomToken(32);
     const sessionKey = "session:" + await hex(await sha256(token));
-    const now = Date.now();
-    await ctx.storage.put(sessionKey, { username: user.username, role: user.role, createdAt: now, expiresAt: now + SESSION_TTL_MS }, { expirationTtl: Math.ceil(SESSION_TTL_MS / 1000) });
+    const sessionNow = Date.now();
+    await ctx.storage.put(sessionKey, { username: user.username, role: user.role, createdAt: sessionNow, expiresAt: sessionNow + SESSION_TTL_MS }, { expirationTtl: Math.ceil(SESSION_TTL_MS / 1000) });
     await audit(ctx, "auth.password.changed", user.username);
     return json({ ok: true, message: "密码已更新，其他设备的登录会话已全部失效。" }, 200, { "set-cookie": cookieHeader(token) });
   }
