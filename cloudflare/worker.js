@@ -70,7 +70,9 @@ export default {
         if (value) headers.set(name, value);
       }
       const body = ["POST", "PUT", "PATCH"].includes(request.method) ? await request.arrayBuffer() : undefined;
-      const internal = new Request("https://relay.internal" + url.pathname.replace(/^\\/api/, ""), { method: request.method, headers, body });
+      const authPath = url.pathname.replace(/^\\/api/, "");
+      if (["POST", "PUT"].includes(request.method) && body && body.byteLength > 8192) return json({ error: "Authentication request body too large." }, 413);
+      const internal = new Request(new URL(authPath, request.url), { method: request.method, headers, body });
       return relayStub(env).fetch(internal);
     }
     // An authenticated HttpOnly session may use the admin APIs without ever
