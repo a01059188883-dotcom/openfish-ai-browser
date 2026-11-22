@@ -289,7 +289,7 @@ const server = http.createServer(async (req, res) => {
       const name = res.reqPath.slice("/api/v1/tools/".length);
       const body = await readBody(req);
       const writeTools = new Set(["open_page", "execute_plan", "click_element", "fill_element", "go_back", "go_forward", "reload_page", "new_tab", "switch_tab", "close_tab", "add_bookmark", "remove_bookmark", "clear_history", "add_reading_item", "remove_reading_item", "organize_tab", "duplicate_tab", "reopen_closed_tab", "save_workspace", "restore_workspace", "remove_workspace", "download_link", "remove_download", "clear_session_data", "import_browser_library"]);
-      const localNoAuth = LOCAL_NO_AUTH && isLoopbackAddress(req.socket.remoteAddress);
+      const localNoAuth = LOCAL_NO_AUTH && isLoopbackAddress(req.socket.remoteAddress) && req.headers["x-openfish-platform"] !== "cloudflare-relay";
       if (!localNoAuth) {
         const requiredScope = writeTools.has(name) ? "browser:write" : "browser:read";
         const bearer = /^Bearer (.+)$/i.exec(req.headers.authorization || "");
