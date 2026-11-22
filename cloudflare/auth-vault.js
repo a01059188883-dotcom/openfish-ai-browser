@@ -184,6 +184,11 @@ export async function handleAuthVaultRoute(request, ctx, env) {
     let body;
     try { body = await readJson(); } catch (error) { return json({ error: error.message }, 400); }
     const user = await ctx.storage.get("auth:user");
+    const passwordRateKey = "password-rate:" + found.key;
+    const now = Date.now();
+    let passwordRate = await ctx.storage.get(passwordRateKey) || { count: 0, resetAt: now + LOGIN_WINDOW_MS };
+    if (passwordRate.resetAt <= now) passwordRate = { count: 0, resetAt: now + LOGIN_WINDOW_MS };
+    if (passwordRate.count >= MAX_LOGIN_ATTEMPTS) return json({ error: "密码验证失败次数过多，请 15 分钟后重试。" }, 429, { "retry-after": String(Math.ceil((passwordRate.resetAt - now) / 1000)) });
     const currentPassword = String(body.currentPassword || "");
     const nextPassword = String(body.newPassword || "");
     if (!user || currentPassword.length > 256 || !nextPassword || nextPassword.length < 14 || nextPassword.length > 256) {
@@ -191,10 +196,13 @@ export async function handleAuthVaultRoute(request, ctx, env) {
     }
     const candidate = await passwordHash(currentPassword, fromBase64url(user.salt), user.iterations || PASSWORD_ITERATIONS);
     if (!constantTimeEqual(candidate, fromBase64url(user.passwordHash))) {
+      passwordRate.count++;
+      await ctx.storage.put(passwordRateKey, passwordRate, { expirationTtl: Math.ceil(LOGIN_WINDOW_MS / 1000) });
       await audit(ctx, "auth.password.failed", found.record.username);
       return json({ error: "当前密码不正确。" }, 401);
     }
     if (currentPassword === nextPassword) return json({ error: "新密码不能与当前密码相同。" }, 400);
+    await ctx.storage.delete(passwordRateKey);
     const salt = new Uint8Array(16); crypto.getRandomValues(salt);
     const digest = await passwordHash(nextPassword, salt);
     await ctx.storage.put("auth:user", { ...user, salt: base64url(salt), passwordHash: base64url(digest), iterations: PASSWORD_ITERATIONS, passwordChangedAt: Date.now() });
