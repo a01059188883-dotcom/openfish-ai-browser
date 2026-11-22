@@ -94,6 +94,13 @@ test("cloud admin bootstrap, secure login, encrypted vault, and logout", async (
   assert.equal(decrypted.secrets.OPENAI_API_KEY, openaiKey);
   assert.equal(decrypted.secrets.ANTHROPIC_API_KEY, anthropicKey);
   assert.equal(decrypted.secrets.GEMINI_API_KEY, geminiKey);
+  const clearOne = await handleAuthVaultRoute(request("/auth/vault", {
+    method: "PUT", cookie, body: { secrets: { clear: ["OPENAI_API_KEY"] } }
+  }), ctx, env);
+  assert.equal(clearOne.status, 200);
+  assert.equal((await clearOne.json()).secrets.OPENAI_API_KEY.configured, false);
+  const afterClear = await handleAuthVaultRoute(request("/auth/credentials", { method: "POST", cookie }), ctx, env);
+  assert.equal((await afterClear.json()).secrets.OPENAI_API_KEY, undefined);
   const relayVerify = await handleAuthVaultRoute(request("/auth/relay-verify", {
     method: "POST", authorization: "Bearer " + secret
   }), ctx, env);
@@ -195,6 +202,8 @@ test("cloud browser frontends use HttpOnly login cookies, not a client-side Rela
   assert.ok(mobileAdmin.includes("/api/auth/login"));
   assert.ok(mobileAdmin.includes("/api/auth/password"));
   assert.ok(mobileAdmin.includes("修改密码并退出其他设备"));
+  assert.ok(mobileAdmin.includes("clearOpenAI"));
+  assert.ok(mobileAdmin.includes("删除不再使用的密钥"));
   assert.ok(mobileAdmin.includes("OPENAI_API_KEY"));
   assert.ok(mobileAdmin.includes("ANTHROPIC_API_KEY"));
   assert.ok(mobileAdmin.includes("GEMINI_API_KEY"));
