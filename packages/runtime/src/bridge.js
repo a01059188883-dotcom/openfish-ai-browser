@@ -12,7 +12,11 @@ import { downloadLink, listDownloads, removeDownload } from "./download-manager.
 import { addBookmark, listBookmarks, removeBookmark, listHistory, clearHistory, addReadingItem, listReadingItems, removeReadingItem, setTabOrganization, getLibraryStats, removeWorkspace, exportBrowserLibrary, importBrowserLibrary } from "./browser-library.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const VERSION = "2.20.0";
+const VERSION = "2.21.0";
+const LOCAL_NO_AUTH = process.env.OPENFISH_LOCAL_NO_AUTH !== "false";
+function isLoopbackAddress(address = "") {
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1" || address.startsWith("::ffff:127.");
+}
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 const MODEL = process.env.OPENFISH_MODEL || "qwen2.5:3b";
 let ollamaCache = null;
@@ -285,15 +289,18 @@ const server = http.createServer(async (req, res) => {
       const name = res.reqPath.slice("/api/v1/tools/".length);
       const body = await readBody(req);
       const writeTools = new Set(["open_page", "execute_plan", "click_element", "fill_element", "go_back", "go_forward", "reload_page", "new_tab", "switch_tab", "close_tab", "add_bookmark", "remove_bookmark", "clear_history", "add_reading_item", "remove_reading_item", "organize_tab", "duplicate_tab", "reopen_closed_tab", "save_workspace", "restore_workspace", "remove_workspace", "download_link", "remove_download", "clear_session_data", "import_browser_library"]);
-      const requiredScope = writeTools.has(name) ? "browser:write" : "browser:read";
-      const bearer = /^Bearer (.+)$/i.exec(req.headers.authorization || "");
-      const identity = await authenticateApiKey(bearer?.[1], requiredScope);
-      if (!identity) return send(res, 401, { error: "A valid OpenFish API key is required.", code: "API_KEY_REQUIRED" });
-      if (identity.forbidden) return send(res, 403, { error: `API key lacks the ${requiredScope} scope.`, code: "INSUFFICIENT_SCOPE" });
-      await registerClient(identity, { clientId: req.headers["x-openfish-client"], platform: req.headers["x-openfish-platform"], sessionId: requestedSession });
-      const rate = checkClientRateLimit(identity.id, Number(process.env.OPENFISH_RATE_LIMIT_PER_MINUTE || 120));
-      res.reqRateHeaders = { "x-ratelimit-limit": String(rate.limit), "x-ratelimit-remaining": String(rate.remaining), "x-ratelimit-reset": rate.resetAt };
-      if (!rate.allowed) { res.setHeader("retry-after", String(rate.retryAfterSeconds)); return send(res, 429, { error: "API key rate limit exceeded.", code: "RATE_LIMITED", retryAfterSeconds: rate.retryAfterSeconds }); }
+      const localNoAuth = LOCAL_NO_AUTH && isLoopbackAddress(req.socket.remoteAddress);
+      if (!localNoAuth) {
+        const requiredScope = writeTools.has(name) ? "browser:write" : "browser:read";
+        const bearer = /^Bearer (.+)$/i.exec(req.headers.authorization || "");
+        const identity = await authenticateApiKey(bearer?.[1], requiredScope);
+        if (!identity) return send(res, 401, { error: "A valid OpenFish API key is required.", code: "API_KEY_REQUIRED" });
+        if (identity.forbidden) return send(res, 403, { error: `API key lacks the ${requiredScope} scope.`, code: "INSUFFICIENT_SCOPE" });
+        await registerClient(identity, { clientId: req.headers["x-openfish-client"], platform: req.headers["x-openfish-platform"], sessionId: requestedSession });
+        const rate = checkClientRateLimit(identity.id, Number(process.env.OPENFISH_RATE_LIMIT_PER_MINUTE || 120));
+        res.reqRateHeaders = { "x-ratelimit-limit": String(rate.limit), "x-ratelimit-remaining": String(rate.remaining), "x-ratelimit-reset": rate.resetAt };
+        if (!rate.allowed) { res.setHeader("retry-after", String(rate.retryAfterSeconds)); return send(res, 429, { error: "API key rate limit exceeded.", code: "RATE_LIMITED", retryAfterSeconds: rate.retryAfterSeconds }); }
+      }
       return send(res, 200, { tool: name, result: await invokeTool(name, body) });
     }
     if (req.method === "POST" && res.reqPath === "/api/admin/ollama-test") {
@@ -307,7 +314,7 @@ const server = http.createServer(async (req, res) => {
       extensionVersion = String(body.version || "").slice(0, 32) || null;
       return send(res, 200, { ok: true, version: VERSION, extensionVersion, lastSeenAt: extensionLastSeenAt });
     }
-    if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, name: "OpenFish AI Browser", version: VERSION });
+    if (req.method === "GET" && req.url === "/health") return send(res, 200, { ok: true, name: "OpenFish AI Browser", version: VERSION, localNoAuth: LOCAL_NO_AUTH });
     if (req.method === "GET" && req.url === "/api/admin/status") {
       const browser = getBrowserStatus();
       const uptime = Math.floor((Date.now() - startedAt) / 1000);
