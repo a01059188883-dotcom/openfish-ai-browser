@@ -56,7 +56,7 @@ export async function runLocalChecks() {
       { name: "本地 MCP 端口 " + mcpPort, ok: mcpPortCheck.ok, required: true, detail: mcpPortCheck.detail },
       { name: "本地免 Token", ok: process.env.OPENFISH_LOCAL_NO_AUTH !== "false", required: false, detail: process.env.OPENFISH_LOCAL_NO_AUTH === "false" ? "已关闭（需要本机 API Key）" : "已启用（仅回环连接）" },
       { name: "云端 Relay", ok: relayValid, required: false, detail: relayValid ? "已配置，启动时自动连接" : relayPartial ? "配置不完整（需要同时设置 Relay URL 和 Token）" : relayConfigured ? "配置格式无效（Relay URL 必须使用 wss://，Token 至少 32 位）" : "未配置（本机浏览器不受影响）" },
-      { name: "Ollama AI", ok: ollama.ok && ollama.installed, required: false, detail: !ollama.ok ? ollama.detail : ollama.installed ? ollama.model + " 已就绪" : "已连接，但缺少模型 " + model }
+      { name: "Ollama AI", ok: ollama.ok && ollama.installed, required: false, detail: !ollama.ok ? ollama.detail : ollama.installed ? ollama.model + " 已就绪" : "已连接，但缺少模型 " + (process.env.OPENFISH_MODEL || "qwen2.5:3b") }
     ],
     port,
     mcpPort,
