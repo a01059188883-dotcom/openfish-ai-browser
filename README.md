@@ -71,6 +71,8 @@ npx wrangler secret put OPENFISH_VAULT_KEY
 
 Keep `OPENFISH_VAULT_KEY` backed up in a secure password manager. It is the encryption root for the Durable Object secret vault; losing or replacing it without decrypting and re-encrypting the vault makes stored secrets unrecoverable. Never put it in `wrangler.toml`, source code, screenshots, issue comments, or chat.
 
+For local Wrangler development, copy `cloudflare/.dev.vars.example` to `cloudflare/.dev.vars` and replace both placeholders with separate random values. The real `.dev.vars` file is ignored by Git.
+
 Deploy the Worker using the normal reviewed release process (deployment is not triggered by this setup guide):
 
 ```bash
