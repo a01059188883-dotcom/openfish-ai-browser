@@ -204,7 +204,7 @@ export default {
     }
     if (url.pathname === "/api/ai/fetch") {
       if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
-      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      if (!sessionCheck.ok && !authorized(request, env)) return json({ error: "Unauthorized." }, 401);
       let payload;
       try { payload = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
       const validPublicUrl = value => {
