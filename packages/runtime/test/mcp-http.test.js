@@ -169,7 +169,7 @@ test("AI integration center generates MCP configuration and keeps API key scopes
   assert.ok(app.includes('mcpServers: { "openfish-browser"'));
   assert.ok(app.includes('servers: { "openfish-browser": { type: "http"'));
   assert.ok(html.includes('value="vscode"'));
-  assert.ok(app.includes('Authorization: "Bearer " + key'));
+  assert.ok(app.includes('headers.Authorization = "Bearer " + key'));
   assert.ok(app.includes("if (!key && !isLoopbackAddressUrl(url))"));
   assert.ok(app.includes("Object.keys(headers).length ? { headers } : {}"));
   assert.ok(app.includes("if (!key && !isLoopbackAddressUrl(base))"));
