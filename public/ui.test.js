@@ -17,7 +17,7 @@ test("public browser loads the mobile-first workspace design", async () => {
   assert.match(css, /grid-template-columns:38px 38px 38px/);
 });
 
-test("admin and mobile admin load the v2.24.0 responsive visual system", async () => {
+test("admin and mobile admin load the v2.25.0 responsive visual system", async () => {
   const admin = await read("../packages/admin/style.css");
   const adminHtml = await read("../packages/admin/index.html");
   const mobile = await read("../cloudflare/mobile-admin.html");
@@ -30,7 +30,7 @@ test("admin and mobile admin load the v2.24.0 responsive visual system", async (
 
 test("application package version is synchronized", async () => {
   const pkg = JSON.parse(await read("../package.json"));
-  assert.equal(pkg.version, "2.24.0");
+  assert.equal(pkg.version, "2.25.0");
 });
 
 test("Cloud Run deployment refuses traffic shift without bounded tmpfs health", async () => {
