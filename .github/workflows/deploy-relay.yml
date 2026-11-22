@@ -1,13 +1,9 @@
 name: Deploy OpenFish Relay
 
 on:
+  # Cloud Run + Worker deployment requires the separate GCP and vault secrets.
+  # Keep this path manual until those credentials are configured and verified.
   workflow_dispatch:
-  # One-time v2.25.0 release gate: only the dedicated marker file on main deploys.
-  # Normal PR merges and unrelated main pushes never deploy production.
-  push:
-    branches: [main]
-    paths:
-      - ".release/openfish-v2.25.0"
 
 concurrency:
   group: openfish-cloudrun-engine-deploy

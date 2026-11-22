@@ -1,6 +1,9 @@
-OpenFish v2.25.0 one-time production release marker.
+OpenFish v2.25.0 one-time Cloudflare Worker and frontend release marker.
 
-This file is intentionally a dedicated GitHub Actions path trigger. Merging the
-approved v2.25.0 release to main runs the authenticated Cloud Run + Cloudflare
-deployment workflow once. Do not edit or remove this file after release; future
+This marker triggers only the Cloudflare Worker/static frontend deployment when
+the approved v2.25.0 release is merged to main. The Cloud Run browser engine is
+unchanged in this release and remains on its separately gated manual workflow,
+which requires GCP Workload Identity and engine token secrets.
+
+Do not edit or remove this marker after the Worker release; future Worker
 releases must use a new versioned marker path.

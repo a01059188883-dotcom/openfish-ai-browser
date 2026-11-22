@@ -100,8 +100,10 @@ test("release deployment builds and verifies Cloud Run before deploying the Work
   assert.match(workflow, /--no-traffic --tag=preflight/);
   assert.match(workflow, /--to-latest --remove-tags=preflight/);
   assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /branches: \[main\]/);
-  assert.ok(workflow.includes(".release/openfish-v2.25.0"), "only the dedicated v2.25.0 release marker triggers deployment");
+  assert.doesNotMatch(workflow, /^\s+push:/m, "Cloud Run deployment remains manual until GCP secrets are configured");
+  const workerWorkflow = await readFile(new URL("../../../.github/workflows/deploy-cloudflare.yml", import.meta.url), "utf8");
+  assert.match(workerWorkflow, /branches: \[main\]/);
+  assert.ok(workerWorkflow.includes(".release/openfish-v2.25.0"));
 });
 
 test("engine bearer authentication uses constant-time token comparison", async () => {
