@@ -52,8 +52,49 @@ The side panel invalidates old plans when the task text changes, disables execut
 ## Cloud browser
 Set `BROWSER_WS_ENDPOINT` to a Chromium Playwright-compatible WebSocket endpoint and run the bridge/MCP server in a trusted server environment. A free local setup is included; a permanently available cloud browser needs compute hosting and may not remain free.
 
-## Deployment readiness
-This is a local-first developer tool, not yet a hardened multi-user SaaS. Before public hosting, add authentication, per-user browser isolation, SSRF/private-network protections, rate limits, a durable task queue, observability, and deployment secret management. Set `ALLOWED_EXTENSION_ORIGIN=chrome-extension://YOUR_EXTENSION_ID` in `.env` to pin the local bridge to your exact extension ID. Extension-origin requests are denied until this value is set; do not leave it blank for normal use.
+## Cloud login and encrypted secret vault (v2.17.0)
+
+The Cloudflare mobile admin at `/admin` now uses a server-side owner account instead of asking the browser to retain a Relay Token.
+
+### One-time Cloudflare setup
+
+Run these commands from the repository root. Generate each value independently; do not reuse a password or commit either value to Git:
+
+```bash
+openssl rand -base64 48
+npx wrangler secret put OPENFISH_BOOTSTRAP_SECRET
+# Paste the first generated value when prompted.
+openssl rand -base64 48
+npx wrangler secret put OPENFISH_VAULT_KEY
+# Paste the second generated value when prompted.
+```
+
+Keep `OPENFISH_VAULT_KEY` backed up in a secure password manager. It is the encryption root for the Durable Object secret vault; losing or replacing it without decrypting and re-encrypting the vault makes stored secrets unrecoverable. Never put it in `wrangler.toml`, source code, screenshots, issue comments, or chat.
+
+Deploy the Worker using the normal reviewed release process (deployment is not triggered by this setup guide):
+
+```bash
+npx wrangler deploy --config cloudflare/wrangler.toml
+```
+
+Then open `https://YOUR_WORKER_HOST/admin`:
+
+1. Under **首次初始化管理员账号**, enter the one-time bootstrap secret, choose a username and a unique password of at least 14 characters, then create the owner account.
+2. Remove `OPENFISH_BOOTSTRAP_SECRET` from Worker secrets after successful initialization. Do not remove `OPENFISH_VAULT_KEY`.
+3. Log in with the owner account.
+4. In **服务器密钥库**, enter the existing Relay Token used by the desktop Relay Agent. If using the self-hosted browser engine, also enter its HTTPS URL and Engine Token. Save the settings.
+5. On the desktop Relay Agent, keep `OPENFISH_RELAY_TOKEN` set to the exact same Relay Token. The cloud Worker reads its encrypted copy from the vault; it never returns the raw value to browser JavaScript.
+
+### Security model
+
+- Owner password hashes use PBKDF2-HMAC-SHA-256 with a per-account random salt and 310,000 iterations; login attempts are rate-limited.
+- Admin sessions are random, 12-hour, `HttpOnly`, `Secure`, `SameSite=Strict` cookies. The UI uses same-origin requests and does not save bearer tokens in localStorage or sessionStorage.
+- Relay and Engine tokens are encrypted at rest with AES-256-GCM using the separately configured `OPENFISH_VAULT_KEY`; only masked status is returned to the browser.
+- Session records, encrypted vault data and bounded security audit events live in the existing Cloudflare Durable Object storage.
+- The bootstrap route is one-time only. The Worker must be served over HTTPS. Do not expose the self-hosted engine directly to the public internet.
+- The app vault intentionally does not accept broad Cloudflare account API tokens. Manage infrastructure credentials through Cloudflare's own secret manager and least-privilege access controls.
+
+This adds a single-owner cloud admin login and encrypted token vault; it is not yet a general multi-tenant user-management product. Keep PR #40 in draft until CI and real deployment acceptance are complete. Set `ALLOWED_EXTENSION_ORIGIN=chrome-extension://YOUR_EXTENSION_ID` in `.env` to pin the local bridge to your exact extension ID. Extension-origin requests are denied until this value is set; do not leave it blank for normal use.
 
 ## Safety
 - Never paste passwords, recovery codes, payment details, or API keys into task prompts.
