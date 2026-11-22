@@ -154,7 +154,7 @@ test("cloud auth rejects cross-origin state changes and invalid vault settings",
     method: "POST", originHeader: "https://attacker.example",
     body: { bootstrapSecret: env.OPENFISH_BOOTSTRAP_SECRET, username: "owner", password: "this-is-a-very-long-test-password" }
   }), ctx, env);
-  assert.equal(csrf.status, 403);
+  assert.equal(csrf.status, 403);\n  const backupCsrf = await handleAuthVaultRoute(request("/auth/vault/backup", { method: "POST", originHeader: "https://attacker.example", body: { action: "export", passphrase: "a-separate-backup-passphrase" } }), ctx, env);\n  assert.equal(backupCsrf.status, 403);
   const shortPassword = await handleAuthVaultRoute(request("/auth/bootstrap", {
     method: "POST",
     body: { bootstrapSecret: env.OPENFISH_BOOTSTRAP_SECRET, username: "owner", password: "short" }
