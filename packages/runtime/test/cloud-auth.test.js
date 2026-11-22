@@ -185,6 +185,7 @@ test("cloud auth enforces login throttling and keeps raw vault credentials off p
   assert.equal(allowlistLine.includes("/api/auth/credentials"), false);
   assert.equal(allowlistLine.includes("/api/auth/relay-verify"), false);
   assert.ok(worker.includes("if (!publicAuthPaths.has(url.pathname)) return json"));
+  assert.ok(worker.includes('url.pathname === "/api/auth/vault/backup" ? 100 * 1024 : 8192'));
 });
 
 test("cloud browser frontends use HttpOnly login cookies, not a client-side Relay Token", async () => {
