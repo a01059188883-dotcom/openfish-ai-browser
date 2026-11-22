@@ -120,7 +120,8 @@ export async function handleAuthVaultRoute(request, ctx, env) {
   const url = new URL(request.url);
   const path = url.pathname;
   if (!path.startsWith("/auth/")) return null;
-  if (!safeOrigin(request) && !["GET"].includes(request.method)) return json({ error: "Cross-origin request rejected." }, 403);
+  if (["/auth/bootstrap", "/auth/login", "/auth/logout", "/auth/vault"].includes(path) && request.method !== "GET" &&
+      (!request.headers.get("origin") || !safeOrigin(request))) return json({ error: "Same-origin request required." }, 403);
   const readJson = async () => {
     const length = Number(request.headers.get("content-length") || 0);
     if (length > 8192) throw new Error("Request body too large.");
