@@ -46,7 +46,7 @@ test("release metadata includes HTTP MCP entry point", async () => {
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
   const httpMcp = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
   assert.equal(pkg.version, "2.21.0");
-  assert.equal(pkg.scripts["start:mcp:http"], "node packages/mcp-server/src/http.js");
+  assert.equal(pkg.scripts["start:mcp:http"], "node --env-file=.env packages/mcp-server/src/http.js");
   assert.ok(pkg.scripts.check.includes("node --check packages/mcp-server/src/http.js"));
   assert.ok(httpMcp.includes(`const VERSION = "${pkg.version}"`));
 });
