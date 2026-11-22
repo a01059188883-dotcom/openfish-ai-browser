@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-test("Streamable HTTP MCP endpoint is authenticated and loopback-bound by default", async () => {
+test("Streamable HTTP MCP endpoint supports tokenless loopback mode and retains remote API-key auth", async () => {
   const source = await readFile(resolve("packages/mcp-server/src/http.js"), "utf8");
   const sdk = await import("@modelcontextprotocol/sdk/server/streamableHttp.js");
   assert.equal(typeof sdk.StreamableHTTPServerTransport, "function");
@@ -12,6 +12,11 @@ test("Streamable HTTP MCP endpoint is authenticated and loopback-bound by defaul
   assert.ok(source.includes('transport.handleRequest(req, res, body)'));
   assert.ok(source.includes('process.env.OPENFISH_MCP_HTTP_HOST || "127.0.0.1"'));
   assert.ok(source.includes('Authorization: Bearer API_KEY'));
+  assert.ok(source.includes('process.env.OPENFISH_LOCAL_NO_AUTH !== "false"'));
+  assert.ok(source.includes("localNoAuthRequest"));
+  assert.ok(source.includes("isLoopbackAddress(req.socket.remoteAddress)"));
+  assert.ok(source.includes("if (!localNoAuthRequest)"));
+  assert.ok(source.includes("if (write && token)"));
   assert.ok(source.includes('await verifyKey(bearer[1], "browser:read", { ...clientMeta, sessionId })'));
   assert.ok(source.includes('verifyKey(token, "browser:write", { ...clientMeta, sessionId })'));
   assert.ok(source.includes('"x-openfish-session": sessionId'));
