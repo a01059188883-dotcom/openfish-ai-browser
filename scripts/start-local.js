@@ -101,6 +101,8 @@ async function runStack() {
     console.log("连接方式：本机使用默认免 Token，无需再单独启动 MCP 服务。");
   } else if (!stopping) {
     console.error("OpenFish 服务未能全部就绪，正在重启服务组。");
+    await stopChildren("SIGTERM");
+    return { code: 1, ready: false };
   }
 
   const completed = await Promise.race(exits.filter(item => item instanceof Promise));
