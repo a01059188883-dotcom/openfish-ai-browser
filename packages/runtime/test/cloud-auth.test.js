@@ -244,4 +244,6 @@ test("vault backup exports ciphertext only and restores atomically after passphr
   assert.equal((await credentials.json()).secrets.OPENFISH_RELAY_TOKEN, original);
   const malformed = await handleAuthVaultRoute(request("/auth/vault/backup", { method: "POST", cookie, body: { action: "restore", passphrase, backup: { ...envelope, version: 999 } } }), ctx, env);
   assert.equal(malformed.status, 400);
+  const oversized = await handleAuthVaultRoute(request("/auth/vault/backup", { method: "POST", cookie, body: { action: "restore", passphrase, backup: { ...envelope, data: "A".repeat(110000) } } }), ctx, env);
+  assert.equal(oversized.status, 400);
 });
