@@ -1,6 +1,6 @@
 {
   "name": "openfish-ai-browser",
-  "version": "2.16.0",
+  "version": "2.16.1",
   "private": true,
   "type": "module",
   "description": "Free-first open-source AI browser automation with MCP and Chrome extension",
