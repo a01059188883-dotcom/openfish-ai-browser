@@ -60,6 +60,9 @@ export default {
       return new Response(mobileAdminHtml, { headers: {
         "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
         "x-content-type-options": "nosniff", "referrer-policy": "no-referrer",
+        "x-frame-options": "DENY", "strict-transport-security": "max-age=63072000; includeSubDomains",
+        "permissions-policy": "camera=(), microphone=(), geolocation=()",
+        "cross-origin-opener-policy": "same-origin", "cross-origin-resource-policy": "same-origin",
         "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
       }});
     }
