@@ -127,14 +127,20 @@ test("HTTP MCP execute_plan accepts the durable task ID returned by plan_task", 
 });
 
 
-test("mobile admin remembers relay token only when the device opt-in is enabled", async () => {
+test("mobile admin uses server-side login and encrypted token vault", async () => {
   const html = await readFile(resolve("cloudflare/mobile-admin.html"), "utf8");
-  assert.ok(html.includes('id="rememberToken"'));
-  assert.ok(html.includes('localStorage.getItem(tokenKey)'));
-  assert.ok(html.includes('localStorage.setItem(tokenKey,value)'));
-  assert.ok(html.includes('localStorage.removeItem(tokenKey)'));
-  assert.ok(html.includes('sessionStorage.removeItem(tokenKey)'));
-  assert.ok(html.includes('断开并清除'));
+  const auth = await readFile(resolve("cloudflare/auth-vault.js"), "utf8");
+  assert.ok(html.includes('id="loginUser"'));
+  assert.ok(html.includes('id="loginPassword"'));
+  assert.ok(html.includes('api("/api/auth/login"'));
+  assert.ok(html.includes('api("/api/auth/vault"'));
+  assert.ok(html.includes('id="saveVault"'));
+  assert.ok(html.includes('id="logoutAdmin"'));
+  assert.equal(html.includes('id="rememberToken"'), false);
+  assert.equal(html.includes('localStorage.setItem("openfish.relay.token"'), false);
+  assert.equal(auth.includes("PBKDF2"), true);
+  assert.equal(auth.includes("AES-GCM"), true);
+  assert.equal(auth.includes("HttpOnly; Secure; SameSite=Strict"), true);
 });
 
 
