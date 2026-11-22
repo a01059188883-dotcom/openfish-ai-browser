@@ -1,15 +1,15 @@
 import mobileAdminHtml from "./mobile-admin.html";
 import { acquire, connect } from "@cloudflare/playwright";
 
-const VERSION = "2.14.2";
+const VERSION = "2.16.1";
 const MAX_BODY_BYTES = 512 * 1024;
 const guardedBrowserContexts = new WeakSet();
-const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/browser/sessions"]);
+const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/admin/tasks", "/api/browser/sessions"]);
 const ALLOWED_PATH = path => path === "/mcp" || path === "/health" ||
   path === "/.well-known/openfish-tools.json" ||
   path === "/api/v1/tools" || path.startsWith("/api/v1/tools/") ||
   path.startsWith("/api/v1/adapters/") || path === "/api/v1/openapi.json" || path.startsWith("/api/v1/browser/") ||
-  ADMIN_PATHS.has(path) || /^\/api\/browser\/sessions\/[A-Za-z0-9_-]+\/close$/.test(path) ||
+  ADMIN_PATHS.has(path) || /^\/api\/admin\/tasks\/[A-Za-z0-9-]+(?:\/restore)?$/.test(path) || /^\/api\/browser\/sessions\/[A-Za-z0-9_-]+\/close$/.test(path) ||
   path === "/api/plan" || path === "/api/execute";
 
 function bearer(request) {
@@ -87,7 +87,7 @@ export default {
       try { payload = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
       const query = String(payload.query || "").trim().slice(0, 300);
       if (!query) return json({ error: "A search query is required." }, 400);
-      const headers = { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.2)", "accept": "text/html" };
+      const headers = { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.16.1)", "accept": "text/html" };
       const sources = await Promise.allSettled([
         fetch("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), { headers, signal: AbortSignal.timeout(12000) }),
         fetch("https://www.bing.com/search?q=" + encodeURIComponent(query), { headers, signal: AbortSignal.timeout(12000) })
@@ -131,7 +131,7 @@ export default {
       try {
         let response;
         for (let hop = 0; hop < 4; hop++) {
-          response = await fetch(target.href, { redirect: "manual", signal: AbortSignal.timeout(12000), headers: { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.14.2)", "accept": "text/html,text/plain;q=0.9" } });
+          response = await fetch(target.href, { redirect: "manual", signal: AbortSignal.timeout(12000), headers: { "user-agent": "Mozilla/5.0 (compatible; OpenFishAI-Browser/2.16.1)", "accept": "text/html,text/plain;q=0.9" } });
           if (![301, 302, 303, 307, 308].includes(response.status)) break;
           const location = response.headers.get("location");
           if (!location || hop === 3) return json({ error: "Too many or invalid redirects." }, 502);

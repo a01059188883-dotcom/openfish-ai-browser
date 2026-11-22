@@ -48,7 +48,7 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(worker.includes('url.pathname === "/cloud/tabs"'));
   assert.ok(worker.includes('/api/v1/openapi.json'));
   assert.ok(worker.includes('access-control-allow-origin'));
-  assert.ok(worker.includes('const VERSION = "2.14.2"'));
+  assert.ok(worker.includes('const VERSION = "2.16.1"'));
   assert.ok(worker.includes('if (!authorized(request, env))'));
   assert.ok(worker.includes('acquire(this.env.BROWSER)'));
   assert.ok(worker.includes('connect(this.env.BROWSER, acquired.sessionId)'));
@@ -74,6 +74,7 @@ test("mobile frontend is served by the Worker and uses authenticated cloud brows
   assert.ok(app.includes("function renderTabs"));
   assert.ok(admin.includes('id="cloudStatus"'));
   assert.ok(admin.includes('id="cloudClose"'));
-  assert.ok(admin.includes('sessionStorage.setItem("openfish.relay.token"'));
+  assert.ok(admin.includes('localStorage.setItem("openfish.relay.token"'));
+  assert.ok(admin.includes('sessionStorage.setItem(tokenKey,value)'));
   assert.ok(admin.includes('api("/api/cloud-browser/status")'));
 });

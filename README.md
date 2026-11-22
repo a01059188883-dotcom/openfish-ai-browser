@@ -1,6 +1,6 @@
 # OpenFish AI Browser
 
-Open-source, free-first browser automation starter. Version: **2.14.2**.
+Open-source, free-first browser automation starter. Version: **2.16.1**.
 
 ## What is included
 - **MCP server** (`packages/mcp-server`): browser tools for ChatGPT-compatible MCP clients, including plan review and explicitly approved sequential execution.
@@ -9,7 +9,7 @@ Open-source, free-first browser automation starter. Version: **2.14.2**.
 - **Local AI planner**: optional Ollama integration (default model `qwen2.5:3b`) creates constrained JSON plans.
 - **Safety defaults**: no credential collection; sensitive fields and potentially irreversible actions are blocked during plan execution.
 
-## AI workbench (2.14.2 hardening)
+## AI workbench (2.16.1 integration center)
 - Integrates page and multi-tab context, model-provider settings, local Skills and Memory, writing, approved browser task plans, workspace snapshots, voice I/O, research search, and file input.
 - Supports Ollama and OpenAI-compatible, Anthropic, and Gemini-style chat endpoints configured by the user. API keys and local Memory/Skills are stored in the browser's local profile; they are not synced between devices.
 - Research uses authenticated Worker endpoints to query DuckDuckGo and Bing, then fetches public web pages for source cross-checking. Public-source fetching is restricted to HTTP(S) hostnames, rejects IP-literal/local targets, and revalidates redirects.
@@ -53,7 +53,7 @@ The side panel invalidates old plans when the task text changes, disables execut
 Set `BROWSER_WS_ENDPOINT` to a Chromium Playwright-compatible WebSocket endpoint and run the bridge/MCP server in a trusted server environment. A free local setup is included; a permanently available cloud browser needs compute hosting and may not remain free.
 
 ## Deployment readiness
-This is a local-first developer tool, not yet a hardened multi-user SaaS. Before public hosting, add authentication, per-user browser isolation, SSRF/private-network protections, rate limits, a durable task queue, observability, and deployment secret management. Set `ALLOWED_EXTENSION_ORIGIN=chrome-extension://YOUR_EXTENSION_ID` in `.env` to pin the local bridge to your extension ID; leave it blank only during initial unpacked-extension setup.
+This is a local-first developer tool, not yet a hardened multi-user SaaS. Before public hosting, add authentication, per-user browser isolation, SSRF/private-network protections, rate limits, a durable task queue, observability, and deployment secret management. Set `ALLOWED_EXTENSION_ORIGIN=chrome-extension://YOUR_EXTENSION_ID` in `.env` to pin the local bridge to your exact extension ID. Extension-origin requests are denied until this value is set; do not leave it blank for normal use.
 
 ## Safety
 - Never paste passwords, recovery codes, payment details, or API keys into task prompts.
@@ -239,3 +239,36 @@ The public-source review used these projects as architecture references, not as 
 OpenFish's existing runtime module set includes Chromium/Playwright navigation, isolated sessions, local tab management, bookmarks, browsing history, reading list, downloads, tab organization, page diagnostics, accessibility snapshots, reader-content extraction, screenshots, AI task planning, explicit action approval, MCP/REST tool discovery and provider adapters. The v2.13.4 mobile workspace adds searchable local history and favorites, selectable search engines, page-text copy and a simplified reading view while preserving the existing legacy bookmark storage key.
 
 **Not represented as completed in this release:** durable per-tab profiles, private-profile isolation in the mobile cloud UI, built-in network ad blocking, extension installation management, browser sync, and a full native desktop browser shell. These require separate backend, permission and security work; the UI does not expose fake controls for them.
+
+## Durable task history (v2.15.0)
+Local task records are stored in `.openfish/tasks.json` with atomic file replacement and restrictive permissions. The store retains at most 500 records by default (`OPENFISH_MAX_TASKS` can be set between 50 and 2,000), redacts common credentials, and supports search, detail, and restore. Restored plans return to the review state and always require a new explicit approval. For Cloud Run or other ephemeral container hosting, mount a persistent volume or use a durable database; the container writable layer alone is not a cross-restart or multi-instance store.
+
+
+## AI client integration center (v2.16.1)
+
+The local admin dashboard at `http://127.0.0.1:8787/admin` includes an integration configuration generator. Create a separate API key for each client under **API Keys**, choose `browser:read` for read-only access or both `browser:read` and `browser:write` for approved browser actions, then paste the key into **AI Integration** to generate a Streamable HTTP MCP client configuration. The MCP endpoint is `http://127.0.0.1:8788/mcp`; REST tools are available at `http://127.0.0.1:8787/api/v1/tools/<tool_name>`.
+
+The generated configuration keeps the API key in the client configuration as a Bearer header. For Cursor / Cherry Studio, use the `mcpServers` format:
+```json
+{
+  "mcpServers": {
+    "openfish-browser": {
+      "url": "http://127.0.0.1:8788/mcp",
+      "headers": { "Authorization": "Bearer YOUR_OPENFISH_API_KEY" }
+    }
+  }
+}
+```
+For Visual Studio Code, use its native `servers` format:
+```json
+{
+  "servers": {
+    "openfish-browser": {
+      "type": "http",
+      "url": "http://127.0.0.1:8788/mcp",
+      "headers": { "Authorization": "Bearer YOUR_OPENFISH_API_KEY" }
+    }
+  }
+}
+```
+For REST, send `POST http://127.0.0.1:8787/api/v1/tools/read_page` with `Authorization: Bearer YOUR_OPENFISH_API_KEY` and `Content-Type: application/json`; the JSON body can be `{}` for the current page. Choose the read-only scope for read tools; browser actions require the write scope. The server stores only a SHA-256 digest and shows the raw key only once. Revoke a client key from the local admin panel to disable that client. Use a unique key per application and least-privilege scopes. The local MCP listener binds to `127.0.0.1` by default. Prefer SSH local port forwarding (for example, `ssh -L 8787:127.0.0.1:8787 -L 8788:127.0.0.1:8788 user@host`) so the client continues to connect to its own `127.0.0.1`. Do not expose the local ports directly to the public internet. The Cloudflare Relay Token is a separate credential and is not interchangeable with an `ofb_live_` API key.

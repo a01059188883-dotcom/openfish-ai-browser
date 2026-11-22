@@ -91,7 +91,7 @@ test("visual admin dashboard is wired to local status and event APIs", async () 
   const html = await readFile(resolve("packages/admin/index.html"), "utf8");
   const app = await readFile(resolve("packages/admin/app.js"), "utf8");
   const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
-  assert.equal(pkg.version, "2.14.2");
+  assert.equal(pkg.version, "2.16.1");
   assert.ok(bridge.includes('req.url === "/api/admin/status"'));
   assert.ok(bridge.includes('req.url === "/api/admin/events"'));
   assert.ok(bridge.includes('["../../admin/index.html"'));
@@ -329,4 +329,79 @@ test("portable backup and command center are exposed with bounded import", async
   assert.ok(html.includes("Shift + T"));
   assert.ok(panel.includes('event.shiftKey&&key==="t"'));
   assert.ok(bridge.includes("/api/library/import"));
+});
+
+test("durable task store is integrated into bridge routes and admin task history", async () => {
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  const html = await readFile(resolve("packages/admin/index.html"), "utf8");
+  const app = await readFile(resolve("packages/admin/app.js"), "utf8");
+  const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
+  assert.ok(bridge.includes('"/api/admin/tasks"'));
+  assert.ok(bridge.includes('"/api/mcp/plan_task"'));
+  assert.ok(bridge.includes('"/api/mcp/execute_plan"'));
+  assert.ok(bridge.includes("restoreTask(id)"));
+  assert.ok(html.includes('id="taskSearch"'));
+  assert.ok(html.includes('id="taskDetail"'));
+  assert.ok(app.includes("/api/admin/tasks?"));
+  assert.ok(app.includes("/restore"));
+  assert.ok(app.includes("restore"));
+  assert.ok(pkg.scripts.check.includes("task-store.js"));
+});
+
+test("Ollama and Chrome extension connectivity diagnostics are wired into the local admin panel", async () => {
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  const panel = await readFile(resolve("packages/chrome-extension/sidepanel.js"), "utf8");
+  const html = await readFile(resolve("packages/admin/index.html"), "utf8");
+  const app = await readFile(resolve("packages/admin/app.js"), "utf8");
+  assert.ok(bridge.includes("async function getOllamaStatus()"));
+  assert.ok(bridge.includes('res.reqOrigin?.startsWith("chrome-extension://")'));
+  assert.ok(bridge.includes('res.reqPath === "/api/extension/heartbeat"'));
+  assert.ok(bridge.includes("AbortSignal.timeout(2500)"));
+  assert.ok(panel.includes("/api/extension/heartbeat"));
+  assert.ok(panel.includes("window.setInterval(health, 15000)"));
+  assert.ok(html.includes('id="ollamaHealth"'));
+  assert.ok(html.includes('id="extensionHealth"'));
+  assert.ok(app.includes("status.ollama?.reachable"));
+  assert.ok(app.includes("status.extension?.connected"));
+});
+
+test("local bridge requires an explicitly pinned Chrome extension origin", async () => {
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  assert.ok(bridge.includes('origin.startsWith("chrome-extension://") && Boolean(allowedOrigin) && origin === allowedOrigin'));
+  assert.ok(bridge.includes("if (origin && !localOrigins.has(origin) && !isExtensionOrigin)"));
+});
+
+test("mobile admin preserves task IDs and displays Ollama and extension connectivity", async () => {
+  const mobile = await readFile(resolve("cloudflare/mobile-admin.html"), "utf8");
+  assert.ok(mobile.includes("currentTaskId=d.taskId||null"));
+  assert.ok(mobile.includes("taskId:currentTaskId"));
+  assert.ok(mobile.includes("s.ollama?.reachable"));
+  assert.ok(mobile.includes("s.extension?.connected"));
+});
+
+test("mobile relay exposes only the authenticated task list, detail and restore routes", async () => {
+  const worker = await readFile(resolve("cloudflare/worker.js"), "utf8");
+  const agent = await readFile(resolve("packages/runtime/src/relay-agent.js"), "utf8");
+  const mobile = await readFile(resolve("cloudflare/mobile-admin.html"), "utf8");
+  for (const source of [worker, agent]) {
+    assert.ok(source.includes('"/api/admin/tasks"'));
+    assert.ok(source.includes("A-Za-z0-9-]+") && source.includes("restore"));
+  }
+  assert.ok(mobile.includes('id="taskSearch"'));
+  assert.ok(mobile.includes('id="taskHistory"'));
+  assert.ok(mobile.includes('"/api/admin/tasks/"+encodeURIComponent(task.id)+"/restore"'));
+  const inlineScript = mobile.split("<script>")[1]?.split("</script>")[0];
+  assert.ok(inlineScript);
+  assert.doesNotThrow(() => new Function(inlineScript));
+});
+
+test("Ollama model can be tested with a real bounded generation request", async () => {
+  const bridge = await readFile(resolve("packages/runtime/src/bridge.js"), "utf8");
+  const html = await readFile(resolve("packages/admin/index.html"), "utf8");
+  const app = await readFile(resolve("packages/admin/app.js"), "utf8");
+  assert.ok(bridge.includes('res.reqPath === "/api/admin/ollama-test"'));
+  assert.ok(bridge.includes("/api/generate"));
+  assert.ok(bridge.includes("AbortSignal.timeout(12000)"));
+  assert.ok(html.includes('id="testOllama"'));
+  assert.ok(app.includes('api("/api/admin/ollama-test", {})'));
 });
