@@ -62,10 +62,10 @@ Run these commands from the repository root. Generate each value independently; 
 
 ```bash
 openssl rand -base64 48
-npx wrangler secret put OPENFISH_BOOTSTRAP_SECRET --config cloudflare/wrangler.toml
+npx wrangler secret put OPENFISH_BOOTSTRAP_SECRET --config cloudflare/wrangler.toml --config cloudflare/wrangler.toml
 # Paste the first generated value when prompted.
 openssl rand -base64 48
-npx wrangler secret put OPENFISH_VAULT_KEY --config cloudflare/wrangler.toml
+npx wrangler secret put OPENFISH_VAULT_KEY --config cloudflare/wrangler.toml --config cloudflare/wrangler.toml
 # Paste the second generated value when prompted.
 ```
 
@@ -86,6 +86,8 @@ Then open `https://YOUR_WORKER_HOST/admin`:
 3. Log in with the owner account.
 4. In **服务器密钥库**, enter the existing Relay Token used by the desktop Relay Agent. If using the self-hosted browser engine, also enter its HTTPS URL and Engine Token. Save the settings.
 5. On the desktop Relay Agent, keep `OPENFISH_RELAY_TOKEN` set to the exact same Relay Token. The cloud Worker reads its encrypted copy from the vault; it never returns the raw value to browser JavaScript.
+
+For the manual GitHub Actions production workflow, configure repository secrets `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `OPENFISH_BOOTSTRAP_SECRET`, `OPENFISH_VAULT_KEY`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`, and `BROWSER_ENGINE_TOKEN`. The workflow installs only the bootstrap and vault-encryption secrets in the Worker; it does not duplicate the Relay or Engine bearer tokens as Worker secrets. `BROWSER_ENGINE_TOKEN` is required by the Cloud Run engine and must also be entered into the authenticated vault after first login. The Relay Token is entered in the vault and must match the desktop Agent's `.env` value.
 
 ### Security model
 
