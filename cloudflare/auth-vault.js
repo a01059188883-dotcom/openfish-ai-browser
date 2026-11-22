@@ -161,11 +161,9 @@ export async function handleAuthVaultRoute(request, ctx, env) {
     const user = await ctx.storage.get("auth:user");
     const username = cleanUsername(body.username);
     const password = String(body.password || "");
-    let valid = false;
-    if (user && username === user.username && password.length <= 256) {
-      const candidate = await passwordHash(password, fromBase64url(user.salt), user.iterations);
-      valid = constantTimeEqual(candidate, fromBase64url(user.passwordHash));
-    }
+    const candidate = await passwordHash(password.length <= 256 ? password : "", user ? fromBase64url(user.salt) : new Uint8Array(16), user?.iterations || PASSWORD_ITERATIONS);
+    const valid = Boolean(user) && username === user.username && password.length <= 256 &&
+      constantTimeEqual(candidate, fromBase64url(user.passwordHash));
     if (!valid) {
       rate.count++;
       await ctx.storage.put(rateKey, rate, { expirationTtl: Math.ceil(LOGIN_WINDOW_MS / 1000) });
