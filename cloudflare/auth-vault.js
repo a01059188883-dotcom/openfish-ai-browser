@@ -120,7 +120,7 @@ export async function handleAuthVaultRoute(request, ctx, env) {
   const url = new URL(request.url);
   const path = url.pathname;
   if (!path.startsWith("/auth/")) return null;
-  if (["/auth/bootstrap", "/auth/login", "/auth/logout", "/auth/vault"].includes(path) && request.method !== "GET" &&
+  if (["/auth/bootstrap", "/auth/login", "/auth/logout", "/auth/vault", "/auth/password"].includes(path) && request.method !== "GET" &&
       (!request.headers.get("origin") || !safeOrigin(request))) return json({ error: "Same-origin request required." }, 403);
   const readJson = async () => {
     const length = Number(request.headers.get("content-length") || 0);
@@ -176,6 +176,37 @@ export async function handleAuthVaultRoute(request, ctx, env) {
     await ctx.storage.put(sessionKey, { username: user.username, role: user.role, createdAt: now, expiresAt: now + SESSION_TTL_MS }, { expirationTtl: Math.ceil(SESSION_TTL_MS / 1000) });
     await audit(ctx, "auth.login.success", user.username);
     return json({ ok: true, user: { username: user.username, role: user.role }, expiresIn: SESSION_TTL_MS / 1000 }, 200, { "set-cookie": cookieHeader(token) });
+  }
+
+  if (path === "/auth/password" && request.method === "PUT") {
+    const found = await sessionRecord(ctx, request);
+    if (!found || found.record.role !== "owner") return json({ error: "Unauthorized." }, 401);
+    let body;
+    try { body = await readJson(); } catch (error) { return json({ error: error.message }, 400); }
+    const user = await ctx.storage.get("auth:user");
+    const currentPassword = String(body.currentPassword || "");
+    const nextPassword = String(body.newPassword || "");
+    if (!user || currentPassword.length > 256 || !nextPassword || nextPassword.length < 14 || nextPassword.length > 256) {
+      return json({ error: "新密码至少 14 个字符，且不得超过 256 个字符。" }, 400);
+    }
+    const candidate = await passwordHash(currentPassword, fromBase64url(user.salt), user.iterations || PASSWORD_ITERATIONS);
+    if (!constantTimeEqual(candidate, fromBase64url(user.passwordHash))) {
+      await audit(ctx, "auth.password.failed", found.record.username);
+      return json({ error: "当前密码不正确。" }, 401);
+    }
+    if (currentPassword === nextPassword) return json({ error: "新密码不能与当前密码相同。" }, 400);
+    const salt = new Uint8Array(16); crypto.getRandomValues(salt);
+    const digest = await passwordHash(nextPassword, salt);
+    await ctx.storage.put("auth:user", { ...user, salt: base64url(salt), passwordHash: base64url(digest), iterations: PASSWORD_ITERATIONS, passwordChangedAt: Date.now() });
+    const sessions = await ctx.storage.list({ prefix: "session:" });
+    const sessionKeys = [...sessions.keys()];
+    if (sessionKeys.length) await ctx.storage.delete(sessionKeys);
+    const token = randomToken(32);
+    const sessionKey = "session:" + await hex(await sha256(token));
+    const now = Date.now();
+    await ctx.storage.put(sessionKey, { username: user.username, role: user.role, createdAt: now, expiresAt: now + SESSION_TTL_MS }, { expirationTtl: Math.ceil(SESSION_TTL_MS / 1000) });
+    await audit(ctx, "auth.password.changed", user.username);
+    return json({ ok: true, message: "密码已更新，其他设备的登录会话已全部失效。" }, 200, { "set-cookie": cookieHeader(token) });
   }
 
   if (path === "/auth/logout" && request.method === "POST") {
