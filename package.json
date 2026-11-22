@@ -14,7 +14,9 @@
     "dev:relay": "npx wrangler dev --config cloudflare/wrangler.toml",
     "deploy:relay": "npx wrangler deploy --config cloudflare/wrangler.toml",
     "start:local": "node scripts/start-local.js",
-    "doctor": "node scripts/doctor.js"
+    "doctor": "node scripts/doctor.js",
+    "start": "node scripts/start-local.js",
+    "setup:local": "node scripts/setup-local.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
