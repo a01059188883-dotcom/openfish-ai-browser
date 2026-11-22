@@ -1,7 +1,8 @@
 import mobileAdminHtml from "./mobile-admin.html";
+import { handleAuthVaultRoute } from "./auth-vault.js";
 import { acquire, connect } from "@cloudflare/playwright";
 
-const VERSION = "2.16.1";
+const VERSION = "2.17.0";
 const MAX_BODY_BYTES = 512 * 1024;
 const guardedBrowserContexts = new WeakSet();
 const ADMIN_PATHS = new Set(["/api/admin/status", "/api/admin/events", "/api/admin/relay-status", "/api/admin/tasks", "/api/browser/sessions"]);
@@ -61,6 +62,40 @@ export default {
         "x-content-type-options": "nosniff", "referrer-policy": "no-referrer",
         "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
       }});
+    }
+    if (url.pathname.startsWith("/api/auth/")) {
+      const headers = new Headers();
+      for (const name of ["cookie", "origin", "content-type", "cf-connecting-ip"]) {
+        const value = request.headers.get(name);
+        if (value) headers.set(name, value);
+      }
+      const body = ["POST", "PUT", "PATCH"].includes(request.method) ? await request.arrayBuffer() : undefined;
+      const internal = new Request("https://relay.internal" + url.pathname.replace(/^\\/api/, ""), { method: request.method, headers, body });
+      return relayStub(env).fetch(internal);
+    }
+    // An authenticated HttpOnly session may use the admin APIs without ever
+    // returning the Relay or Engine tokens to JavaScript.
+    const sessionCheck = await relayStub(env).fetch(new Request("https://relay.internal/auth/validate", {
+      method: "POST", headers: { cookie: request.headers.get("cookie") || "" }
+    }));
+    if (sessionCheck.ok) {
+      const credentialResponse = await relayStub(env).fetch(new Request("https://relay.internal/auth/credentials", {
+        method: "POST", headers: { cookie: request.headers.get("cookie") || "" }
+      }));
+      if (credentialResponse.ok) {
+        const credentials = (await credentialResponse.json()).secrets || {};
+        env = {
+          ...env,
+          OPENFISH_RELAY_TOKEN: credentials.OPENFISH_RELAY_TOKEN || env.OPENFISH_RELAY_TOKEN,
+          BROWSER_ENGINE_TOKEN: credentials.BROWSER_ENGINE_TOKEN || env.BROWSER_ENGINE_TOKEN,
+          BROWSER_ENGINE_URL: credentials.BROWSER_ENGINE_URL || env.BROWSER_ENGINE_URL
+        };
+        if (!request.headers.get("authorization") && env.OPENFISH_RELAY_TOKEN) {
+          const headers = new Headers(request.headers);
+          headers.set("authorization", "Bearer " + env.OPENFISH_RELAY_TOKEN);
+          request = new Request(request, { headers });
+        }
+      }
     }
     // Public plugin discovery document; all browser operations remain bearer-authenticated.
     if (url.pathname === "/api/v1/openapi.json" && request.method === "GET") {
@@ -226,6 +261,8 @@ export class OpenFishRelay {
     this.ctx = ctx; this.env = env; this.pending = new Map(); this.cloudLocks = new Map(); this.maxPending = 32; this.requestTimeoutMs = 45000;
   }
   async fetch(request) {
+    const authResponse = await handleAuthVaultRoute(request, this.ctx, this.env);
+    if (authResponse) return authResponse;
     const url = new URL(request.url);
     if (url.pathname.startsWith("/cloud/")) return this.withCloudSessionLock(request);
     if (url.pathname === "/connect") {
