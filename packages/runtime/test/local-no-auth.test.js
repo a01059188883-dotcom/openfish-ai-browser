@@ -57,6 +57,10 @@ test("local single-machine bridge allows browser tools without any API token by 
   const base = await startBridge(t, "true");
   const health = await (await fetch(base + "/health")).json();
   assert.equal(health.localNoAuth, true);
+  const status = await (await fetch(base + "/api/admin/status")).json();
+  assert.equal(status.localNoAuth, true);
+  assert.equal(typeof status.runtime.node, "string");
+  assert.equal(typeof status.runtime.platform, "string");
   const response = await fetch(base + "/api/v1/tools/list_workspaces", {
     method: "POST", headers: { "content-type": "application/json" }, body: "{}"
   });
