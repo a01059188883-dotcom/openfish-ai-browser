@@ -105,7 +105,7 @@ async function writeVault(ctx, env, secrets) {
   await ctx.storage.put("vault:encrypted", { iv: base64url(iv), data: base64url(new Uint8Array(encrypted)), updatedAt: Date.now() });
 }
 function publicVault(secrets) {
-  return Object.fromEntries(["OPENFISH_RELAY_TOKEN", "BROWSER_ENGINE_TOKEN", "BROWSER_ENGINE_URL"].map(name => [
+  return Object.fromEntries(["OPENFISH_RELAY_TOKEN", "BROWSER_ENGINE_TOKEN", "BROWSER_ENGINE_URL", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"].map(name => [
     name,
     secrets[name] ? { configured: true, masked: name.endsWith("_URL") ? secrets[name].replace(/^(https?:\/\/)[^/]+/, "$1••••") : "••••••••" + secrets[name].slice(-4) } : { configured: false, masked: "" }
   ]));
@@ -225,7 +225,7 @@ export async function handleAuthVaultRoute(request, ctx, env) {
     if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) return json({ error: "A secrets object is required." }, 400);
     const current = await readVault(ctx, env);
     const next = { ...current };
-    for (const name of ["OPENFISH_RELAY_TOKEN", "BROWSER_ENGINE_TOKEN"]) {
+    for (const name of ["OPENFISH_RELAY_TOKEN", "BROWSER_ENGINE_TOKEN", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"]) {
       if (Object.hasOwn(incoming, name) && incoming[name] !== "") {
         if (!validSecret(incoming[name])) return json({ error: name + " must contain at least 32 characters." }, 400);
         next[name] = incoming[name];
@@ -238,7 +238,7 @@ export async function handleAuthVaultRoute(request, ctx, env) {
       next.BROWSER_ENGINE_URL = parsed.origin;
     }
     if (Object.hasOwn(incoming, "clear") && Array.isArray(incoming.clear)) {
-      for (const name of incoming.clear) if (["OPENFISH_RELAY_TOKEN", "BROWSER_ENGINE_TOKEN", "BROWSER_ENGINE_URL"].includes(name)) delete next[name];
+      for (const name of incoming.clear) if (["OPENFISH_RELAY_TOKEN", "BROWSER_ENGINE_TOKEN", "BROWSER_ENGINE_URL", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"].includes(name)) delete next[name];
     }
     await writeVault(ctx, env, next);
     await audit(ctx, "vault.updated", found.record.username);
