@@ -152,7 +152,7 @@ const httpServer = http.createServer(async (req, res) => {
   const localHosts = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`, `[::1]:${PORT}`]);
   const origin = String(req.headers.origin || "");
   const localOrigins = new Set([`http://127.0.0.1:${PORT}`, `http://localhost:${PORT}`, `http://[::1]:${PORT}`]);
-  const localNoAuthRequest = LOCAL_NO_AUTH && isLoopbackAddress(req.socket.remoteAddress) && localHosts.has(host) && (!origin || localOrigins.has(origin));
+  const localNoAuthRequest = LOCAL_NO_AUTH && isLoopbackAddress(req.socket.remoteAddress) && req.headers["x-openfish-platform"] !== "cloudflare-relay" && localHosts.has(host) && (!origin || localOrigins.has(origin));
   const bearer = /^Bearer (.+)$/i.exec(req.headers.authorization || "");
   const token = localNoAuthRequest ? "" : (bearer?.[1] || "");
   const sessionId = req.headers["x-openfish-session"] || "default";
