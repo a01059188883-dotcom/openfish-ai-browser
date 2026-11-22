@@ -97,6 +97,21 @@ test("Cloudflare relay is authenticated, allowlisted, bounded, and outbound-only
 });
 
 
+test("local launcher provisions a least-privilege Relay key and starts the outbound agent automatically", async () => {
+  const bootstrap = await readFile(resolve("scripts/relay-key-bootstrap.js"), "utf8");
+  const launcher = await readFile(resolve("scripts/start-local.js"), "utf8");
+  const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
+  assert.ok(bootstrap.includes("/api/auth/verify"));
+  assert.ok(bootstrap.includes("/api/admin/keys"));
+  assert.ok(bootstrap.includes('["browser:read", "browser:write"]'));
+  assert.ok(bootstrap.includes('chmod(keyPath, 0o600)'));
+  assert.ok(bootstrap.includes("restricted to the local Bridge"));
+  assert.ok(launcher.includes("ensureRelayApiKey"));
+  assert.ok(launcher.includes("packages/runtime/src/relay-agent.js"));
+  assert.ok(launcher.includes("remoteMcpAddress"));
+  assert.ok(pkg.scripts.check.includes("node --check scripts/relay-key-bootstrap.js"));
+});
+
 test("GitHub Actions deploys cloud login bootstrap and vault secrets without Worker bearer-token copies", async () => {
   const workflow = await readFile(resolve(".github/workflows/deploy-relay.yml"), "utf8");
   assert.ok(workflow.includes("workflow_dispatch"));
