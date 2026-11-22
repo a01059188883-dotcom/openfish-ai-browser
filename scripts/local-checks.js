@@ -1,6 +1,18 @@
 import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import net from "node:net";
 import { chromium } from "playwright";
+
+export async function loadLocalEnv() {
+  if (!existsSync(".env")) return;
+  for (const line of (await readFile(".env", "utf8")).split(/\\r?\\n/)) {
+    const match = /^\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*=\\s*(.*)\\s*$/.exec(line);
+    if (!match || Object.hasOwn(process.env, match[1])) continue;
+    let value = match[2];
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+    process.env[match[1]] = value;
+  }
+}
 
 export async function checkPort(port = Number(process.env.PORT || 8787)) {
   return new Promise(resolve => {
@@ -10,7 +22,7 @@ export async function checkPort(port = Number(process.env.PORT || 8787)) {
   });
 }
 
-export async function runLocalChecks() {
+export async function runLocalChecks() {\n  await loadLocalEnv();
   const nodeMajor = Number(process.versions.node.split(".")[0]);
   const executable = chromium.executablePath();
   const port = Number(process.env.PORT || 8787);
