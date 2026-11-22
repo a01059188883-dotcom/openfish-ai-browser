@@ -12,7 +12,7 @@ import { downloadLink, listDownloads, removeDownload } from "./download-manager.
 import { addBookmark, listBookmarks, removeBookmark, listHistory, clearHistory, addReadingItem, listReadingItems, removeReadingItem, setTabOrganization, getLibraryStats, removeWorkspace, exportBrowserLibrary, importBrowserLibrary } from "./browser-library.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const VERSION = "2.17.0";
+const VERSION = "2.18.0";
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 const MODEL = process.env.OPENFISH_MODEL || "qwen2.5:3b";
 let ollamaCache = null;
