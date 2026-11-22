@@ -26,9 +26,10 @@ const env = {
   OPENFISH_VAULT_KEY: "vault-encryption-key-value-that-is-long-enough-456"
 };
 const origin = "https://openfish.example";
-function request(path, { method = "GET", body, cookie = "", originHeader = origin } = {}) {
+function request(path, { method = "GET", body, cookie = "", originHeader = origin, authorization = "" } = {}) {
   const headers = new Headers();
   if (cookie) headers.set("cookie", cookie);
+  if (authorization) headers.set("authorization", authorization);
   if (originHeader) headers.set("origin", originHeader);
   if (body !== undefined) headers.set("content-type", "application/json");
   return new Request(origin + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -84,6 +85,14 @@ test("cloud admin bootstrap, secure login, encrypted vault, and logout", async (
   const decrypted = await credentials.json();
   assert.equal(decrypted.secrets.OPENFISH_RELAY_TOKEN, secret);
   assert.equal(decrypted.secrets.BROWSER_ENGINE_TOKEN, engineToken);
+  const relayVerify = await handleAuthVaultRoute(request("/auth/relay-verify", {
+    method: "POST", authorization: "Bearer " + secret
+  }), ctx, env);
+  assert.equal(relayVerify.status, 200);
+  const invalidRelayVerify = await handleAuthVaultRoute(request("/auth/relay-verify", {
+    method: "POST", authorization: "Bearer " + "wrong-token-value-that-is-long-enough-123456"
+  }), ctx, env);
+  assert.equal(invalidRelayVerify.status, 401);
 
   const me = await handleAuthVaultRoute(request("/auth/me", { cookie }), ctx, env);
   assert.equal((await me.json()).authenticated, true);
@@ -125,6 +134,7 @@ test("cloud auth enforces login throttling and keeps raw vault credentials off p
   assert.ok(allowlistLine);
   assert.ok(allowlistLine.includes("/api/auth/vault"));
   assert.equal(allowlistLine.includes("/api/auth/credentials"), false);
+  assert.equal(allowlistLine.includes("/api/auth/relay-verify"), false);
   assert.ok(worker.includes("if (!publicAuthPaths.has(url.pathname)) return json"));
 });
 
