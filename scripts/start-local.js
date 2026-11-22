@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { runLocalChecks } from "./local-checks.js";
+import { canRestart, restartDelayMs } from "./supervisor-policy.js";
 
 const checks = await runLocalChecks();
 for (const check of checks.checks) {
@@ -7,38 +8,92 @@ for (const check of checks.checks) {
   console.log(mark + " " + check.name + "： " + check.detail);
 }
 if (!checks.requiredOk) {
-  console.error("\n启动中止：请先运行 npm install 或 npx playwright install chromium，并解决端口占用等必需问题。");
+  console.error("\n启动中止：请先修复必需环境检查项目。");
   process.exit(1);
 }
 
-const child = spawn(process.execPath, ["packages/runtime/src/bridge.js"], { stdio: "inherit", env: process.env });
+const base = "http://127.0.0.1:" + checks.port;
+const restartTimes = [];
 let stopping = false;
-const stop = signal => {
+let activeChild = null;
+let restarts = 0;
+
+function stop(signal) {
   if (stopping) return;
   stopping = true;
-  if (child.exitCode === null) child.kill(signal);
-};
+  console.log("\n收到 " + signal + "，正在安全停止 OpenFish…");
+  if (activeChild && activeChild.exitCode === null) activeChild.kill(signal);
+}
 process.once("SIGINT", () => stop("SIGINT"));
 process.once("SIGTERM", () => stop("SIGTERM"));
 
-const base = "http://127.0.0.1:" + checks.port;
-let ready = false;
-for (let attempt = 0; attempt < 60 && child.exitCode === null; attempt++) {
-  try {
-    const response = await fetch(base + "/health", { signal: AbortSignal.timeout(700) });
-    if (response.ok) { ready = true; break; }
-  } catch {}
-  await new Promise(resolve => setTimeout(resolve, 250));
+async function wait(ms) {
+  if (stopping) return;
+  await new Promise(resolve => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      process.off("SIGINT", finish);
+      process.off("SIGTERM", finish);
+      resolve();
+    };
+    const timer = setTimeout(finish, ms);
+    process.once("SIGINT", finish);
+    process.once("SIGTERM", finish);
+  });
 }
-if (!ready) {
-  console.error("\nOpenFish 服务未能在 15 秒内就绪。请检查上方启动日志。");
-  stop("SIGTERM");
-  process.exitCode = 1;
-} else {
-  console.log("\nOpenFish 本机服务已就绪");
-  console.log("管理后台：" + base + "/admin");
-  console.log("健康检查：" + base + "/health");
-  console.log("免 Token 模式：" + (process.env.OPENFISH_LOCAL_NO_AUTH === "false" ? "关闭" : "开启（仅本机回环地址）"));
-  console.log("按 Ctrl+C 停止服务。\n");
+
+async function runChild() {
+  const child = spawn(process.execPath, ["packages/runtime/src/bridge.js"], {
+    stdio: "inherit",
+    env: { ...process.env, OPENFISH_SUPERVISOR_RESTARTS: String(restarts) }
+  });
+  activeChild = child;
+  let spawnError = null;
+  child.once("error", error => { spawnError = error; });
+  let ready = false;
+  for (let attempt = 0; attempt < 60 && child.exitCode === null && !spawnError && !stopping; attempt++) {
+    try {
+      const response = await fetch(base + "/health", { signal: AbortSignal.timeout(700) });
+      if (response.ok) { ready = true; break; }
+    } catch {}
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  if (ready) {
+    console.log("\nOpenFish 本机服务已就绪");
+    console.log("管理后台：" + base + "/admin");
+    console.log("健康检查：" + base + "/health");
+    console.log("自动恢复次数：" + restarts);
+    console.log("免 Token 模式：" + (process.env.OPENFISH_LOCAL_NO_AUTH === "false" ? "关闭" : "开启（仅本机回环地址）"));
+  } else if (!stopping && child.exitCode === null) {
+    console.error("OpenFish 启动健康检查失败，正在终止本次启动。");
+    child.kill("SIGTERM");
+  }
+  if (child.exitCode === null) {
+    await new Promise(resolve => child.once("exit", (code, signal) => resolve({ code, signal })));
+  }
+  activeChild = null;
+  return { code: child.exitCode, signal: child.signalCode, spawnError, ready };
 }
-if (child.exitCode === null) await new Promise(resolve => child.once("exit", resolve));
+
+console.log("OpenFish 本地守护进程已启动；异常退出时将有限次数自动恢复。");
+while (!stopping) {
+  const result = await runChild();
+  if (stopping) break;
+  const reason = result.spawnError?.message || (result.signal ? "signal " + result.signal : "exit code " + result.code);
+  const policy = canRestart(restartTimes);
+  if (!policy.allowed) {
+    console.error("OpenFish 在 5 分钟内异常退出达到恢复上限（3 次），为避免无限重启已停止。");
+    process.exitCode = 1;
+    break;
+  }
+  restartTimes.splice(0, restartTimes.length, ...policy.recent);
+  restartTimes.push(Date.now());
+  restarts++;
+  const delay = restartDelayMs(restarts);
+  console.error("OpenFish 非正常退出（" + reason + "）；" + Math.ceil(delay / 1000) + " 秒后进行第 " + restarts + " 次自动恢复。");
+  await wait(delay);
+}
+if (stopping) process.exitCode = 0;
