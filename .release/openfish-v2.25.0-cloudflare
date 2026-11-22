@@ -1,0 +1,5 @@
+OpenFish v2.25.0 Cloudflare Worker release marker.
+
+This dedicated path trigger deploys the Worker and static assets only after the
+release is merged to main. Cloud Run Relay/Browser Engine deployment remains
+separately gated by its required GCP and vault secrets.
