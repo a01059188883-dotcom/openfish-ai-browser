@@ -67,9 +67,12 @@ test("cloud admin bootstrap, secure login, encrypted vault, and logout", async (
 
   const secret = "relay-token-that-is-at-least-thirty-two-characters-long";
   const engineToken = "engine-token-that-is-at-least-thirty-two-characters-long";
+  const openaiKey = "openai-api-key-test-value-that-is-at-least-32";
+  const anthropicKey = "anthropic-api-key-test-value-that-is-at-least-32";
+  const geminiKey = "gemini-api-key-test-value-that-is-at-least-32";
   const save = await handleAuthVaultRoute(request("/auth/vault", {
     method: "PUT", cookie,
-    body: { secrets: { OPENFISH_RELAY_TOKEN: secret, BROWSER_ENGINE_TOKEN: engineToken, BROWSER_ENGINE_URL: "https://engine.openfish.example" } }
+    body: { secrets: { OPENFISH_RELAY_TOKEN: secret, BROWSER_ENGINE_TOKEN: engineToken, BROWSER_ENGINE_URL: "https://engine.openfish.example", OPENAI_API_KEY: openaiKey, ANTHROPIC_API_KEY: anthropicKey, GEMINI_API_KEY: geminiKey } }
   }), ctx, env);
   assert.equal(save.status, 200);
   const publicResult = await save.json();
@@ -79,12 +82,18 @@ test("cloud admin bootstrap, secure login, encrypted vault, and logout", async (
   const serializedStorage = JSON.stringify([...ctx.values.entries()]);
   assert.equal(serializedStorage.includes(secret), false);
   assert.equal(serializedStorage.includes(engineToken), false);
+  assert.equal(serializedStorage.includes(openaiKey), false);
+  assert.equal(serializedStorage.includes(anthropicKey), false);
+  assert.equal(serializedStorage.includes(geminiKey), false);
 
   const credentials = await handleAuthVaultRoute(request("/auth/credentials", { method: "POST", cookie }), ctx, env);
   assert.equal(credentials.status, 200);
   const decrypted = await credentials.json();
   assert.equal(decrypted.secrets.OPENFISH_RELAY_TOKEN, secret);
   assert.equal(decrypted.secrets.BROWSER_ENGINE_TOKEN, engineToken);
+  assert.equal(decrypted.secrets.OPENAI_API_KEY, openaiKey);
+  assert.equal(decrypted.secrets.ANTHROPIC_API_KEY, anthropicKey);
+  assert.equal(decrypted.secrets.GEMINI_API_KEY, geminiKey);
   const relayVerify = await handleAuthVaultRoute(request("/auth/relay-verify", {
     method: "POST", authorization: "Bearer " + secret
   }), ctx, env);
@@ -153,4 +162,16 @@ test("cloud browser frontends use HttpOnly login cookies, not a client-side Rela
   assert.equal(mobileAdmin.includes('localStorage.setItem("openfish.relay.token"'), false);
   assert.equal(mobileAdmin.includes('authorization:'), false);
   assert.ok(mobileAdmin.includes("/api/auth/login"));
+  assert.ok(mobileAdmin.includes("OPENAI_API_KEY"));
+  assert.ok(mobileAdmin.includes("ANTHROPIC_API_KEY"));
+  assert.ok(mobileAdmin.includes("GEMINI_API_KEY"));
+  assert.ok(workbench.includes("/api/ai/chat"));
+  assert.equal(workbench.includes('id="of-key"'), false);
+  assert.equal(workbench.includes('cfg.key||'), false);
+  const worker = await readFile(new URL("../../../cloudflare/worker.js", import.meta.url), "utf8");
+  assert.ok(worker.includes('url.pathname === "/api/ai/chat"'));
+  assert.ok(worker.includes("https://api.openai.com/v1/chat/completions"));
+  assert.ok(worker.includes("https://api.anthropic.com/v1/messages"));
+  assert.ok(worker.includes("https://generativelanguage.googleapis.com/v1beta/models/"));
+  assert.ok(worker.includes('if (!sessionCheck.ok) return json({ error: "Cloud login required." }, 401);'));
 });
