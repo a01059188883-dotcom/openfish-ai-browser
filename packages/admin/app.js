@@ -328,17 +328,28 @@ document.querySelectorAll("[data-copy]").forEach(button => button.addEventListen
   }
 }));
 
+function isLoopbackAddressUrl(value) {
+  try {
+    const hostname = new URL(value).hostname;
+    return ["127.0.0.1", "localhost", "[::1]"].includes(hostname);
+  } catch { return false; }
+}
 function integrationConfigText() {
   const key = $("integrationApiKey")?.value.trim() || "";
   const url = $("integrationMcpUrl")?.value.trim() || "";
   const sessionId = $("integrationSession")?.value.trim() || "default";
-  if (!key) throw new Error("请先粘贴 OpenFish API 密钥。");
   if (!/^https?:\/\//i.test(url) || !url.endsWith("/mcp")) throw new Error("MCP 地址必须是 http(s) URL，并以 /mcp 结尾。");
+  if (!key && !isLoopbackAddressUrl(url)) throw new Error("远程地址必须使用 API 密钥；本机 127.0.0.1 / localhost 可免 Token。");
   if (sessionId !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) throw new Error("浏览器会话 ID 格式不正确。");
-  const headers = { Authorization: "Bearer " + key, "X-OpenFish-Client": $("integrationClient").value, "X-OpenFish-Platform": $("integrationClient").value };
+  const headers = {};
+  if (key) {
+    headers.Authorization = "Bearer " + key;
+    headers["X-OpenFish-Client"] = $("integrationClient").value;
+    headers["X-OpenFish-Platform"] = $("integrationClient").value;
+  }
   if (sessionId !== "default") headers["X-OpenFish-Session"] = sessionId;
   const client = $("integrationClient").value;
-  const server = { url, headers };
+  const server = { url, ...(Object.keys(headers).length ? { headers } : {}) };
   const config = client === "vscode"
     ? { servers: { "openfish-browser": { type: "http", ...server } } }
     : { mcpServers: { "openfish-browser": server } };
@@ -356,6 +367,7 @@ $("copyIntegrationConfig")?.addEventListener("click", async () => {
   try { await navigator.clipboard.writeText(integrationConfigText()); $("copyIntegrationConfig").textContent = "已复制"; }
   catch (error) { window.alert("复制配置失败：" + error.message); }
 });
+refreshIntegrationConfig();
 function relayCurlCommand() {
   const base = $("relayWorkerUrl")?.value.trim().replace(/\/$/, "") || "";
   const token = $("relayAccessToken")?.value.trim() || "";
@@ -378,10 +390,12 @@ $("copyRelayCurl")?.addEventListener("click", async () => {
 $("copyRestExample")?.addEventListener("click", async () => {
   try {
     const key = $("integrationApiKey").value.trim();
-    const base = $("integrationMcpUrl").value.trim().replace(/\/mcp$/, "").replace(/:8788$/, ":8787");
-    if (!key) throw new Error("请先粘贴 OpenFish API 密钥。");
-    if (!/^https?:\/\//i.test(base)) throw new Error("请填写有效的服务地址。");
-    const command = `curl -X POST "${base}/api/v1/tools/read_page" \\\n  -H "Authorization: Bearer ${key}" \\\n  -H "Content-Type: application/json" \\\n  -H "X-OpenFish-Client: rest-client" \\\n  -d '{}'`;
+    const mcp = new URL($("integrationMcpUrl").value.trim());
+    const base = mcp.origin.replace(/:8788$/, ":8787");
+    if (!/^https?:$/.test(mcp.protocol)) throw new Error("请填写有效的服务地址。");
+    if (!key && !isLoopbackAddressUrl(base)) throw new Error("远程 REST 地址必须使用 API 密钥；本机地址可免 Token。");
+    const auth = key ? `  -H "Authorization: Bearer ${key}" \\\n` : "";
+    const command = `curl -X POST "${base}/api/v1/tools/read_page" \\\n${auth}  -H "Content-Type: application/json" \\\n  -d '{}'`;
     await navigator.clipboard.writeText(command);
     $("copyRestExample").textContent = "已复制";
   } catch (error) { window.alert("生成 REST 示例失败：" + error.message); }
