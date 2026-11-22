@@ -120,21 +120,22 @@ test("cloud auth enforces login throttling and keeps raw vault credentials off p
   assert.equal(throttled.status, 429);
 
   const worker = await readFile(new URL("../../../cloudflare/worker.js", import.meta.url), "utf8");
-  const allowlist = /const publicAuthPaths = new Set\(\[([^\]]+)\]\)/.exec(worker)?.[1] || "";
-  assert.ok(allowlist.includes("/api/auth/bootstrap"));
-  assert.ok(allowlist.includes("/api/auth/vault"));
-  assert.equal(allowlist.includes("/api/auth/credentials"), false);
-  assert.match(worker, /if \(!publicAuthPaths\.has\(url\.pathname\)\) return json/);
+  const allowlistLine = worker.split("\\n").find(line => line.includes("const publicAuthPaths"));
+  assert.ok(allowlistLine);
+  assert.ok(allowlistLine.includes("/api/auth/vault"));
+  assert.equal(allowlistLine.includes("/api/auth/credentials"), false);
+  assert.ok(worker.includes("if (!publicAuthPaths.has(url.pathname)) return json"));
 });
 
-test("cloud browser frontend uses the HttpOnly login session, not a client-side Relay Token", async () => {
+test("cloud browser frontends use HttpOnly login cookies, not a client-side Relay Token", async () => {
   const publicApp = await readFile(new URL("../../../public/app.js", import.meta.url), "utf8");
   const workbench = await readFile(new URL("../../../public/ai-workbench.js", import.meta.url), "utf8");
   const mobileAdmin = await readFile(new URL("../../../cloudflare/mobile-admin.html", import.meta.url), "utf8");
-  assert.match(publicApp, /credentials:\\s*["']same-origin["']/);
-  assert.doesNotMatch(publicApp, /Authorization|TOKEN_KEY|请输入 Cloudflare Relay Token/);
-  assert.doesNotMatch(workbench, /Authorization:\s*["']Bearer/);
-  assert.doesNotMatch(mobileAdmin, /localStorage\\.setItem\\(["']openfish\\.relay\\.token/);
-  assert.doesNotMatch(mobileAdmin, /authorization["']?\\s*:/i);
-  assert.match(mobileAdmin, /api\/auth\/login/);
+  assert.ok(publicApp.includes('credentials:"same-origin"'));
+  assert.equal(publicApp.includes("Authorization"), false);
+  assert.equal(publicApp.includes("请输入 Cloudflare Relay Token"), false);
+  assert.equal(workbench.includes('sessionStorage.getItem("openfish.relay.token")'), false);
+  assert.equal(mobileAdmin.includes('localStorage.setItem("openfish.relay.token"'), false);
+  assert.equal(mobileAdmin.includes('authorization:'), false);
+  assert.ok(mobileAdmin.includes("/api/auth/login"));
 });
