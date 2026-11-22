@@ -120,7 +120,7 @@ test("cloud auth enforces login throttling and keeps raw vault credentials off p
   assert.equal(throttled.status, 429);
 
   const worker = await readFile(new URL("../../../cloudflare/worker.js", import.meta.url), "utf8");
-  const allowlistLine = worker.split("\\n").find(line => line.includes("const publicAuthPaths"));
+  const allowlistLine = worker.split("\n").find(line => line.includes("const publicAuthPaths"));
   assert.ok(allowlistLine);
   assert.ok(allowlistLine.includes("/api/auth/vault"));
   assert.equal(allowlistLine.includes("/api/auth/credentials"), false);
