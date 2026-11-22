@@ -100,6 +100,14 @@ export default {
           request = new Request(request, { headers });
         }
       }
+    } else if (bearer(request)) {
+      // Desktop Relay Agents and external API clients authenticate with the
+      // bearer token; compare it inside the Durable Object without returning
+      // the stored secret to this request's caller.
+      const relayCheck = await relayStub(env).fetch(new Request("https://relay.internal/auth/relay-verify", {
+        method: "POST", headers: { authorization: "Bearer " + bearer(request) }
+      }));
+      if (relayCheck.ok) env = { ...env, OPENFISH_RELAY_TOKEN: bearer(request) };
     }
     // Public plugin discovery document; all browser operations remain bearer-authenticated.
     if (url.pathname === "/api/v1/openapi.json" && request.method === "GET") {
