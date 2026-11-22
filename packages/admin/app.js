@@ -86,7 +86,7 @@ async function refresh() {
     $("extensionHealth").className = status.extension?.connected ? "status-good" : "muted";
     if ($("clientCount")) $("clientCount").textContent = status.clientCount ?? 0;
     $("mode").textContent = status.browser?.remote ? "远程" : "本地";
-    $("version").textContent = status.version || "2.16.0";
+    $("version").textContent = status.version || "2.16.1";
     latestEvents = Array.isArray(activity.events) ? activity.events : [];
     renderEvents(latestEvents);
     drawBars(latestEvents);
@@ -335,7 +335,7 @@ function integrationConfigText() {
   if (sessionId !== "default" && !/^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) throw new Error("浏览器会话 ID 格式不正确。");
   const headers = { Authorization: "Bearer " + key, "X-OpenFish-Client": $("integrationClient").value, "X-OpenFish-Platform": $("integrationClient").value };
   if (sessionId !== "default") headers["X-OpenFish-Session"] = sessionId;
-  const config = { mcpServers: { "openfish-browser": { url, headers } } };
+  const client = $("integrationClient").value;\n  const server = { url, headers };\n  const config = client === "vscode"\n    ? { servers: { "openfish-browser": { type: "http", ...server } } }\n    : { mcpServers: { "openfish-browser": server } };
   return JSON.stringify(config, null, 2);
 }
 function refreshIntegrationConfig() {
