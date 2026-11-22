@@ -52,6 +52,7 @@ async function runChild() {
   });
   activeChild = child;
   let spawnError = null;
+  const exitPromise = new Promise(resolve => child.once("exit", (code, signal) => resolve({ code, signal })));
   child.once("error", error => { spawnError = error; });
   let ready = false;
   for (let attempt = 0; attempt < 60 && child.exitCode === null && !spawnError && !stopping; attempt++) {
@@ -71,11 +72,9 @@ async function runChild() {
     console.error("OpenFish 启动健康检查失败，正在终止本次启动。");
     child.kill("SIGTERM");
   }
-  if (child.exitCode === null) {
-    await new Promise(resolve => child.once("exit", (code, signal) => resolve({ code, signal })));
-  }
+  const exit = child.exitCode === null ? await exitPromise : { code: child.exitCode, signal: child.signalCode };
   activeChild = null;
-  return { code: child.exitCode, signal: child.signalCode, spawnError, ready };
+  return { ...exit, spawnError, ready };
 }
 
 console.log("OpenFish 本地守护进程已启动；异常退出时将有限次数自动恢复。");
