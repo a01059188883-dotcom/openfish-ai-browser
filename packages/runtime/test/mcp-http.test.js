@@ -119,6 +119,7 @@ test("GitHub Actions deploys cloud login bootstrap and vault secrets without Wor
   assert.ok(workflow.includes("wrangler@4 deploy"));
   assert.ok(workflow.includes("wrangler@4 secret put OPENFISH_BOOTSTRAP_SECRET"));
   assert.ok(workflow.includes("wrangler@4 secret put OPENFISH_VAULT_KEY"));
+  assert.ok(workflow.includes('if [ -n "$OPENFISH_BOOTSTRAP_SECRET" ]'));
   assert.ok(workflow.includes("npm run check"));
   assert.ok(workflow.includes("npm test"));
 });
