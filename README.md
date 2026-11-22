@@ -93,6 +93,7 @@ Then open `https://YOUR_WORKER_HOST/admin`:
 - Session records, encrypted vault data and bounded security audit events live in the existing Cloudflare Durable Object storage.
 - The bootstrap route is one-time only. The Worker must be served over HTTPS. Do not expose the self-hosted engine directly to the public internet.
 - The app vault intentionally does not accept broad Cloudflare account API tokens. Manage infrastructure credentials through Cloudflare's own secret manager and least-privilege access controls.
+- Third-party model-provider API keys configured in the AI Workbench are still device-profile settings in this release; they are not part of the Relay/Engine vault and are not synchronized to the cloud login. Do not treat them as server-side encrypted by this feature.
 
 This adds a single-owner cloud admin login and encrypted token vault; it is not yet a general multi-tenant user-management product. Keep PR #40 in draft until CI and real deployment acceptance are complete. Set `ALLOWED_EXTENSION_ORIGIN=chrome-extension://YOUR_EXTENSION_ID` in `.env` to pin the local bridge to your exact extension ID. Extension-origin requests are denied until this value is set; do not leave it blank for normal use.
 
