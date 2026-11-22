@@ -82,7 +82,7 @@ test("mobile downloads remain resumable and require an explicit save tap", async
   const app = await readFile(new URL("../../../public/app.js", import.meta.url), "utf8");
   const worker = await readFile(new URL("../../../cloudflare/worker.js", import.meta.url), "utf8");
   const index = await readFile(new URL("../../../public/index.html", import.meta.url), "utf8");
-  assert.ok(index.includes("OpenFish AI Browser · v2.23.0"));
+  assert.ok(index.includes("OpenFish AI Browser · v2.24.0"));
   assert.match(app, /downloads\/file/);
   assert.match(app, /点按保存到手机/);
   assert.match(app, /downloadObjectUrls/);
