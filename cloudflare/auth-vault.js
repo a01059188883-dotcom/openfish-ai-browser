@@ -203,7 +203,7 @@ export async function handleAuthVaultRoute(request, ctx, env) {
   }
 
   if (path === "/auth/relay-verify" && request.method === "POST") {
-    const supplied = /^Bearer\\s+(.+)$/i.exec(request.headers.get("authorization") || "")?.[1] || "";
+    const supplied = /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") || "")?.[1] || "";
     if (!validSecret(supplied)) return json({ ok: false }, 401);
     const expected = (await readVault(ctx, env)).OPENFISH_RELAY_TOKEN || "";
     const valid = validSecret(expected) && constantTimeEqual(encoder.encode(supplied), encoder.encode(expected));
