@@ -30,6 +30,7 @@ Install [Ollama](https://ollama.com), then run `ollama pull qwen2.5:3b`. Configu
 ## Run locally
 ```bash
 npm install
+cp .env.example .env
 npm run start:bridge
 ```
 Then load `packages/chrome-extension` in `chrome://extensions` → Developer mode → Load unpacked.
