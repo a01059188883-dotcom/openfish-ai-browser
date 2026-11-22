@@ -352,6 +352,18 @@ The mobile cloud admin includes an account-security panel to change the owner pa
 The owner password cannot currently be reset by email or a public recovery link. Keep the password in a trusted password manager. There is currently no self-service password reset or recovery route. If the owner password is lost, do not delete or recreate the Durable Object data; operator-assisted recovery needs a separately reviewed and tested procedure before production use. Do not expose bootstrap or vault secrets in chat or issue trackers. The vault encryption key remains separate from the account password and must be backed up independently.
 
 
+## Zero-configuration local setup (v2.25.0)
+
+**Windows:** after installing Node.js 20+, double-click `scripts/setup-local.cmd` once. It creates `.env` only when missing, installs project dependencies and Chromium, then starts the local Bridge and MCP service together. Existing `.env` settings are never overwritten and no cloud token is requested.
+
+**macOS / Linux:** from the repository root, run:
+
+```sh
+npm run setup:local
+```
+
+After the first setup, use `npm start` to launch OpenFish again. Connect local AI clients to `http://127.0.0.1:8788/mcp`; no API key is required for same-computer loopback connections. Open the control panel at `http://127.0.0.1:8787/admin`.
+
 ## One-command local and cloud browser connection (v2.25.0)
 
 Run `npm run start:local` once. The launcher starts and supervises the local Browser Bridge and Streamable HTTP MCP server as one service group. It no longer requires a second terminal or a separate MCP startup command.
