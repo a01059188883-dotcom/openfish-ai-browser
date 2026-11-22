@@ -79,8 +79,8 @@ async function refresh() {
     $("bridgeHealth").textContent = "正常";
     $("bridgeHealth").className = "status-good";
     if ($("localAuthHealth")) { $("localAuthHealth").textContent = status.localNoAuth ? "已启用 · 仅回环地址" : "已关闭 · 需要 API Key"; $("localAuthHealth").className = status.localNoAuth ? "status-good" : "muted"; }
-    if ($("runtimeHealth")) $("runtimeHealth").textContent = (status.runtime?.platform || "未知平台") + " · Node " + (status.runtime?.node || "未知");
-    $("browserHealth").textContent = status.browser?.connected ? "已连接" : "待启动";
+    if ($("runtimeHealth")) $("runtimeHealth").textContent = (status.runtime?.platform || "未知平台") + " · Node " + (status.runtime?.node || "未知") + " · PID " + (status.runtime?.pid || "—") + " · 内存 " + (status.runtime?.memoryMb ?? "—") + " MB · 自动恢复 " + (status.runtime?.supervisorRestarts ?? 0) + " 次";
+    $("browserHealth").textContent = status.browser?.connected ? "已连接 · " + (status.browser.sessionCount ?? 0) + " 个会话" : "待启动";
     $("model").textContent = status.model || "未配置";
     $("ollamaHealth").textContent = status.ollama?.reachable ? (status.ollama.modelInstalled ? "已连接 · 模型就绪" : "已连接 · 缺少模型") : "不可达";
     $("ollamaHealth").className = status.ollama?.reachable && status.ollama.modelInstalled ? "status-good" : "status-bad";
