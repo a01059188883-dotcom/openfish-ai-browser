@@ -128,7 +128,7 @@ test("GitHub Actions deploys cloud login bootstrap and vault secrets without Wor
   assert.ok(workflow.includes("status.traffic[?tag=preflight].url"));
   assert.ok(workflow.includes("gcloud run services update-traffic openfish-browser-engine"));
   assert.ok(workflow.includes("--to-latest --remove-tags=preflight"));
-  assert.doesNotMatch(workflow, /^\\s+push:/m, "Cloud Run release stays manual until GCP secrets are configured");
+  assert.doesNotMatch(workflow, /^\s+push:/m, "Cloud Run release stays manual until GCP secrets are configured");
   const workerWorkflow = await readFile(resolve(".github/workflows/deploy-cloudflare.yml"), "utf8");
   assert.ok(workerWorkflow.includes("branches: [main]"));
   assert.ok(workerWorkflow.includes(".release/openfish-v2.25.0"));
