@@ -1,0 +1,4 @@
+# Copy to cloudflare/.dev.vars for local Wrangler development.
+# Generate two different values with: openssl rand -base64 48
+OPENFISH_BOOTSTRAP_SECRET=replace-with-a-unique-random-bootstrap-secret
+OPENFISH_VAULT_KEY=replace-with-a-different-random-vault-encryption-key
