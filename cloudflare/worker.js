@@ -64,6 +64,8 @@ export default {
       }});
     }
     if (url.pathname.startsWith("/api/auth/")) {
+      const publicAuthPaths = new Set(["/api/auth/bootstrap", "/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/auth/vault"]);
+      if (!publicAuthPaths.has(url.pathname)) return json({ error: "Not found." }, 404);
       const headers = new Headers();
       for (const name of ["cookie", "origin", "content-type", "cf-connecting-ip"]) {
         const value = request.headers.get(name);
