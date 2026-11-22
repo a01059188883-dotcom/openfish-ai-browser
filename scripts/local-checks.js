@@ -22,7 +22,8 @@ export async function checkPort(port = Number(process.env.PORT || 8787)) {
   });
 }
 
-export async function runLocalChecks() {\n  await loadLocalEnv();
+export async function runLocalChecks() {
+  await loadLocalEnv();
   const nodeMajor = Number(process.versions.node.split(".")[0]);
   const executable = chromium.executablePath();
   const port = Number(process.env.PORT || 8787);
