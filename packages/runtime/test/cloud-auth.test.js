@@ -234,7 +234,7 @@ test("vault backup exports ciphertext only and restores atomically after passphr
   assert.equal(JSON.stringify(envelope).includes(original), false);
   await handleAuthVaultRoute(request("/auth/vault", { method: "PUT", cookie, body: { secrets: { clear: ["OPENFISH_RELAY_TOKEN"] } } }), ctx, env);
   const wrong = await handleAuthVaultRoute(request("/auth/vault/backup", { method: "POST", cookie, body: { action: "restore", passphrase: "incorrect-backup-passphrase", backup: envelope } }), ctx, env);
-  assert.equal(wrong.status, 500);
+  assert.equal(wrong.status, 400);
   assert.equal((await (await handleAuthVaultRoute(request("/auth/credentials", { method: "POST", cookie }), ctx, env)).json()).secrets.OPENFISH_RELAY_TOKEN, undefined);
   const restored = await handleAuthVaultRoute(request("/auth/vault/backup", { method: "POST", cookie, body: { action: "restore", passphrase, backup: envelope } }), ctx, env);
   assert.equal(restored.status, 200);
