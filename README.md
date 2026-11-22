@@ -30,10 +30,11 @@ Install [Ollama](https://ollama.com), then run `ollama pull qwen2.5:3b`. Configu
 ## Run locally
 ```bash
 npm install
+npx playwright install chromium
 cp .env.example .env
 npm run start:local
 ```
-Then load `packages/chrome-extension` in `chrome://extensions` → Developer mode → Load unpacked.
+On Windows, you can double-click `scripts/start-local.cmd` after installing dependencies and Chromium. `npm run doctor` checks Node.js, project dependencies, Playwright Chromium, port availability, local no-token mode, and optional Ollama without starting the server. The launcher waits for the local health endpoint and prints the dashboard URL; it never prints `.env` values.\n\nThen load `packages/chrome-extension` in `chrome://extensions` → Developer mode → Load unpacked.
 The extension connects to `http://127.0.0.1:8787`.
 
 ### Local single-machine no-token mode (default)
