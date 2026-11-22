@@ -12,7 +12,7 @@ import { downloadLink, listDownloads, removeDownload } from "./download-manager.
 import { addBookmark, listBookmarks, removeBookmark, listHistory, clearHistory, addReadingItem, listReadingItems, removeReadingItem, setTabOrganization, getLibraryStats, removeWorkspace, exportBrowserLibrary, importBrowserLibrary } from "./browser-library.js";
 
 const PORT = Number(process.env.PORT || 8787);
-const VERSION = "2.23.0";
+const VERSION = "2.24.0";
 const LOCAL_NO_AUTH = process.env.OPENFISH_LOCAL_NO_AUTH !== "false";
 function isLoopbackAddress(address = "") {
   return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1" || address.startsWith("::ffff:127.");
