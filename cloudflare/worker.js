@@ -136,12 +136,18 @@ export default {
     if (url.pathname === "/api/ai/chat") {
       if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
       if (!sessionCheck.ok) return json({ error: "Cloud login required." }, 401);
+      const declaredLength = Number(request.headers.get("content-length") || 0);
+      if (declaredLength > 450000) return json({ error: "Model request exceeds 450 KB." }, 413);
       let input;
-      try { input = await request.json(); } catch { return json({ error: "Invalid JSON body." }, 400); }
+      try {
+        const rawBody = await request.text();
+        if (rawBody.length > 450000) return json({ error: "Model request exceeds 450 KB." }, 413);
+        input = JSON.parse(rawBody);
+      } catch { return json({ error: "Invalid JSON body." }, 400); }
       const provider = String(input.provider || "");
       const model = String(input.model || "").trim().slice(0, 160);
       const payload = input.payload;
-      if (!model || !payload || typeof payload !== "object" || Array.isArray(payload)) return json({ error: "A model and request payload are required." }, 400);
+      if (!model || !payload || typeof payload !== "object" || Array.isArray(payload) || payload.stream === true) return json({ error: "A model and non-streaming request payload are required." }, 400);
       let endpoint, headers = { "content-type": "application/json" }, apiKey;
       if (provider === "openai") {
         apiKey = env.OPENAI_API_KEY; endpoint = "https://api.openai.com/v1/chat/completions";
