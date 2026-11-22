@@ -4,8 +4,8 @@ const PASSWORD_ITERATIONS = 310000;
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const BACKUP_ITERATIONS = 600000;
-const BACKUP_AAD = encoder.encode("OpenFish encrypted vault backup v1");
 const encoder = new TextEncoder();
+const BACKUP_AAD = encoder.encode("OpenFish encrypted vault backup v1");
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", ...headers } });
@@ -166,9 +166,9 @@ export async function handleAuthVaultRoute(request, ctx, env) {
   if (!path.startsWith("/auth/")) return null;
   if (["/auth/bootstrap", "/auth/login", "/auth/logout", "/auth/vault", "/auth/password"].includes(path) && request.method !== "GET" &&
       (!request.headers.get("origin") || !safeOrigin(request))) return json({ error: "Same-origin request required." }, 403);
-  const readJson = async () => {
+  const readJson = async (maxBytes = 8192) => {
     const length = Number(request.headers.get("content-length") || 0);
-    if (length > 8192) throw new Error("Request body too large.");
+    if (length > maxBytes) throw new Error("Request body too large.");
     let data;
     try { data = await request.json(); } catch { throw new Error("Invalid JSON body."); }
     if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Invalid JSON body.");
@@ -298,7 +298,7 @@ export async function handleAuthVaultRoute(request, ctx, env) {
     const found = await sessionRecord(ctx, request);
     if (!found || found.record.role !== "owner") return json({ error: "Unauthorized." }, 401);
     let body;
-    try { body = await readJson(); } catch (error) { return json({ error: error.message }, 400); }
+    try { body = await readJson(100 * 1024); } catch (error) { return json({ error: error.message }, 400); }
     const passphrase = String(body.passphrase || "");
     if (passphrase.length < 16 || passphrase.length > 256) return json({ error: "备份口令必须为 16–256 个字符。" }, 400);
     if (body.action === "export") {
@@ -307,7 +307,8 @@ export async function handleAuthVaultRoute(request, ctx, env) {
       return json({ ok: true, backup });
     }
     if (body.action === "restore") {
-      const backup = await openVaultBackup(body.backup, passphrase);
+      let backup;
+      try { backup = await openVaultBackup(body.backup, passphrase); } catch (error) { return json({ error: error.message }, 400); }
       await writeVault(ctx, env, backup);
       await audit(ctx, "vault.backup.restored", found.record.username);
       return json({ ok: true, secrets: publicVault(backup), message: "备份已验证并恢复；原密钥库已整体替换。" });
