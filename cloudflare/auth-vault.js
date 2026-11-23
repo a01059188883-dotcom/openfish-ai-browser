@@ -161,6 +161,13 @@ export async function validateCloudSession(ctx, request) {
 }
 
 export async function handleAuthVaultRoute(request, ctx, env) {
+  // Prefer secrets forwarded by the trusted Worker entry point. These headers
+  // are created from Worker bindings, not copied from the public request.
+  env = {
+    ...env,
+    OPENFISH_BOOTSTRAP_SECRET: request.headers.get("x-openfish-internal-bootstrap-secret") || env.OPENFISH_BOOTSTRAP_SECRET,
+    OPENFISH_VAULT_KEY: request.headers.get("x-openfish-internal-vault-key") || env.OPENFISH_VAULT_KEY
+  };
   const url = new URL(request.url);
   const path = url.pathname;
   if (!path.startsWith("/auth/")) return null;
