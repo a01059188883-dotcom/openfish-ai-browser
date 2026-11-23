@@ -37,7 +37,11 @@ jobs:
           npm run check
           npm test
 
-      - name: Validate deployment secrets
+      # Cloudflare Browser Run is the supported cloud-browser fallback. The
+      # self-hosted Cloud Run engine is optional and must never block that path.
+      # Missing optional secrets preserve existing Worker secrets unchanged.
+      - name: Validate deployment configuration
+        id: config
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -47,15 +51,31 @@ jobs:
           GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
           BROWSER_ENGINE_TOKEN: ${{ secrets.BROWSER_ENGINE_TOKEN }}
         run: |
+          set -euo pipefail
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "Missing CLOUDFLARE_API_TOKEN repository secret"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Missing CLOUDFLARE_ACCOUNT_ID repository secret"; exit 1; }
-          if [ -n "$OPENFISH_BOOTSTRAP_SECRET" ]; then test "${#OPENFISH_BOOTSTRAP_SECRET}" -ge 32 || { echo "OPENFISH_BOOTSTRAP_SECRET must be at least 32 characters when set"; exit 1; }; fi
-          test "${#OPENFISH_VAULT_KEY}" -ge 32 || { echo "OPENFISH_VAULT_KEY must be at least 32 characters"; exit 1; }
-          test -n "$GCP_WORKLOAD_IDENTITY_PROVIDER" || { echo "Missing GCP_WORKLOAD_IDENTITY_PROVIDER repository secret"; exit 1; }
-          test -n "$GCP_SERVICE_ACCOUNT" || { echo "Missing GCP_SERVICE_ACCOUNT repository secret"; exit 1; }
-          test "${#BROWSER_ENGINE_TOKEN}" -ge 32 || { echo "BROWSER_ENGINE_TOKEN must be at least 32 characters"; exit 1; }
+          if [ -n "$OPENFISH_BOOTSTRAP_SECRET" ] && [ "${#OPENFISH_BOOTSTRAP_SECRET}" -lt 32 ]; then
+            echo "OPENFISH_BOOTSTRAP_SECRET must be at least 32 characters when set"; exit 1
+          fi
+          if [ -n "$OPENFISH_VAULT_KEY" ] && [ "${#OPENFISH_VAULT_KEY}" -lt 32 ]; then
+            echo "OPENFISH_VAULT_KEY must be at least 32 characters when set"; exit 1
+          fi
+          if [ -n "$OPENFISH_VAULT_KEY" ]; then
+            echo "vault_key_configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "vault_key_configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::OPENFISH_VAULT_KEY is absent; preserving the existing Worker secret. If no Worker vault key exists, cloud login/vault features will remain unavailable."
+          fi
+          if [ -n "$GCP_WORKLOAD_IDENTITY_PROVIDER" ] && [ -n "$GCP_SERVICE_ACCOUNT" ] && [ "${#BROWSER_ENGINE_TOKEN}" -ge 32 ]; then
+            echo "cloudrun_enabled=true" >> "$GITHUB_OUTPUT"
+            echo "All Cloud Run deployment credentials are configured."
+          else
+            echo "cloudrun_enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Cloud Run deployment skipped: GCP federation credentials and a 32+ character browser engine token are optional. Cloudflare Browser Run remains the cloud-browser provider."
+          fi
 
       - name: Authenticate to Google Cloud with Workload Identity Federation
+        if: steps.config.outputs.cloudrun_enabled == 'true'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -63,13 +83,16 @@ jobs:
           project_id: openfish-ai-browser
 
       - name: Set up Google Cloud SDK
+        if: steps.config.outputs.cloudrun_enabled == 'true'
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Deploy self-hosted browser engine to Cloud Run
         id: engine
+        if: steps.config.outputs.cloudrun_enabled == 'true'
         env:
           BROWSER_ENGINE_TOKEN: ${{ secrets.BROWSER_ENGINE_TOKEN }}
         run: |
+          set -euo pipefail
           gcloud run deploy openfish-browser-engine \
             --source services/browser-engine \
             --project openfish-ai-browser \
@@ -112,14 +135,32 @@ jobs:
           OPENFISH_BOOTSTRAP_SECRET: ${{ secrets.OPENFISH_BOOTSTRAP_SECRET }}
           OPENFISH_VAULT_KEY: ${{ secrets.OPENFISH_VAULT_KEY }}
         run: |
+          set -euo pipefail
           if [ -n "$OPENFISH_BOOTSTRAP_SECRET" ]; then
             printf '%s' "$OPENFISH_BOOTSTRAP_SECRET" | npx --yes wrangler@4 secret put OPENFISH_BOOTSTRAP_SECRET --config cloudflare/wrangler.toml
           else
             echo "Bootstrap secret not set; leaving the existing Worker bootstrap secret unchanged."
           fi
-          printf '%s' "$OPENFISH_VAULT_KEY" | npx --yes wrangler@4 secret put OPENFISH_VAULT_KEY --config cloudflare/wrangler.toml
+          if [ -n "$OPENFISH_VAULT_KEY" ]; then
+            printf '%s' "$OPENFISH_VAULT_KEY" | npx --yes wrangler@4 secret put OPENFISH_VAULT_KEY --config cloudflare/wrangler.toml
+          else
+            echo "Vault key not set; leaving the existing Worker vault key unchanged to avoid breaking encrypted data."
+          fi
 
-      - name: Smoke test deployed OpenFish web app
+      - name: Connect the verified Cloud Run engine to the Worker
+        if: steps.config.outputs.cloudrun_enabled == 'true' && steps.engine.outputs.url != ''
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BROWSER_ENGINE_TOKEN: ${{ secrets.BROWSER_ENGINE_TOKEN }}
+          BROWSER_ENGINE_URL: ${{ steps.engine.outputs.url }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$BROWSER_ENGINE_URL" | npx --yes wrangler@4 secret put BROWSER_ENGINE_URL --config cloudflare/wrangler.toml
+          printf '%s' "$BROWSER_ENGINE_TOKEN" | npx --yes wrangler@4 secret put BROWSER_ENGINE_TOKEN --config cloudflare/wrangler.toml
+          echo "Verified Cloud Run engine URL and token are configured as Worker secrets."
+
+      - name: Smoke test deployed OpenFish web app and plugin schema
         run: |
           set -euo pipefail
           base="https://openfish-ai-browser-relay.a01059188883.workers.dev"
@@ -129,4 +170,6 @@ jobs:
           grep -Fq 'function validatePlan' /tmp/openfish-ai-workbench.js
           curl --retry 5 --retry-delay 2 -fsS "$base/app.js?v=2.25.0" -o /tmp/openfish-app.js
           grep -Fq 'OpenFish' /tmp/openfish-app.js
-          echo "Production Worker frontend assets are reachable and match v2.25.0."
+          curl --retry 5 --retry-delay 2 -fsS "$base/api/v1/openapi.json" -o /tmp/openfish-openapi.json
+          node -e 'const x=require("/tmp/openfish-openapi.json"); for (const p of ["/api/v1/browser/status","/api/v1/browser/navigate","/api/v1/browser/action"]) if(!x.paths?.[p]) process.exit(1);'
+          echo "Production Worker frontend and browser plugin schema are reachable and match v2.25.0."
