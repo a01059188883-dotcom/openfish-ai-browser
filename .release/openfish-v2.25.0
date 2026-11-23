@@ -1,3 +1,6 @@
-OpenFish v2.25.0 production release marker.
+OpenFish v2.25.0 one-time production release marker.
 
-Deploy the validated v2.25.0 release using the updated workflow. Cloud Run is optional; Cloudflare Browser Run remains the cloud-browser fallback. Existing Worker vault secrets must be preserved when repository secrets are absent.
+This file is intentionally a dedicated GitHub Actions path trigger. It deploys the
+validated v2.25.0 release using the updated workflow. Cloud Run is optional;
+Cloudflare Browser Run remains the cloud-browser fallback. Existing Worker vault
+secrets must be preserved when repository secrets are absent.
