@@ -74,6 +74,14 @@ export default {
         const value = request.headers.get(name);
         if (value) headers.set(name, value);
       }
+      // Cloudflare Worker secrets are forwarded only over this internal
+      // Worker-to-Durable-Object request, never copied from client headers.
+      if (typeof env.OPENFISH_BOOTSTRAP_SECRET === "string") {
+        headers.set("x-openfish-internal-bootstrap-secret", env.OPENFISH_BOOTSTRAP_SECRET);
+      }
+      if (typeof env.OPENFISH_VAULT_KEY === "string") {
+        headers.set("x-openfish-internal-vault-key", env.OPENFISH_VAULT_KEY);
+      }
       const body = ["POST", "PUT", "PATCH"].includes(request.method) ? await request.arrayBuffer() : undefined;
       const authPath = url.pathname.replace(/^\/api/, "");
       const maxAuthBodyBytes = url.pathname === "/api/auth/vault/backup" ? 100 * 1024 : 8192;
