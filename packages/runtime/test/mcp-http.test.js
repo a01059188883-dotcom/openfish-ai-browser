@@ -112,7 +112,7 @@ test("local launcher provisions a least-privilege Relay key and starts the outbo
   assert.ok(pkg.scripts.check.includes("node --check scripts/relay-key-bootstrap.js"));
 });
 
-test("GitHub Actions deploys cloud login bootstrap and vault secrets without Worker bearer-token copies", async () => {
+test("GitHub Actions preserves vault secrets and makes the self-hosted engine optional without copying the Relay token", async () => {
   const workflow = await readFile(resolve(".github/workflows/deploy-relay.yml"), "utf8");
   assert.ok(workflow.includes("workflow_dispatch"));
   assert.ok(workflow.includes("secrets.CLOUDFLARE_API_TOKEN"));
@@ -137,8 +137,11 @@ test("GitHub Actions deploys cloud login bootstrap and vault secrets without Wor
   assert.ok(workflow.indexOf('h.version!=="1.3.6"') < workflow.indexOf("gcloud run services update-traffic"));
   assert.ok(workflow.includes("h.version!==\"1.3.6\""));
   assert.ok(workflow.includes("secrets.BROWSER_ENGINE_TOKEN"));
-  assert.equal(workflow.includes("wrangler@4 secret put BROWSER_ENGINE_URL"), false);
-  assert.equal(workflow.includes("wrangler@4 secret put BROWSER_ENGINE_TOKEN"), false);
+  assert.ok(workflow.includes("echo \"cloudrun_enabled=false\" >> \"$GITHUB_OUTPUT\""));
+  assert.ok(workflow.includes("Cloudflare Browser Run remains the cloud-browser provider."));
+  assert.ok(workflow.includes("leaving the existing Worker vault key unchanged"));
+  assert.ok(workflow.includes("wrangler@4 secret put BROWSER_ENGINE_URL"));
+  assert.ok(workflow.includes("wrangler@4 secret put BROWSER_ENGINE_TOKEN"));
   assert.ok(workflow.includes("wrangler@4 deploy"));
   assert.ok(workflow.includes("wrangler@4 secret put OPENFISH_BOOTSTRAP_SECRET"));
   assert.ok(workflow.includes("wrangler@4 secret put OPENFISH_VAULT_KEY"));
